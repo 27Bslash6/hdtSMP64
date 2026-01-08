@@ -190,19 +190,8 @@ namespace hdt
 					});
 			}
 
-			// Sync GPU before applying previous frame's collision results
-			// This is where the "delay" pays off - GPU work ran async during constraint solving
-			if (!m_delayedFuncs.empty())
-			{
-				HDT_ZONE_SCOPED_N("SyncDelayedCollisions");
-				CudaInterface::instance()->synchronize();
-
-				for (auto& f : m_delayedFuncs)
-				{
-					f();
-				}
-				m_delayedFuncs.clear();
-			}
+			// NOTE: Sync of previous frame's collision results is now done in syncPreviousCollisionResults()
+			// which is called at the START of physics step, allowing GPU collision to overlap with CPU solve
 
 			CudaInterface::instance()->setCurrentDevice();
 			{
@@ -311,6 +300,23 @@ namespace hdt
 
 		FrameTimer::instance()->addManifoldCount(getNumManifolds());
 		FrameTimer::instance()->logEvent(FrameTimer::e_End);
+	}
+
+	void CollisionDispatcher::syncPreviousCollisionResults()
+	{
+		// Sync and apply collision results from previous frame
+		// Called at START of physics step (before prediction) to allow GPU overlap with solve
+		if (!m_delayedFuncs.empty())
+		{
+			HDT_ZONE_SCOPED_N("SyncPreviousCollisions");
+			CudaInterface::instance()->synchronize();
+
+			for (auto& f : m_delayedFuncs)
+			{
+				f();
+			}
+			m_delayedFuncs.clear();
+		}
 	}
 #else
 			});

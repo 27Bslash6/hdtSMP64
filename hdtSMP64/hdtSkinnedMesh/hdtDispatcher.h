@@ -43,6 +43,12 @@ namespace hdt
 
 		void clearAllManifold();
 
+#ifdef CUDA
+		// Sync and apply collision results from previous frame
+		// Called at START of physics step, before prediction, to allow GPU overlap with solve
+		void syncPreviousCollisionResults();
+#endif
+
 		std::mutex m_lock;
 		std::vector<std::pair<SkinnedMeshBody*, SkinnedMeshBody*>> m_pairs;
 #ifdef CUDA

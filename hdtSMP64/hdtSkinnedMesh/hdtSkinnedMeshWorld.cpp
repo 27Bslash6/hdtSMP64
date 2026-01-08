@@ -138,7 +138,10 @@ namespace hdt
 				m_systems[i]->internalUpdate();
 		}
 
-		btDiscreteDynamicsWorldMt::performDiscreteCollisionDetection();
+		{
+			HDT_ZONE_SCOPED_N("BulletCollisionDetection");
+			btDiscreteDynamicsWorldMt::performDiscreteCollisionDetection();
+		}
 	}
 
 	void SkinnedMeshWorld::applyGravity()
@@ -275,5 +278,20 @@ namespace hdt
 
 		static_cast<CollisionDispatcher*>(m_dispatcher1)->clearAllManifold();
 		m_constraintSolver.m_groups.clear();
+	}
+
+	void SkinnedMeshWorld::internalSingleStepSimulation(btScalar timeStep)
+	{
+		// Sync previous frame's GPU collision results FIRST
+		// This allows GPU collision to overlap with CPU constraint solving
+		// Timeline: [SyncPrev][Predict][Collision(launch)][Solve(CPU)][Integrate]
+		//           GPU from prev frame done ^            ^ GPU collision runs during this
+#ifdef CUDA
+		static_cast<CollisionDispatcher*>(m_dispatcher1)->syncPreviousCollisionResults();
+#endif
+
+		// Now run the standard physics step
+		// performDiscreteCollisionDetection will launch new GPU work but NOT wait for it
+		btDiscreteDynamicsWorldMt::internalSingleStepSimulation(timeStep);
 	}
 }

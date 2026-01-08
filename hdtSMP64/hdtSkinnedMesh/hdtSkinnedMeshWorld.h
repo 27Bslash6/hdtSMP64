@@ -45,6 +45,7 @@ namespace hdt
 		void integrateTransforms(btScalar timeStep) override;
 		void performDiscreteCollisionDetection() override;
 		void solveConstraints(btContactSolverInfo& solverInfo) override;
+		void internalSingleStepSimulation(btScalar timeStep) override;
 
 		std::vector<Ref<SkinnedMeshSystem>> m_systems;
 
