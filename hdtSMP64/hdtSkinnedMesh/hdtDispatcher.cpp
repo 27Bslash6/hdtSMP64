@@ -213,20 +213,22 @@ namespace hdt
 			// Update the aggregate parts of the AABB trees
 			{
 				HDT_ZONE_SCOPED_N("SyncAndTreeUpdates");
-				for (auto o : to_update)
-				{
-					o.first->m_cudaObject->synchronize();
+				// Single global sync instead of N per-body syncs
+				CudaInterface::instance()->synchronize();
 
-					if (o.second.first)
+				// Tree updates are CPU work - can run in parallel
+				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
 					{
-						o.second.first->m_cudaObject->updateTree();
-					}
-					if (o.second.second)
-					{
-						o.second.second->m_cudaObject->updateTree();
-					}
-					o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
-				}
+						if (o.second.first)
+						{
+							o.second.first->m_cudaObject->updateTree();
+						}
+						if (o.second.second)
+						{
+							o.second.second->m_cudaObject->updateTree();
+						}
+						o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
+					});
 			}
 		}
 		else

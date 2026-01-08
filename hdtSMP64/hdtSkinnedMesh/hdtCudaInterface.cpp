@@ -1,5 +1,6 @@
 #ifdef CUDA
 #include "hdtCudaInterface.h"
+#include "../hdtTracy.h"
 
 #include <ppl.h>
 #include <immintrin.h>
@@ -974,8 +975,12 @@ namespace hdt
 			0,
 			{ 0, 0 } };
 
-		body->m_imp->m_bones.toDevice(body->m_imp->m_stream);
+		{
+			HDT_ZONE_SCOPED_N("BonesToDevice");
+			body->m_imp->m_bones.toDevice(body->m_imp->m_stream);
+		}
 
+		HDT_ZONE_SCOPED_N("cuInternalUpdateKernel");
 		cuInternalUpdate(
 			body->m_imp->m_stream,
 			*body->m_imp,
