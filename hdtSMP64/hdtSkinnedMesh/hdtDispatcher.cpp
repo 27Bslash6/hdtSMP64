@@ -255,27 +255,26 @@ namespace hdt
 		{
 			CudaInterface::instance()->clearBufferPool();
 
-			// Launch collision checking
+			// Launch collision checking - parallelized for better CPU utilization
 			{
 				HDT_ZONE_SCOPED_N("CudaQueueCollisions");
-				m_delayedFuncs.reserve(m_pairs.size());
-				m_immediateFuncs.reserve(m_pairs.size());
+				const int pairCount = static_cast<int>(m_pairs.size());
 
-				for (int i = 0; i < m_pairs.size(); ++i)
-				{
-					auto& pair = m_pairs[i];
-					if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
+				concurrency::parallel_for(0, pairCount, [this](int i)
 					{
-						if (!pair.first->m_shape->asPerTriangleShape() || !pair.second->m_shape->asPerTriangleShape())
+						auto& pair = m_pairs[i];
+						if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
 						{
-							m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
+							if (!pair.first->m_shape->asPerTriangleShape() || !pair.second->m_shape->asPerTriangleShape())
+							{
+								m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
+							}
+							else if (pair.first->m_shape->asPerTriangleShape() && pair.second->m_shape->asPerTriangleShape())
+							{
+								m_immediateFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
+							}
 						}
-						else if (pair.first->m_shape->asPerTriangleShape() && pair.second->m_shape->asPerTriangleShape())
-						{
-							m_immediateFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
-						}
-					}
-				}
+					});
 			}
 
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
