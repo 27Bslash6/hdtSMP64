@@ -714,6 +714,8 @@ namespace hdt
 
 		void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher)
 		{
+			HDT_ZONE_SCOPED_N("MergeBuffer::apply");
+
 			// Checking can-collide-with and no-collide-with involves a list search, so just do it once for each bone
 			std::vector<bool> canCollide0(body0->m_skinnedBones.size());
 			for (int i = 0; i < body0->m_skinnedBones.size(); ++i)
@@ -726,7 +728,7 @@ namespace hdt
 				canCollide1[i] = body0->canCollideWith(body1->m_skinnedBones[i].ptr);
 			}
 
-			cuSynchronize(m_stream).check(__FUNCTION__);
+			// NOTE: StreamSync removed - GlobalResultsSync in dispatcher syncs all streams before apply loop
 
 			int* map0 = body0->m_cudaObject->m_imp->m_boneMap.get();
 			int* map1 = body1->m_cudaObject->m_imp->m_boneMap.get();
@@ -986,10 +988,12 @@ namespace hdt
 			BoundingBoxArray(nullptr, 0),
 			0,
 			{ 0, 0 } };
+		// Mutex for graph capture - CUDA graph capture isn't thread-safe across streams
+		static std::mutex s_graphCaptureMutex;
 
 		auto& imp = *body->m_imp;
 
-		// Use CUDA Graph if already captured
+		// Fast path: Use CUDA Graph if already captured (thread-safe, no lock needed)
 		if (imp.m_graphCaptured && imp.m_graphExec)
 		{
 			HDT_ZONE_SCOPED_N("GraphLaunch");
@@ -997,14 +1001,23 @@ namespace hdt
 			return;
 		}
 
+		// Slow path: Need to capture graph (serialize with mutex)
+		std::lock_guard<std::mutex> lock(s_graphCaptureMutex);
+
+		// Double-check after acquiring lock
+		if (imp.m_graphCaptured && imp.m_graphExec)
+		{
+			cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+			return;
+		}
+
 		// First call: capture the graph
-		if (!imp.m_graphCaptured)
 		{
 			HDT_ZONE_SCOPED_N("GraphCapture");
 			cuStreamBeginCapture(imp.m_stream).check(__FUNCTION__);
 		}
 
-		// Memory transfer and kernel launches (captured into graph on first call)
+		// Memory transfer and kernel launches (captured into graph)
 		{
 			HDT_ZONE_SCOPED_N("BonesToDevice");
 			imp.m_bones.toDevice(imp.m_stream);
@@ -1027,12 +1040,9 @@ namespace hdt
 		}
 
 		// End capture and instantiate
-		if (!imp.m_graphCaptured)
-		{
-			cuStreamEndCapture(imp.m_stream, &imp.m_graph).check(__FUNCTION__);
-			cuGraphInstantiate(&imp.m_graphExec, imp.m_graph).check(__FUNCTION__);
-			imp.m_graphCaptured = true;
-		}
+		cuStreamEndCapture(imp.m_stream, &imp.m_graph).check(__FUNCTION__);
+		cuGraphInstantiate(&imp.m_graphExec, imp.m_graph).check(__FUNCTION__);
+		imp.m_graphCaptured = true;
 	}
 
 	CudaInterface::CudaInterface()

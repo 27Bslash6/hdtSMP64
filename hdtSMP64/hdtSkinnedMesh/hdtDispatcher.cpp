@@ -190,45 +190,61 @@ namespace hdt
 					});
 			}
 
-			// FIXME: This is probably broken if the current CUDA device changes and any tasks haven't finished yet.
-			// But delayed collisions are disabled for now anyway.
-			for (auto f : m_delayedFuncs)
+			// Sync GPU before applying previous frame's collision results
+			// This is where the "delay" pays off - GPU work ran async during constraint solving
+			if (!m_delayedFuncs.empty())
 			{
-				f();
+				HDT_ZONE_SCOPED_N("SyncDelayedCollisions");
+				CudaInterface::instance()->synchronize();
+
+				for (auto& f : m_delayedFuncs)
+				{
+					f();
+				}
+				m_delayedFuncs.clear();
 			}
 
 			CudaInterface::instance()->setCurrentDevice();
 			{
 				HDT_ZONE_SCOPED_N("LaunchInternalUpdates");
-				for (auto o : to_update)
-				{
-					o.first->updateBones();
-					CudaInterface::launchInternalUpdate(
-						o.first->m_cudaObject,
-						o.second.first ? o.second.first->m_cudaObject : nullptr,
-						o.second.second ? o.second.second->m_cudaObject : nullptr);
-				}
+				// Fully parallel: updateBones (CPU) + CUDA launches (mutex-protected graph capture)
+				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
+					{
+						CudaInterface::instance()->setCurrentDevice();
+						o.first->updateBones();
+						CudaInterface::launchInternalUpdate(
+							o.first->m_cudaObject,
+							o.second.first ? o.second.first->m_cudaObject : nullptr,
+							o.second.second ? o.second.second->m_cudaObject : nullptr);
+					});
 			}
 
 			// Update the aggregate parts of the AABB trees
 			{
 				HDT_ZONE_SCOPED_N("SyncAndTreeUpdates");
-				// Single global sync instead of N per-body syncs
-				CudaInterface::instance()->synchronize();
 
-				// Tree updates are CPU work - can run in parallel
-				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
-					{
-						if (o.second.first)
+				{
+					HDT_ZONE_SCOPED_N("GlobalGpuSync");
+					// Single global sync instead of N per-body syncs
+					CudaInterface::instance()->synchronize();
+				}
+
+				{
+					HDT_ZONE_SCOPED_N("ParallelTreeUpdates");
+					// Tree updates are CPU work - can run in parallel
+					concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
 						{
-							o.second.first->m_cudaObject->updateTree();
-						}
-						if (o.second.second)
-						{
-							o.second.second->m_cudaObject->updateTree();
-						}
-						o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
-					});
+							if (o.second.first)
+							{
+								o.second.first->m_cudaObject->updateTree();
+							}
+							if (o.second.second)
+							{
+								o.second.second->m_cudaObject->updateTree();
+							}
+							o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
+						});
+				}
 			}
 		}
 		else
@@ -260,40 +276,22 @@ namespace hdt
 				HDT_ZONE_SCOPED_N("CudaQueueCollisions");
 				const int pairCount = static_cast<int>(m_pairs.size());
 
+				// All collisions are now delayed - results applied next frame
+				// This eliminates the GlobalResultsSync bottleneck (was 17% of frame time)
 				concurrency::parallel_for(0, pairCount, [this](int i)
 					{
 						auto& pair = m_pairs[i];
 						if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
 						{
-							if (!pair.first->m_shape->asPerTriangleShape() || !pair.second->m_shape->asPerTriangleShape())
-							{
-								m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
-							}
-							else if (pair.first->m_shape->asPerTriangleShape() && pair.second->m_shape->asPerTriangleShape())
-							{
-								m_immediateFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
-							}
+							m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
 						}
 					});
 			}
 
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 
-			{
-				HDT_ZONE_SCOPED_N("CudaApplyResults");
-				for (auto f : m_immediateFuncs)
-				{
-					f();
-				}
-				m_immediateFuncs.clear();
-#ifndef CUDA_DELAYED_COLLISIONS
-				for (auto f : m_delayedFuncs)
-				{
-					f();
-				}
-				m_delayedFuncs.clear();
-#endif
-			}
+			// No sync needed - all collision results are applied next frame
+			// GPU work continues asynchronously while we proceed with constraint solving
 		}
 		else
 		{
