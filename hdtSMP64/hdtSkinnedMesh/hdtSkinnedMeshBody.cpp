@@ -1,5 +1,6 @@
 #include "hdtSkinnedMeshBody.h"
 #include "hdtSkinnedMeshShape.h"
+#include "hdtSkinnedMeshWorld.h"
 #include "../hdtTracy.h"
 
 #include <ppl.h>
@@ -142,6 +143,13 @@ __kernel void updateVertices(
 	void SkinnedMeshBody::internalUpdate()
 	{
 		HDT_ZONE_SCOPED_N("SkinnedMeshBody::internalUpdate");
+
+		// Skip if already updated this frame (dirty flag optimization)
+		uint32_t currentFrame = SkinnedMeshWorld::getCurrentFrame();
+		if (m_lastUpdateFrame == currentFrame)
+			return;
+		m_lastUpdateFrame = currentFrame;
+
 		updateBones();
 
 		int size = m_vertices.size();
@@ -164,6 +172,13 @@ __kernel void updateVertices(
 	void SkinnedMeshBody::internalUpdate()
 	{
 		HDT_ZONE_SCOPED_N("SkinnedMeshBody::internalUpdate");
+
+		// Skip if already updated this frame (dirty flag optimization)
+		uint32_t currentFrame = SkinnedMeshWorld::getCurrentFrame();
+		if (m_lastUpdateFrame == currentFrame)
+			return;
+		m_lastUpdateFrame = currentFrame;
+
 		for (size_t i = 0; i < m_skinnedBones.size(); ++i)
 		{
 			auto& v = m_skinnedBones[i];

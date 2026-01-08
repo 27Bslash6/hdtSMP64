@@ -10,6 +10,8 @@
 
 namespace hdt
 {
+	// Static frame counter for dirty flag optimization
+	uint32_t SkinnedMeshWorld::s_currentFrame = 0;
 	SkinnedMeshWorld::SkinnedMeshWorld()
 		: btDiscreteDynamicsWorldMt(nullptr, nullptr, m_solverPool, &m_constraintSolver, nullptr)
 	{
@@ -103,6 +105,7 @@ namespace hdt
 	int SkinnedMeshWorld::stepSimulation(btScalar remainingTimeStep, int maxSubSteps, btScalar fixedTimeStep)
 	{
 		HDT_ZONE_SCOPED_N("StepSimulation");
+		incrementFrame(); // Advance frame counter for dirty flag optimization
 		applyGravity();
 		if (hdt::SkyrimPhysicsWorld::get()->m_enableWind)
 			applyWind();

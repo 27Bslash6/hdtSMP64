@@ -17,6 +17,10 @@ namespace hdt
 		int stepSimulation(btScalar remainingTimeStep, int maxSubSteps = 1,
 		                   btScalar fixedTimeStep = btScalar(1.) / btScalar(60.)) override;
 
+		// Global frame counter for dirty flag optimization
+		static uint32_t getCurrentFrame() { return s_currentFrame; }
+		static void incrementFrame() { ++s_currentFrame; }
+
 		btVector3& getWind() { return m_windSpeed; }
 		const btVector3& getWind() const { return m_windSpeed; }
 
@@ -52,5 +56,6 @@ namespace hdt
 		std::vector<SkinnedMeshShape*> _shapes;
 		btConstraintSolverPoolMt* m_solverPool;
 		GroupConstraintSolver m_constraintSolver;
+		static uint32_t s_currentFrame;
 	};
 }

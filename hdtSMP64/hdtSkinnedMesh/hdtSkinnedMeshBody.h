@@ -74,6 +74,7 @@ namespace hdt
 		//		int m_priority;
 		bool m_isKinematic;
 		bool m_useBoundingSphere;
+		uint32_t m_lastUpdateFrame = 0; // Dirty flag: last frame this body was updated
 		Ref<SkinnedMeshShape> m_shape;
 
 		int addBone(SkinnedMeshBone* bone, const btQsTransform& verticesToBone, const BoundingSphere& boundingSphere);
