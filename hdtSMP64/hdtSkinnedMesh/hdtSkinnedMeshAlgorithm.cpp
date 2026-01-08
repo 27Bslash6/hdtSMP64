@@ -2,6 +2,7 @@
 #include "hdtCollider.h"
 #include "../hdtTracy.h"
 #include <memory>
+#include <vector>
 
 #ifdef CUDA
 #include <numeric>
@@ -780,27 +781,32 @@ namespace hdt
 		CollisionDispatcher* dispatcher)
 	{
 		HDT_ZONE_SCOPED_N("ProcessCollision");
-		MergeBuffer merge;
-		merge.alloc(body0->m_skinnedBones.size(), body1->m_skinnedBones.size());
 
-		auto collision = std::make_unique<CollisionResult[]>(MaxCollisionCount);
+		// Thread-local buffers to avoid per-call allocations (86K+ calls per frame)
+		thread_local MergeBuffer merge;
+		thread_local std::vector<CollisionResult> collisionBuffer(MaxCollisionCount);
+
+		merge.ensureCapacity(body0->m_skinnedBones.size(), body1->m_skinnedBones.size());
+		merge.clear();
+
+		CollisionResult* collision = collisionBuffer.data();
 		if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
 		{
 			processCollision(body0->m_shape->asPerTriangleShape(), body1->m_shape->asPerVertexShape(), merge,
-				collision.get());
+				collision);
 			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), merge,
-				collision.get());
+				collision);
 		}
 		else if (body0->m_shape->asPerTriangleShape())
 			processCollision(body0->m_shape->asPerTriangleShape(), body1->m_shape->asPerVertexShape(), merge,
-				collision.get());
+				collision);
 		else if (body1->m_shape->asPerTriangleShape())
 			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), merge,
-				collision.get());
-		else processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), merge, collision.get());
+				collision);
+		else processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), merge, collision);
 
 		merge.apply(body0, body1, dispatcher);
-		merge.release();
+		// No release needed - thread_local persists and reuses memory
 	}
 
 	void SkinnedMeshAlgorithm::registerAlgorithm(btCollisionDispatcherMt* dispatcher)
