@@ -1,5 +1,6 @@
 #include "hdtSkinnedMeshBody.h"
 #include "hdtSkinnedMeshShape.h"
+#include "../hdtTracy.h"
 
 #include <ppl.h>
 
@@ -124,6 +125,7 @@ __kernel void updateVertices(
 #ifdef CUDA
 	void SkinnedMeshBody::updateBones()
 	{
+		HDT_ZONE_SCOPED_N("UpdateBones");
 		for (size_t i = 0; i < m_skinnedBones.size(); ++i)
 		{
 			auto& v = m_skinnedBones[i];
@@ -139,9 +141,11 @@ __kernel void updateVertices(
 
 	void SkinnedMeshBody::internalUpdate()
 	{
+		HDT_ZONE_SCOPED_N("SkinnedMeshBody::internalUpdate");
 		updateBones();
 
 		int size = m_vertices.size();
+		HDT_ZONE_VALUE(size);
 
 		for (int idx = 0; idx < size; ++idx)
 		{
@@ -159,6 +163,7 @@ __kernel void updateVertices(
 #else
 	void SkinnedMeshBody::internalUpdate()
 	{
+		HDT_ZONE_SCOPED_N("SkinnedMeshBody::internalUpdate");
 		for (size_t i = 0; i < m_skinnedBones.size(); ++i)
 		{
 			auto& v = m_skinnedBones[i];
@@ -167,7 +172,8 @@ __kernel void updateVertices(
 			m_bones[i].m_maginMultipler = v.ptr->m_marginMultipler * boneT.getScale();
 		}
 		int size = m_vpos.size();
-		
+		HDT_ZONE_VALUE(size);
+
 		for (int idx = 0; idx < size; ++idx)
 		{
 			auto& v = m_vertices[idx];

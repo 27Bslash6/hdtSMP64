@@ -62,6 +62,9 @@
 #define HDT_MESSAGE(text, len)    TracyMessage(text, len)
 #define HDT_MESSAGE_L(text)       TracyMessageL(text)
 
+// Connection status
+#define HDT_IS_CONNECTED          TracyIsConnected
+
 #else // HDT_TRACY_ENABLE not defined
 
 // No-op versions - zero overhead when profiling disabled
@@ -86,5 +89,7 @@
 
 #define HDT_MESSAGE(text, len)    (void)0
 #define HDT_MESSAGE_L(text)       (void)0
+
+#define HDT_IS_CONNECTED          false
 
 #endif // HDT_TRACY_ENABLE

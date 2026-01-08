@@ -2,6 +2,7 @@
 #include "hdtSkinnedMeshBody.h"
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtFrameTimer.h"
+#include "../hdtTracy.h"
 #ifdef CUDA
 #include "hdtCudaInterface.h"
 #endif
@@ -68,7 +69,9 @@ namespace hdt
 	void CollisionDispatcher::dispatchAllCollisionPairs(btOverlappingPairCache* pairCache,
 		const btDispatcherInfo& dispatchInfo, btDispatcher* dispatcher)
 	{
+		HDT_ZONE_SCOPED_N("DispatchCollisionPairs");
 		auto size = pairCache->getNumOverlappingPairs();
+		HDT_ZONE_VALUE(static_cast<int64_t>(size));
 		if (!size) return;
 
 		m_pairs.reserve(size);

@@ -570,6 +570,9 @@ namespace hdt
 			_MESSAGE("  Build: %s %s", hdt::BuildInfo::GetBuildDate(), hdt::BuildInfo::GetBuildTime());
 			_MESSAGE("  Target: %s | %s | %s", hdt::BuildInfo::GetGameVersionString(), hdt::BuildInfo::GetCudaStatus(), hdt::BuildInfo::GetAVXLevel());
 			_MESSAGE("  Compiler: %s (%s)", hdt::BuildInfo::GetCompilerInfo(), hdt::BuildInfo::GetBuildType());
+#ifdef HDT_TRACY_ENABLE
+			_MESSAGE("  Profiling: Tracy ENABLED - connect profiler to capture data");
+#endif
 
 			// Initialize thread-safe logger
 			char logPath[MAX_PATH];
@@ -752,6 +755,9 @@ extern "C" {
 		_MESSAGE("  Build: %s %s", hdt::BuildInfo::GetBuildDate(), hdt::BuildInfo::GetBuildTime());
 		_MESSAGE("  Target: %s | %s | %s", hdt::BuildInfo::GetGameVersionString(), hdt::BuildInfo::GetCudaStatus(), hdt::BuildInfo::GetAVXLevel());
 		_MESSAGE("  Compiler: %s (%s)", hdt::BuildInfo::GetCompilerInfo(), hdt::BuildInfo::GetBuildType());
+#ifdef HDT_TRACY_ENABLE
+		_MESSAGE("  Profiling: Tracy ENABLED - connect profiler to capture data");
+#endif
 
 		if (skse->isEditor)
 		{

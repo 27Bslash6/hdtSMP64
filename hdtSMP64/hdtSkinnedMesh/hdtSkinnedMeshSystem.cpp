@@ -3,6 +3,7 @@
 #include "hdtSkinnedMeshBody.h"
 #include "hdtSkinnedMeshShape.h"
 #include "hdtBoneScaleConstraint.h"
+#include "../hdtTracy.h"
 
 namespace hdt
 {
@@ -41,11 +42,19 @@ namespace hdt
 
 	void SkinnedMeshSystem::internalUpdate()
 	{
-		for (auto& i : m_bones)
-			i->internalUpdate();
-
-		for (auto& i : m_meshes)
-			i->updateBoundingSphereAabb();
+		HDT_ZONE_SCOPED_N("System::internalUpdate");
+		{
+			HDT_ZONE_SCOPED_N("BoneUpdates");
+			HDT_ZONE_VALUE(static_cast<int64_t>(m_bones.size()));
+			for (auto& i : m_bones)
+				i->internalUpdate();
+		}
+		{
+			HDT_ZONE_SCOPED_N("MeshUpdates");
+			HDT_ZONE_VALUE(static_cast<int64_t>(m_meshes.size()));
+			for (auto& i : m_meshes)
+				i->updateBoundingSphereAabb();
+		}
 	}
 
 	//void SkinnedMeshSystem::internalUpdateCL()

@@ -1,6 +1,7 @@
 #include "hdtSkinnedMeshShape.h"
 
 #include <ppl.h>
+#include "../hdtTracy.h"
 
 namespace hdt
 {
@@ -199,6 +200,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 	void PerVertexShape::internalUpdate()
 	{
+		HDT_ZONE_SCOPED_N("PerVertexShape::internalUpdate");
 #ifdef CUDA
 		auto vertices = m_owner->m_vpos.get();
 #else
@@ -206,16 +208,22 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 #endif // CUDA
 
 		size_t size = m_colliders.size();
-		for (size_t i = 0; i < size; ++i)
+		HDT_ZONE_VALUE(static_cast<int64_t>(size));
 		{
-			auto c = &m_colliders[i];
-			auto p0 = vertices[c->vertex].m_data;
-			auto margin = _mm_set_ps1(p0.m128_f32[3] * m_shapeProp.margin);
-			m_aabb[i].m_min = p0 - margin;
-			m_aabb[i].m_max = p0 + margin;
+			HDT_ZONE_SCOPED_N("VertexAABBLoop");
+			for (size_t i = 0; i < size; ++i)
+			{
+				auto c = &m_colliders[i];
+				auto p0 = vertices[c->vertex].m_data;
+				auto margin = _mm_set_ps1(p0.m128_f32[3] * m_shapeProp.margin);
+				m_aabb[i].m_min = p0 - margin;
+				m_aabb[i].m_max = p0 + margin;
+			}
 		}
-
-		m_tree.updateAabb();
+		{
+			HDT_ZONE_SCOPED_N("TreeUpdateAabb");
+			m_tree.updateAabb();
+		}
 	}
 
 	void PerVertexShape::autoGen()
@@ -270,6 +278,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 	void PerTriangleShape::internalUpdate()
 	{
+		HDT_ZONE_SCOPED_N("PerTriangleShape::internalUpdate");
 #ifdef CUDA
 		auto vertices = m_owner->m_vpos.get();
 #else
@@ -277,28 +286,34 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 #endif // CUDA
 
 		size_t size = m_colliders.size();
-		for (size_t i = 0; i < size; ++i)
+		HDT_ZONE_VALUE(static_cast<int64_t>(size));
 		{
-			auto c = &m_colliders[i];
-			auto p0 = vertices[c->vertices[0]].m_data;
-			auto p1 = vertices[c->vertices[1]].m_data;
-			auto p2 = vertices[c->vertices[2]].m_data;
-			auto margin4 = p0 + p1 + p2;
+			HDT_ZONE_SCOPED_N("TriangleAABBLoop");
+			for (size_t i = 0; i < size; ++i)
+			{
+				auto c = &m_colliders[i];
+				auto p0 = vertices[c->vertices[0]].m_data;
+				auto p1 = vertices[c->vertices[1]].m_data;
+				auto p2 = vertices[c->vertices[2]].m_data;
+				auto margin4 = p0 + p1 + p2;
 
-			auto aabbMin = _mm_min_ps(_mm_min_ps(p0, p1), p2);
-			auto aabbMax = _mm_max_ps(_mm_max_ps(p0, p1), p2);
-			auto prenetration = _mm_set_ss(m_shapeProp.penetration);
-			prenetration = _mm_andnot_ps(_mm_set_ss(-0.0f), prenetration); // abs
-			margin4 = _mm_max_ss(_mm_set_ss(margin4.m128_f32[3] * m_shapeProp.margin / 3), prenetration);
-			margin4 = _mm_shuffle_ps(margin4, margin4, 0);
-			aabbMin = aabbMin - margin4;
-			aabbMax = aabbMax + margin4;
+				auto aabbMin = _mm_min_ps(_mm_min_ps(p0, p1), p2);
+				auto aabbMax = _mm_max_ps(_mm_max_ps(p0, p1), p2);
+				auto prenetration = _mm_set_ss(m_shapeProp.penetration);
+				prenetration = _mm_andnot_ps(_mm_set_ss(-0.0f), prenetration); // abs
+				margin4 = _mm_max_ss(_mm_set_ss(margin4.m128_f32[3] * m_shapeProp.margin / 3), prenetration);
+				margin4 = _mm_shuffle_ps(margin4, margin4, 0);
+				aabbMin = aabbMin - margin4;
+				aabbMax = aabbMax + margin4;
 
-			m_aabb[i].m_min = aabbMin;
-			m_aabb[i].m_max = aabbMax;
+				m_aabb[i].m_min = aabbMin;
+				m_aabb[i].m_max = aabbMax;
+			}
 		}
-
-		m_tree.updateAabb();
+		{
+			HDT_ZONE_SCOPED_N("TreeUpdateAabb");
+			m_tree.updateAabb();
+		}
 	}
 
 	void PerTriangleShape::finishBuild()

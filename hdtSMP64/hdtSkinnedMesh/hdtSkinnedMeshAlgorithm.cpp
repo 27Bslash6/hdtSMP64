@@ -1,5 +1,6 @@
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtCollider.h"
+#include "../hdtTracy.h"
 #include <memory>
 
 #ifdef CUDA
@@ -388,8 +389,12 @@ namespace hdt
 
 			std::vector<std::pair<ColliderTree*, ColliderTree*>> pairs;
 			pairs.reserve(c0->colliders.size() + c1->colliders.size());
-			c0->checkCollisionL(c1, pairs);
+			{
+				HDT_ZONE_SCOPED_N("TreeTraversal");
+				c0->checkCollisionL(c1, pairs);
+			}
 			if (pairs.empty()) return 0;
+			HDT_PLOT("CollisionPairs", static_cast<int64_t>(pairs.size()));
 
 			decltype(auto) func = [this](const std::pair<ColliderTree*, ColliderTree*>& pair)
 			{
@@ -454,9 +459,16 @@ namespace hdt
 			};
 
 			if (pairs.size() >= std::thread::hardware_concurrency())
+			{
+				HDT_ZONE_SCOPED_N("ParallelCollide");
 				// FIXME PROFILING This is the line where we spend the most time in the whole mod.
 				concurrency::parallel_for_each(pairs.begin(), pairs.end(), func);
-			else for (auto& i : pairs) func(i);
+			}
+			else
+			{
+				HDT_ZONE_SCOPED_N("SequentialCollide");
+				for (auto& i : pairs) func(i);
+			}
 
 			return numResults;
 		}
@@ -587,6 +599,7 @@ namespace hdt
 	void SkinnedMeshAlgorithm::MergeBuffer::doMerge(SkinnedMeshShape* a, SkinnedMeshShape* b,
 		CollisionResult* collision, int count)
 	{
+		HDT_ZONE_SCOPED_N("MergeCollisions");
 		for (int i = 0; i < count; ++i)
 		{
 			auto& res = collision[i];
@@ -634,6 +647,7 @@ namespace hdt
 	void SkinnedMeshAlgorithm::MergeBuffer::apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1,
 		CollisionDispatcher* dispatcher)
 	{
+		HDT_ZONE_SCOPED_N("ApplyManifolds");
 		for (int i = 0; i < body0->m_skinnedBones.size(); ++i)
 		{
 			if (!body1->canCollideWith(body0->m_skinnedBones[i].ptr)) continue;
@@ -765,6 +779,7 @@ namespace hdt
 	void SkinnedMeshAlgorithm::processCollision(SkinnedMeshBody* body0, SkinnedMeshBody* body1,
 		CollisionDispatcher* dispatcher)
 	{
+		HDT_ZONE_SCOPED_N("ProcessCollision");
 		MergeBuffer merge;
 		merge.alloc(body0->m_skinnedBones.size(), body1->m_skinnedBones.size());
 

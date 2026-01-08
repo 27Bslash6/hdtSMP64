@@ -6,6 +6,7 @@
 #include "hdtBoneScaleConstraint.h"
 #include "hdtSkyrimSystem.h"
 #include "hdtSkyrimPhysicsWorld.h"
+#include "../hdtTracy.h"
 
 namespace hdt
 {
@@ -101,6 +102,7 @@ namespace hdt
 
 	int SkinnedMeshWorld::stepSimulation(btScalar remainingTimeStep, int maxSubSteps, btScalar fixedTimeStep)
 	{
+		HDT_ZONE_SCOPED_N("StepSimulation");
 		applyGravity();
 		if (hdt::SkyrimPhysicsWorld::get()->m_enableWind)
 			applyWind();
@@ -125,8 +127,13 @@ namespace hdt
 
 	void SkinnedMeshWorld::performDiscreteCollisionDetection()
 	{
-		for (int i = 0; i < m_systems.size(); ++i)
-			m_systems[i]->internalUpdate();
+		HDT_ZONE_SCOPED_N("CollisionDetection");
+		{
+			HDT_ZONE_SCOPED_N("SystemsInternalUpdate");
+			HDT_ZONE_VALUE(static_cast<int64_t>(m_systems.size()));
+			for (int i = 0; i < m_systems.size(); ++i)
+				m_systems[i]->internalUpdate();
+		}
 
 		btDiscreteDynamicsWorldMt::performDiscreteCollisionDetection();
 	}
@@ -169,6 +176,7 @@ namespace hdt
 
 	void SkinnedMeshWorld::predictUnconstraintMotion(btScalar timeStep)
 	{
+		HDT_ZONE_SCOPED_N("PredictMotion");
 		for (int i = 0; i < m_nonStaticRigidBodies.size(); i++)
 		{
 			btRigidBody* body = m_nonStaticRigidBodies[i];
@@ -187,6 +195,7 @@ namespace hdt
 
 	void SkinnedMeshWorld::integrateTransforms(btScalar timeStep)
 	{
+		HDT_ZONE_SCOPED_N("IntegrateTransforms");
 		for (int i = 0; i < m_collisionObjects.size(); ++i)
 		{
 			auto body = m_collisionObjects[i];
@@ -223,11 +232,15 @@ namespace hdt
 
 	void SkinnedMeshWorld::solveConstraints(btContactSolverInfo& solverInfo)
 	{
+		HDT_ZONE_SCOPED_N("SolveConstraints");
 		BT_PROFILE("solveConstraints");
 		if (!m_collisionObjects.size()) return;
 
-		m_solverPool->prepareSolve(getCollisionWorld()->getNumCollisionObjects(),
-		                                getCollisionWorld()->getDispatcher()->getNumManifolds());
+		{
+			HDT_ZONE_SCOPED_N("PrepareSolve");
+			m_solverPool->prepareSolve(getCollisionWorld()->getNumCollisionObjects(),
+			                                getCollisionWorld()->getDispatcher()->getNumManifolds());
+		}
 
 		m_constraintSolver.m_groups.clear();
 		for (auto& i : m_systems)
@@ -236,11 +249,27 @@ namespace hdt
 
 		btPersistentManifold** manifold = m_dispatcher1->getInternalManifoldPointer();
 		int maxNumManifolds = m_dispatcher1->getNumManifolds();
-		m_solverPool->solveGroup(&m_collisionObjects[0], m_collisionObjects.size(), manifold, maxNumManifolds,
-		                              &m_constraints[0], m_constraints.size(), solverInfo, m_debugDrawer,
-		                              m_dispatcher1);
+		int numConstraints = static_cast<int>(m_constraints.size());
+		int numGroups = static_cast<int>(m_constraintSolver.m_groups.size());
+		int numObjects = static_cast<int>(m_collisionObjects.size());
 
-		m_solverPool->allSolved(solverInfo, m_debugDrawer);
+		HDT_PLOT("Manifolds", static_cast<int64_t>(maxNumManifolds));
+		HDT_PLOT("Constraints", static_cast<int64_t>(numConstraints));
+		HDT_PLOT("ConstraintGroups", static_cast<int64_t>(numGroups));
+		HDT_PLOT("CollisionObjects", static_cast<int64_t>(numObjects));
+
+		{
+			HDT_ZONE_SCOPED_N("SolveGroup");
+			m_solverPool->solveGroup(&m_collisionObjects[0], m_collisionObjects.size(), manifold, maxNumManifolds,
+			                              &m_constraints[0], m_constraints.size(), solverInfo, m_debugDrawer,
+			                              m_dispatcher1);
+		}
+
+		{
+			HDT_ZONE_SCOPED_N("AllSolved");
+			m_solverPool->allSolved(solverInfo, m_debugDrawer);
+		}
+
 		static_cast<CollisionDispatcher*>(m_dispatcher1)->clearAllManifold();
 		m_constraintSolver.m_groups.clear();
 	}
