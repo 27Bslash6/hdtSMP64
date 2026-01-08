@@ -274,6 +274,12 @@ namespace hdt
 
 	void cuFreeHost(void* buf);
 
+	// CUDA 12.9 stream-ordered allocation (async, lock-free)
+	cuResult cuInitMemoryPool(int deviceId);
+	cuResult cuGetDeviceBufferAsync(void** buf, size_t size, void* stream);
+	cuResult cuFreeDeviceAsync(void* buf, void* stream);
+	cuResult cuTrimMemoryPool();
+
 	cuResult cuCopyToDevice(void* dst, void* src, size_t n, void* stream);
 
 	cuResult cuCopyToHost(void* dst, void* src, size_t n, void* stream);

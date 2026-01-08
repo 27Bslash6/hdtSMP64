@@ -155,16 +155,30 @@ __kernel void updateVertices(
 		int size = m_vertices.size();
 		HDT_ZONE_VALUE(size);
 
+		const __m128 epsilon = _mm_set_ps1(FLT_EPSILON);
+#ifdef CUDA
+		const Bone* bones = m_bones.get();
+#else
+		const Bone* bones = m_bones.data();
+#endif
+
 		for (int idx = 0; idx < size; ++idx)
 		{
+			// Prefetch ahead to hide memory latency
+			if (idx + 8 < size)
+			{
+				_mm_prefetch(reinterpret_cast<const char*>(&m_vertices[idx + 8]), _MM_HINT_T0);
+				_mm_prefetch(reinterpret_cast<const char*>(&bones[m_vertices[idx + 8].getBoneIdx(0)]), _MM_HINT_T0);
+			}
+
 			auto& v = m_vertices[idx];
 			auto p = v.m_skinPos.get128();
 			auto w = _mm_load_ps(v.m_weight);
-			auto flg = _mm_movemask_ps(_mm_cmplt_ps(_mm_set_ps1(FLT_EPSILON), w));
-			auto posMargin = calcVertexState(p, m_bones[v.getBoneIdx(0)], setAll0(w));
-			if (flg & 0b0010) posMargin += calcVertexState(p, m_bones[v.getBoneIdx(1)], setAll1(w));
-			if (flg & 0b0100) posMargin += calcVertexState(p, m_bones[v.getBoneIdx(2)], setAll2(w));
-			if (flg & 0b1000) posMargin += calcVertexState(p, m_bones[v.getBoneIdx(3)], setAll3(w));
+			auto flg = _mm_movemask_ps(_mm_cmplt_ps(epsilon, w));
+			auto posMargin = calcVertexState(p, bones[v.getBoneIdx(0)], setAll0(w));
+			if (flg & 0b0010) posMargin += calcVertexState(p, bones[v.getBoneIdx(1)], setAll1(w));
+			if (flg & 0b0100) posMargin += calcVertexState(p, bones[v.getBoneIdx(2)], setAll2(w));
+			if (flg & 0b1000) posMargin += calcVertexState(p, bones[v.getBoneIdx(3)], setAll3(w));
 			m_vpos[idx].set(posMargin);
 		}
 	}
@@ -189,16 +203,27 @@ __kernel void updateVertices(
 		int size = m_vpos.size();
 		HDT_ZONE_VALUE(size);
 
+		const __m128 epsilon = _mm_set_ps1(FLT_EPSILON);
+		const Bone* bones = m_bones.data();
+
 		for (int idx = 0; idx < size; ++idx)
 		{
+			// Prefetch ahead to hide memory latency
+			if (idx + 8 < size)
+			{
+				_mm_prefetch(reinterpret_cast<const char*>(&m_vertices[idx + 8]), _MM_HINT_T0);
+				// Prefetch first bone for upcoming vertex
+				_mm_prefetch(reinterpret_cast<const char*>(&bones[m_vertices[idx + 8].getBoneIdx(0)]), _MM_HINT_T0);
+			}
+
 			auto& v = m_vertices[idx];
 			auto p = v.m_skinPos.get128();
 			auto w = _mm_load_ps(v.m_weight);
-			auto flg = _mm_movemask_ps(_mm_cmplt_ps(_mm_set_ps1(FLT_EPSILON), w));
-			auto posMargin = calcVertexState(p, m_bones[v.getBoneIdx(0)], setAll0(w));
-			if (flg & 0b0010) posMargin += calcVertexState(p, m_bones[v.getBoneIdx(1)], setAll1(w));
-			if (flg & 0b0100) posMargin += calcVertexState(p, m_bones[v.getBoneIdx(2)], setAll2(w));
-			if (flg & 0b1000) posMargin += calcVertexState(p, m_bones[v.getBoneIdx(3)], setAll3(w));
+			auto flg = _mm_movemask_ps(_mm_cmplt_ps(epsilon, w));
+			auto posMargin = calcVertexState(p, bones[v.getBoneIdx(0)], setAll0(w));
+			if (flg & 0b0010) posMargin += calcVertexState(p, bones[v.getBoneIdx(1)], setAll1(w));
+			if (flg & 0b0100) posMargin += calcVertexState(p, bones[v.getBoneIdx(2)], setAll2(w));
+			if (flg & 0b1000) posMargin += calcVertexState(p, bones[v.getBoneIdx(3)], setAll3(w));
 			m_vpos[idx].set(posMargin);
 		}
 

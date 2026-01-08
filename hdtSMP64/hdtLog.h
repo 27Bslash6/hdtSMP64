@@ -1,8 +1,9 @@
 #pragma once
 
 // Unified timestamped logging for hdtSMP64
-// Uses SKSE's gLog (writes to hdtSMP64.log) with timestamps
+// Uses SKSE's gLog (writes to hdtSMP64.log) with microsecond timestamps
 
+#include <chrono>
 #include <ctime>
 #include <cstdio>
 #include <cstdarg>
@@ -21,6 +22,20 @@ namespace hdt
 		Error = 3
 	};
 
+	// Shared timestamp formatting with microsecond precision
+	inline void formatTimestamp(char* buf, size_t bufSize)
+	{
+		auto now = std::chrono::system_clock::now();
+		auto time_t_now = std::chrono::system_clock::to_time_t(now);
+		auto micros = std::chrono::duration_cast<std::chrono::microseconds>(
+			now.time_since_epoch()) % 1000000;
+
+		struct tm tm;
+		localtime_s(&tm, &time_t_now);
+		std::strftime(buf, bufSize, "[%H:%M:%S", &tm);
+		snprintf(buf + 9, bufSize - 9, ".%06lld]", micros.count());
+	}
+
 	class Logger
 	{
 	public:
@@ -30,12 +45,7 @@ namespace hdt
 			return instance;
 		}
 
-		// init() no longer needed - we use gLog which is already initialized
-		void init(const char* /*filename*/)
-		{
-			m_initialized = true;
-		}
-
+		void init(const char* /*filename*/) { m_initialized = true; }
 		void setLevel(LogLevel level) { m_level = level; }
 		void setEnabled(bool enabled) { m_enabled = enabled; }
 
@@ -48,13 +58,9 @@ namespace hdt
 
 			try
 			{
-				// Format timestamp
-				char timeBuf[24];
-				auto now = std::time(nullptr);
-				auto tm = *std::localtime(&now);
-				std::strftime(timeBuf, sizeof(timeBuf), "[%H:%M:%S]", &tm);
+				char timeBuf[32];
+				formatTimestamp(timeBuf, sizeof(timeBuf));
 
-				// Level prefix
 				const char* levelStr = "";
 				switch (level)
 				{
@@ -64,14 +70,12 @@ namespace hdt
 				case LogLevel::Error:   levelStr = "[ERROR]"; break;
 				}
 
-				// Format message
 				char msgBuf[2048];
 				va_list args;
 				va_start(args, format);
 				vsnprintf(msgBuf, sizeof(msgBuf), format, args);
 				va_end(args);
 
-				// Combine and send to gLog
 				char finalBuf[2200];
 				snprintf(finalBuf, sizeof(finalBuf), "%s %s %s", timeBuf, levelStr, msgBuf);
 				gLog.Message(finalBuf);
@@ -94,35 +98,9 @@ namespace hdt
 		LogLevel m_level;
 	};
 
-	// Convenience macros - these now write to the main hdtSMP64.log with timestamps
+	// Primary logging macros - use these throughout hdtSMP64
 	#define HDT_LOG_DEBUG(fmt, ...) hdt::Logger::getInstance().log(hdt::LogLevel::Debug, fmt, ##__VA_ARGS__)
 	#define HDT_LOG_INFO(fmt, ...)  hdt::Logger::getInstance().log(hdt::LogLevel::Info, fmt, ##__VA_ARGS__)
 	#define HDT_LOG_WARN(fmt, ...)  hdt::Logger::getInstance().log(hdt::LogLevel::Warning, fmt, ##__VA_ARGS__)
 	#define HDT_LOG_ERROR(fmt, ...) hdt::Logger::getInstance().log(hdt::LogLevel::Error, fmt, ##__VA_ARGS__)
-
-	// Timestamped replacements for SKSE logging macros
-	// Use these instead of _MESSAGE, _WARNING, etc. for timestamped output
-	namespace logging
-	{
-		inline void TimestampedMessage(const char* fmt, ...)
-		{
-			char timeBuf[16];
-			auto now = std::time(nullptr);
-			auto tm = *std::localtime(&now);
-			std::strftime(timeBuf, sizeof(timeBuf), "[%H:%M:%S] ", &tm);
-
-			char msgBuf[4096];
-			va_list args;
-			va_start(args, fmt);
-			vsnprintf(msgBuf, sizeof(msgBuf), fmt, args);
-			va_end(args);
-
-			char finalBuf[4200];
-			snprintf(finalBuf, sizeof(finalBuf), "%s%s", timeBuf, msgBuf);
-			gLog.Message(finalBuf);
-		}
-	}
-
-	// Drop-in timestamped replacement for _MESSAGE
-	#define _TMESSAGE(fmt, ...) hdt::logging::TimestampedMessage(fmt, ##__VA_ARGS__)
 }

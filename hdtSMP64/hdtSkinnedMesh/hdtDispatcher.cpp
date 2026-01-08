@@ -198,29 +198,35 @@ namespace hdt
 			}
 
 			CudaInterface::instance()->setCurrentDevice();
-			for (auto o : to_update)
 			{
-				o.first->updateBones();
-				CudaInterface::launchInternalUpdate(
-					o.first->m_cudaObject,
-					o.second.first ? o.second.first->m_cudaObject : nullptr,
-					o.second.second ? o.second.second->m_cudaObject : nullptr);
+				HDT_ZONE_SCOPED_N("LaunchInternalUpdates");
+				for (auto o : to_update)
+				{
+					o.first->updateBones();
+					CudaInterface::launchInternalUpdate(
+						o.first->m_cudaObject,
+						o.second.first ? o.second.first->m_cudaObject : nullptr,
+						o.second.second ? o.second.second->m_cudaObject : nullptr);
+				}
 			}
 
 			// Update the aggregate parts of the AABB trees
-			for (auto o : to_update)
 			{
-				o.first->m_cudaObject->synchronize();
+				HDT_ZONE_SCOPED_N("SyncAndTreeUpdates");
+				for (auto o : to_update)
+				{
+					o.first->m_cudaObject->synchronize();
 
-				if (o.second.first)
-				{
-					o.second.first->m_cudaObject->updateTree();
+					if (o.second.first)
+					{
+						o.second.first->m_cudaObject->updateTree();
+					}
+					if (o.second.second)
+					{
+						o.second.second->m_cudaObject->updateTree();
+					}
+					o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
 				}
-				if (o.second.second)
-				{
-					o.second.second->m_cudaObject->updateTree();
-				}
-				o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
 			}
 		}
 		else
@@ -248,39 +254,45 @@ namespace hdt
 			CudaInterface::instance()->clearBufferPool();
 
 			// Launch collision checking
-			m_delayedFuncs.reserve(m_pairs.size());
-			m_immediateFuncs.reserve(m_pairs.size());
-
-			for (int i = 0; i < m_pairs.size(); ++i)
 			{
-				auto& pair = m_pairs[i];
-				if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
+				HDT_ZONE_SCOPED_N("CudaQueueCollisions");
+				m_delayedFuncs.reserve(m_pairs.size());
+				m_immediateFuncs.reserve(m_pairs.size());
+
+				for (int i = 0; i < m_pairs.size(); ++i)
 				{
-					if (!pair.first->m_shape->asPerTriangleShape() || !pair.second->m_shape->asPerTriangleShape())
+					auto& pair = m_pairs[i];
+					if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
 					{
-						m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
-					}
-					else if (pair.first->m_shape->asPerTriangleShape() && pair.second->m_shape->asPerTriangleShape())
-					{
-						m_immediateFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
+						if (!pair.first->m_shape->asPerTriangleShape() || !pair.second->m_shape->asPerTriangleShape())
+						{
+							m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
+						}
+						else if (pair.first->m_shape->asPerTriangleShape() && pair.second->m_shape->asPerTriangleShape())
+						{
+							m_immediateFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
+						}
 					}
 				}
 			}
 
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 
-			for (auto f : m_immediateFuncs)
 			{
-				f();
-			}
-			m_immediateFuncs.clear();
+				HDT_ZONE_SCOPED_N("CudaApplyResults");
+				for (auto f : m_immediateFuncs)
+				{
+					f();
+				}
+				m_immediateFuncs.clear();
 #ifndef CUDA_DELAYED_COLLISIONS
-			for (auto f : m_delayedFuncs)
-			{
-				f();
-			}
-			m_delayedFuncs.clear();
+				for (auto f : m_delayedFuncs)
+				{
+					f();
+				}
+				m_delayedFuncs.clear();
 #endif
+			}
 		}
 		else
 		{

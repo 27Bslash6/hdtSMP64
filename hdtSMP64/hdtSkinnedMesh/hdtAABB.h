@@ -97,8 +97,18 @@ namespace hdt
 		{
 			__m512 thisMin = _mm512_broadcast_f32x4(m_min);
 			__m512 thisMax = _mm512_broadcast_f32x4(m_max);
-			__m512 testMin = _mm512_set_m128(aabb3.m_min, aabb2.m_min, aabb1.m_min, aabb0.m_min);
-			__m512 testMax = _mm512_set_m128(aabb3.m_max, aabb2.m_max, aabb1.m_max, aabb0.m_max);
+
+			// Build 512-bit registers from four 128-bit AABBs using insertf32x4
+			__m512 testMin = _mm512_insertf32x4(
+				_mm512_insertf32x4(
+					_mm512_insertf32x4(_mm512_castps128_ps512(aabb0.m_min), aabb1.m_min, 1),
+					aabb2.m_min, 2),
+				aabb3.m_min, 3);
+			__m512 testMax = _mm512_insertf32x4(
+				_mm512_insertf32x4(
+					_mm512_insertf32x4(_mm512_castps128_ps512(aabb0.m_max), aabb1.m_max, 1),
+					aabb2.m_max, 2),
+				aabb3.m_max, 3);
 
 			__mmask16 sep = _mm512_cmp_ps_mask(testMax, thisMin, _CMP_LT_OQ) |
 			                _mm512_cmp_ps_mask(thisMax, testMin, _CMP_LT_OQ);
@@ -152,6 +162,39 @@ namespace hdt
 		{
 			m_min = _mm_min_ps(m_min, rhs.m_min);
 			m_max = _mm_max_ps(m_max, rhs.m_max);
+		}
+
+		// AVX2 batch merge: merge multiple AABBs into this one efficiently
+		void mergeMany(const Aabb* aabbs, int count)
+		{
+			if (count <= 0) return;
+
+			int i = 0;
+			// Start with first AABB
+			__m256 accMin = _mm256_set_m128(aabbs[0].m_min, m_min);
+			__m256 accMax = _mm256_set_m128(aabbs[0].m_max, m_max);
+			i = 1;
+
+			// Process pairs with AVX2
+			for (; i + 1 < count; i += 2)
+			{
+				__m256 pairMin = _mm256_set_m128(aabbs[i + 1].m_min, aabbs[i].m_min);
+				__m256 pairMax = _mm256_set_m128(aabbs[i + 1].m_max, aabbs[i].m_max);
+				accMin = _mm256_min_ps(accMin, pairMin);
+				accMax = _mm256_max_ps(accMax, pairMax);
+			}
+
+			// Reduce 256-bit to 128-bit
+			__m128 lo_min = _mm256_castps256_ps128(accMin);
+			__m128 hi_min = _mm256_extractf128_ps(accMin, 1);
+			__m128 lo_max = _mm256_castps256_ps128(accMax);
+			__m128 hi_max = _mm256_extractf128_ps(accMax, 1);
+			m_min = _mm_min_ps(lo_min, hi_min);
+			m_max = _mm_max_ps(lo_max, hi_max);
+
+			// Handle remaining odd element
+			if (i < count)
+				merge(aabbs[i]);
 		}
 
 		void mergeAdd(const btVector3& p)

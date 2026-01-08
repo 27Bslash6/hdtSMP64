@@ -4,6 +4,7 @@
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 #include <ppl.h>
 #include <ppltasks.h>
+#include <concurrent_vector.h>
 #include <vector>
 
 namespace hdt

@@ -457,7 +457,7 @@
     <RootNamespace>hdtSSEPhysics</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>hdtSMP64</ProjectName>
-    <CudaToolkitCustomDir>$(CUDA_PATH_V11_8)</CudaToolkitCustomDir>
+    <CudaToolkitCustomDir>$(CUDA_PATH)</CudaToolkitCustomDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX|x64'" Label="Configuration">
@@ -1247,7 +1247,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(SolutionDir)hdtSMP64.paths.props" Condition="exists('$(SolutionDir)hdtSMP64.paths.props')" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Condition="!$(Configuration.Contains('NOCUDA'))" Project="C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\BuildCustomizations\CUDA 11.8.props" />
+    <Import Condition="!$(Configuration.Contains('NOCUDA'))" Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.9.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -10005,6 +10005,6 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Condition="!$(Configuration.Contains('NOCUDA'))" Project="C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\BuildCustomizations\CUDA 11.8.targets" />
+    <Import Condition="!$(Configuration.Contains('NOCUDA'))" Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.9.targets" />
   </ImportGroup>
 </Project>

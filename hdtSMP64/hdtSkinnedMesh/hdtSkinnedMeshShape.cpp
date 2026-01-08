@@ -211,11 +211,84 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		HDT_ZONE_VALUE(static_cast<int64_t>(size));
 		{
 			HDT_ZONE_SCOPED_N("VertexAABBLoop");
-			for (size_t i = 0; i < size; ++i)
+			const float shapePropMargin = m_shapeProp.margin;
+			size_t i = 0;
+
+#ifdef __AVX512F__
+			// AVX-512 path: process 4 vertices at a time
+			for (; i + 3 < size; i += 4)
 			{
-				auto c = &m_colliders[i];
-				auto p0 = vertices[c->vertex].m_data;
-				auto margin = _mm_set_ps1(p0.m128_f32[3] * m_shapeProp.margin);
+				if (i + 12 < size)
+				{
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 12].vertex]), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 13].vertex]), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 14].vertex]), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 15].vertex]), _MM_HINT_T0);
+				}
+
+				auto p0 = vertices[m_colliders[i].vertex].m_data;
+				auto p1 = vertices[m_colliders[i + 1].vertex].m_data;
+				auto p2 = vertices[m_colliders[i + 2].vertex].m_data;
+				auto p3 = vertices[m_colliders[i + 3].vertex].m_data;
+
+				__m512 pos = _mm512_insertf32x4(
+					_mm512_insertf32x4(
+						_mm512_insertf32x4(_mm512_castps128_ps512(p0), p1, 1),
+						p2, 2),
+					p3, 3);
+
+				__m512 margins = _mm512_insertf32x4(
+					_mm512_insertf32x4(
+						_mm512_insertf32x4(
+							_mm512_castps128_ps512(_mm_set_ps1(p0.m128_f32[3] * shapePropMargin)),
+							_mm_set_ps1(p1.m128_f32[3] * shapePropMargin), 1),
+						_mm_set_ps1(p2.m128_f32[3] * shapePropMargin), 2),
+					_mm_set_ps1(p3.m128_f32[3] * shapePropMargin), 3);
+
+				__m512 aabbMin = _mm512_sub_ps(pos, margins);
+				__m512 aabbMax = _mm512_add_ps(pos, margins);
+
+				m_aabb[i].m_min = _mm512_castps512_ps128(aabbMin);
+				m_aabb[i].m_max = _mm512_castps512_ps128(aabbMax);
+				m_aabb[i + 1].m_min = _mm512_extractf32x4_ps(aabbMin, 1);
+				m_aabb[i + 1].m_max = _mm512_extractf32x4_ps(aabbMax, 1);
+				m_aabb[i + 2].m_min = _mm512_extractf32x4_ps(aabbMin, 2);
+				m_aabb[i + 2].m_max = _mm512_extractf32x4_ps(aabbMax, 2);
+				m_aabb[i + 3].m_min = _mm512_extractf32x4_ps(aabbMin, 3);
+				m_aabb[i + 3].m_max = _mm512_extractf32x4_ps(aabbMax, 3);
+			}
+#endif
+			// AVX2 path: process 2 vertices at a time
+			for (; i + 1 < size; i += 2)
+			{
+				if (i + 8 < size)
+				{
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 8].vertex]), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 9].vertex]), _MM_HINT_T0);
+				}
+
+				auto p0 = vertices[m_colliders[i].vertex].m_data;
+				auto p1 = vertices[m_colliders[i + 1].vertex].m_data;
+
+				__m256 pos = _mm256_set_m128(p1, p0);
+				__m256 margins = _mm256_set_m128(
+					_mm_set_ps1(p1.m128_f32[3] * shapePropMargin),
+					_mm_set_ps1(p0.m128_f32[3] * shapePropMargin));
+
+				__m256 aabbMin = _mm256_sub_ps(pos, margins);
+				__m256 aabbMax = _mm256_add_ps(pos, margins);
+
+				m_aabb[i].m_min = _mm256_castps256_ps128(aabbMin);
+				m_aabb[i].m_max = _mm256_castps256_ps128(aabbMax);
+				m_aabb[i + 1].m_min = _mm256_extractf128_ps(aabbMin, 1);
+				m_aabb[i + 1].m_max = _mm256_extractf128_ps(aabbMax, 1);
+			}
+
+			// Scalar remainder
+			for (; i < size; ++i)
+			{
+				auto p0 = vertices[m_colliders[i].vertex].m_data;
+				auto margin = _mm_set_ps1(p0.m128_f32[3] * shapePropMargin);
 				m_aabb[i].m_min = p0 - margin;
 				m_aabb[i].m_max = p0 + margin;
 			}
@@ -289,25 +362,36 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		HDT_ZONE_VALUE(static_cast<int64_t>(size));
 		{
 			HDT_ZONE_SCOPED_N("TriangleAABBLoop");
+			const float shapePropMargin = m_shapeProp.margin / 3.0f;
+			const __m128 absPenetration = _mm_andnot_ps(_mm_set_ss(-0.0f), _mm_set_ss(m_shapeProp.penetration));
+
 			for (size_t i = 0; i < size; ++i)
 			{
+				// Prefetch ahead to hide memory latency for triangle vertices
+				if (i + 4 < size)
+				{
+					const auto* prefetchC = &m_colliders[i + 4];
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[prefetchC->vertices[0]]), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[prefetchC->vertices[1]]), _MM_HINT_T0);
+					_mm_prefetch(reinterpret_cast<const char*>(&vertices[prefetchC->vertices[2]]), _MM_HINT_T0);
+				}
+
 				auto c = &m_colliders[i];
 				auto p0 = vertices[c->vertices[0]].m_data;
 				auto p1 = vertices[c->vertices[1]].m_data;
 				auto p2 = vertices[c->vertices[2]].m_data;
-				auto margin4 = p0 + p1 + p2;
 
+				// Compute AABB min/max
 				auto aabbMin = _mm_min_ps(_mm_min_ps(p0, p1), p2);
 				auto aabbMax = _mm_max_ps(_mm_max_ps(p0, p1), p2);
-				auto prenetration = _mm_set_ss(m_shapeProp.penetration);
-				prenetration = _mm_andnot_ps(_mm_set_ss(-0.0f), prenetration); // abs
-				margin4 = _mm_max_ss(_mm_set_ss(margin4.m128_f32[3] * m_shapeProp.margin / 3), prenetration);
-				margin4 = _mm_shuffle_ps(margin4, margin4, 0);
-				aabbMin = aabbMin - margin4;
-				aabbMax = aabbMax + margin4;
 
-				m_aabb[i].m_min = aabbMin;
-				m_aabb[i].m_max = aabbMax;
+				// Margin from average of w components
+				float avgMargin = (p0.m128_f32[3] + p1.m128_f32[3] + p2.m128_f32[3]) * shapePropMargin;
+				auto margin4 = _mm_max_ss(_mm_set_ss(avgMargin), absPenetration);
+				margin4 = _mm_shuffle_ps(margin4, margin4, 0);
+
+				m_aabb[i].m_min = aabbMin - margin4;
+				m_aabb[i].m_max = aabbMax + margin4;
 			}
 		}
 		{

@@ -31,7 +31,20 @@
 // Optional: Enable frame image capture
 // #define TRACY_NO_FRAME_IMAGE
 
+// Save and undefine CUDA macro - conflicts with Tracy's GpuContextType::CUDA enum
+#ifdef CUDA
+#pragma push_macro("CUDA")
+#undef CUDA
+#define HDT_RESTORE_CUDA
+#endif
+
 #include <tracy/Tracy.hpp>
+
+// Restore CUDA macro
+#ifdef HDT_RESTORE_CUDA
+#pragma pop_macro("CUDA")
+#undef HDT_RESTORE_CUDA
+#endif
 
 // Zone profiling macros
 #define HDT_ZONE_SCOPED           ZoneScoped

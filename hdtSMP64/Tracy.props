@@ -18,8 +18,8 @@
     <ClCompile>
       <!-- Add Tracy include directory -->
       <AdditionalIncludeDirectories>$(TracyDir)\public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <!-- Enable Tracy (disable ETW to avoid Windows SDK conflicts, NOMINMAX to fix min/max macro issues) -->
-      <PreprocessorDefinitions>HDT_TRACY_ENABLE;TRACY_ENABLE;TRACY_NO_SYSTEM_TRACING;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Enable Tracy (on-demand mode waits for profiler connection, disable ETW to avoid Windows SDK conflicts, NOMINMAX to fix min/max macro issues) -->
+      <PreprocessorDefinitions>HDT_TRACY_ENABLE;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_NO_SYSTEM_TRACING;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <!-- Tracy requires these Windows libraries -->
@@ -31,7 +31,9 @@
   <ItemGroup>
     <ClCompile Include="$(TracyDir)\public\TracyClient.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PreprocessorDefinitions>TRACY_ENABLE;TRACY_NO_SYSTEM_TRACING;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Undefine CUDA to avoid conflict with Tracy's GpuContextType::CUDA enum -->
+      <PreprocessorDefinitions>TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_NO_SYSTEM_TRACING;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>CUDA;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
     </ClCompile>
   </ItemGroup>
 </Project>

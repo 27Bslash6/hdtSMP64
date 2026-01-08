@@ -230,3 +230,113 @@ TEST_CASE("Aabb::collideWithMany batch processing", "[aabb][avx2]") {
         }
     }
 }
+
+TEST_CASE("Aabb::mergeMany AVX2 batch merge", "[aabb][avx2]") {
+    // Add mergeMany to test::Aabb for testing
+    struct AabbWithMerge : public Aabb {
+        void mergeMany(const Aabb* aabbs, int count) {
+            if (count <= 0) return;
+
+            int i = 0;
+            __m256 accMin = _mm256_set_m128(aabbs[0].m_min, m_min);
+            __m256 accMax = _mm256_set_m128(aabbs[0].m_max, m_max);
+            i = 1;
+
+            for (; i + 1 < count; i += 2) {
+                __m256 pairMin = _mm256_set_m128(aabbs[i + 1].m_min, aabbs[i].m_min);
+                __m256 pairMax = _mm256_set_m128(aabbs[i + 1].m_max, aabbs[i].m_max);
+                accMin = _mm256_min_ps(accMin, pairMin);
+                accMax = _mm256_max_ps(accMax, pairMax);
+            }
+
+            __m128 lo_min = _mm256_castps256_ps128(accMin);
+            __m128 hi_min = _mm256_extractf128_ps(accMin, 1);
+            __m128 lo_max = _mm256_castps256_ps128(accMax);
+            __m128 hi_max = _mm256_extractf128_ps(accMax, 1);
+            m_min = _mm_min_ps(lo_min, hi_min);
+            m_max = _mm_max_ps(lo_max, hi_max);
+
+            if (i < count) {
+                m_min = _mm_min_ps(m_min, aabbs[i].m_min);
+                m_max = _mm_max_ps(m_max, aabbs[i].m_max);
+            }
+        }
+
+        void mergeScalar(const Aabb* aabbs, int count) {
+            for (int i = 0; i < count; ++i) {
+                m_min = _mm_min_ps(m_min, aabbs[i].m_min);
+                m_max = _mm_max_ps(m_max, aabbs[i].m_max);
+            }
+        }
+    };
+
+    auto getMin = [](const Aabb& a, int idx) { return a.m_min.m128_f32[idx]; };
+    auto getMax = [](const Aabb& a, int idx) { return a.m_max.m128_f32[idx]; };
+
+    SECTION("Merge single AABB") {
+        AabbWithMerge result;
+        result.m_min = _mm_set_ps(0, 0, 0, 0);
+        result.m_max = _mm_set_ps(0, 10, 10, 10);
+
+        Aabb toMerge[] = { makeAabb(5, 5, 5, 15, 15, 15) };
+        result.mergeMany(toMerge, 1);
+
+        REQUIRE(getMin(result, 0) == 0);
+        REQUIRE(getMax(result, 0) == 15);
+    }
+
+    SECTION("Merge two AABBs") {
+        AabbWithMerge result;
+        result.m_min = _mm_set_ps(0, 0, 0, 0);
+        result.m_max = _mm_set_ps(0, 10, 10, 10);
+
+        Aabb toMerge[] = {
+            makeAabb(-5, -5, -5, 5, 5, 5),
+            makeAabb(8, 8, 8, 20, 20, 20)
+        };
+        result.mergeMany(toMerge, 2);
+
+        REQUIRE(getMin(result, 0) == -5);
+        REQUIRE(getMax(result, 0) == 20);
+    }
+
+    SECTION("Merge odd number of AABBs") {
+        AabbWithMerge result;
+        result.m_min = _mm_set_ps(0, 50, 50, 50);
+        result.m_max = _mm_set_ps(0, 60, 60, 60);
+
+        Aabb toMerge[] = {
+            makeAabb(0, 0, 0, 10, 10, 10),
+            makeAabb(20, 20, 20, 30, 30, 30),
+            makeAabb(-10, -10, -10, 5, 5, 5)
+        };
+        result.mergeMany(toMerge, 3);
+
+        REQUIRE(getMin(result, 0) == -10);
+        REQUIRE(getMax(result, 0) == 60);
+    }
+
+    SECTION("Matches scalar merge") {
+        Aabb aabbs[10];
+        for (int i = 0; i < 10; i++) {
+            float offset = static_cast<float>(i * 5 - 25);
+            aabbs[i] = makeAabb(offset, offset, offset, offset + 10, offset + 10, offset + 10);
+        }
+
+        AabbWithMerge batchResult;
+        batchResult.m_min = _mm_set_ps(0, 100, 100, 100);
+        batchResult.m_max = _mm_set_ps(0, 110, 110, 110);
+
+        AabbWithMerge scalarResult;
+        scalarResult.m_min = batchResult.m_min;
+        scalarResult.m_max = batchResult.m_max;
+
+        batchResult.mergeMany(aabbs, 10);
+        scalarResult.mergeScalar(aabbs, 10);
+
+        for (int i = 0; i < 3; i++) {
+            REQUIRE(getMin(batchResult, i) == getMin(scalarResult, i));
+            REQUIRE(getMax(batchResult, i) == getMax(scalarResult, i));
+        }
+    }
+}

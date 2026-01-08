@@ -423,27 +423,18 @@ namespace hdt
 				// Colliders in A that intersect full bounding box of B. Compute a new bounding box for just those - this
 				// can be MUCH smaller than the original bounding box for A (consider the case where we have two spheres
 				// colliding, offset by an equal amount in all three axes).
-				for (auto i = abeg; i < aend; ++i)
-				{
-					if (i->collideWith(aabbB))
-					{
-						listA.push_back(i);
-						aabbA.merge(*i);
-					}
-				}
+				// Use batched SIMD collision detection (AVX-512: 4 at a time, AVX2: 2 at a time)
+				Aabb::collideWithMany(aabbB, abeg, asize, std::back_inserter(listA));
+				for (Aabb* aabb : listA)
+					aabbA.merge(*aabb);
 
 				// Colliders in B that intersect the new bounding box for A. Compute a new bounding box for those too.
 				if (listA.size())
 				{
 					aabbB.invalidate();
-					for (auto i = bbeg; i < bend; ++i)
-					{
-						if (i->collideWith(aabbA))
-						{
-							listB.push_back(i);
-							aabbB.merge(*i);
-						}
-					}
+					Aabb::collideWithMany(aabbA, bbeg, bsize, std::back_inserter(listB));
+					for (Aabb* aabb : listB)
+						aabbB.merge(*aabb);
 				}
 
 				// Remove any colliders from A that don't intersect the new bounding box for B
@@ -707,34 +698,39 @@ namespace hdt
 		if (pairs.empty()) return;
 		int npairs = pairs.size();
 
-		// Create buffers for collision processing
 		CudaCollisionPair<T::CudaType> collisionPair(
 			shape0->m_cudaObject.get(),
 			shape1->m_cudaObject.get(),
 			npairs);
 
 		// Set up data for each pair of collision trees
-		for (int i = 0; i < npairs; ++i)
 		{
-			auto a = pairs[i].first;
-			auto b = pairs[i].second;
-			auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
-			auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
-
-			if (asize > 0 && bsize > 0)
+			HDT_ZONE_SCOPED_N("AddCollisionPairs");
+			for (int i = 0; i < npairs; ++i)
 			{
-				collisionPair.addPair(
-					pairs[i].first->cbuf - shape0->m_colliders.data(),
-					pairs[i].second->cbuf - shape1->m_colliders.data(),
-					asize,
-					bsize,
-					a->aabbMe,
-					b->aabbMe);
+				auto a = pairs[i].first;
+				auto b = pairs[i].second;
+				auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
+				auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
+
+				if (asize > 0 && bsize > 0)
+				{
+					collisionPair.addPair(
+						pairs[i].first->cbuf - shape0->m_colliders.data(),
+						pairs[i].second->cbuf - shape1->m_colliders.data(),
+						asize,
+						bsize,
+						a->aabbMe,
+						b->aabbMe);
+				}
 			}
 		}
 
 		// Run the kernel
-		collisionPair.launch(cudaMerge.get(), Swap);
+		{
+			HDT_ZONE_SCOPED_N("KernelLaunch");
+			collisionPair.launch(cudaMerge.get(), Swap);
+		}
 	}
 
 	std::function<void()> SkinnedMeshAlgorithm::queueCollision(
@@ -742,21 +738,33 @@ namespace hdt
 		SkinnedMeshBody* body1,
 		CollisionDispatcher* dispatcher)
 	{
-		std::shared_ptr<CudaMergeBuffer> cudaMerge = std::make_shared<CudaMergeBuffer>(body0, body1);
+		HDT_ZONE_SCOPED_N("queueCollision");
 
-		if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
+		std::shared_ptr<CudaMergeBuffer> cudaMerge;
 		{
-			launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
-			launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+			HDT_ZONE_SCOPED_N("CreateMergeBuffer");
+			cudaMerge = std::make_shared<CudaMergeBuffer>(body0, body1);
 		}
-		else if (body0->m_shape->asPerTriangleShape())
-			launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
-		else if (body1->m_shape->asPerTriangleShape())
-			launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
-		else
-			launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), cudaMerge);
 
-		cudaMerge->launchTransfer();
+		{
+			HDT_ZONE_SCOPED_N("LaunchKernels");
+			if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
+			{
+				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+			}
+			else if (body0->m_shape->asPerTriangleShape())
+				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
+			else if (body1->m_shape->asPerTriangleShape())
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+			else
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), cudaMerge);
+		}
+
+		{
+			HDT_ZONE_SCOPED_N("LaunchTransfer");
+			cudaMerge->launchTransfer();
+		}
 
 		std::weak_ptr<CudaBody> weak0 = body0->m_cudaObject;
 		std::weak_ptr<CudaBody> weak1 = body1->m_cudaObject;

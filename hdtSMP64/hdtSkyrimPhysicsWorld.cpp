@@ -406,7 +406,9 @@ namespace hdt
 			m_SMPProcessingTimeInMainLoop += (endTime - startTime) / static_cast<float>(ticks.QuadPart) * 1e3;
 			m_averageSMPProcessingTimeInMainLoop = (m_averageSMPProcessingTimeInMainLoop * (m_sampleSize - 1) + m_SMPProcessingTimeInMainLoop) / m_sampleSize;
 			float totalSMPTime = m_averageSMPProcessingTimeInMainLoop + m_2ndStepAverageProcessingTime;
-			HDT_LOG_INFO("smp cost in main loop (msecs): %2.2g, cost outside main loop: %2.2g, percentage outside vs total: %2.2f%%", m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime, 100. * m_2ndStepAverageProcessingTime / totalSMPTime);
+			HDT_LOG_INFO("Physics timing: %.2f ms main thread | %.2f ms async | %.1f%% async of total %.2f ms",
+			m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime,
+			100. * m_2ndStepAverageProcessingTime / totalSMPTime, totalSMPTime);
 		}
 		else
 			m_tasks.wait();

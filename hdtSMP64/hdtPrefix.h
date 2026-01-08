@@ -9,16 +9,24 @@
 // We use macros (not functions) so they override even after re-includes
 
 #include <ctime>
+#include <chrono>
 
 namespace hdt::logging
 {
     inline void LogWithTimestamp(IDebugLog::LogLevel level, const char* fmt, ...)
     {
-        char timeBuf[16];
-        auto now = std::time(nullptr);
+        // Get time with microsecond precision
+        auto now = std::chrono::system_clock::now();
+        auto time_t_now = std::chrono::system_clock::to_time_t(now);
+        auto micros = std::chrono::duration_cast<std::chrono::microseconds>(
+            now.time_since_epoch()) % 1000000;
+
         struct tm tm;
-        localtime_s(&tm, &now);
-        std::strftime(timeBuf, sizeof(timeBuf), "[%H:%M:%S] ", &tm);
+        localtime_s(&tm, &time_t_now);
+
+        char timeBuf[32];
+        std::strftime(timeBuf, sizeof(timeBuf), "[%H:%M:%S", &tm);
+        snprintf(timeBuf + 9, sizeof(timeBuf) - 9, ".%06lld] ", micros.count());
 
         char msgBuf[8192];
         va_list args;
