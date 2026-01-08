@@ -388,6 +388,13 @@ namespace hdt
 			body->m_bones.reset(m_bones.get(), NullDeleter<Bone[]>());
 		}
 
+		~Imp()
+		{
+			// Clean up CUDA graph resources
+			cuGraphExecDestroy(m_graphExec);
+			cuGraphDestroy(m_graph);
+		}
+
 		void synchronize()
 		{
 			cuSynchronize(m_stream).check(__FUNCTION__);
@@ -418,6 +425,11 @@ namespace hdt
 		int m_numVertices;
 		int m_numDynamicBones;
 		CudaBuffer<cuBone, Bone> m_bones;
+
+		// CUDA Graph for internal update (reduces kernel launch overhead)
+		void* m_graph = nullptr;        // cudaGraph_t
+		void* m_graphExec = nullptr;    // cudaGraphExec_t
+		bool m_graphCaptured = false;
 	};
 
 	CudaBody::CudaBody(SkinnedMeshBody* body)
@@ -975,24 +987,52 @@ namespace hdt
 			0,
 			{ 0, 0 } };
 
+		auto& imp = *body->m_imp;
+
+		// Use CUDA Graph if already captured
+		if (imp.m_graphCaptured && imp.m_graphExec)
 		{
-			HDT_ZONE_SCOPED_N("BonesToDevice");
-			body->m_imp->m_bones.toDevice(body->m_imp->m_stream);
+			HDT_ZONE_SCOPED_N("GraphLaunch");
+			cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+			return;
 		}
 
-		HDT_ZONE_SCOPED_N("cuInternalUpdateKernel");
-		cuInternalUpdate(
-			body->m_imp->m_stream,
-			*body->m_imp,
-			body->m_imp->m_bones.getD(),
-			vertexShape ? static_cast<cuColliderData<CudaPerVertexShape>>(*vertexShape->m_imp) : s_emptyVertexData,
-			vertexShape ? vertexShape->m_imp->m_tree.m_numNodes : 0,
-			vertexShape ? vertexShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
-			vertexShape ? vertexShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr,
-			triangleShape ? static_cast<cuColliderData<CudaPerTriangleShape>>(*triangleShape->m_imp) : s_emptyTriangleData,
-			triangleShape ? triangleShape->m_imp->m_tree.m_numNodes : 0,
-			triangleShape ? triangleShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
-			triangleShape ? triangleShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr).check(__FUNCTION__);
+		// First call: capture the graph
+		if (!imp.m_graphCaptured)
+		{
+			HDT_ZONE_SCOPED_N("GraphCapture");
+			cuStreamBeginCapture(imp.m_stream).check(__FUNCTION__);
+		}
+
+		// Memory transfer and kernel launches (captured into graph on first call)
+		{
+			HDT_ZONE_SCOPED_N("BonesToDevice");
+			imp.m_bones.toDevice(imp.m_stream);
+		}
+
+		{
+			HDT_ZONE_SCOPED_N("cuInternalUpdateKernel");
+			cuInternalUpdate(
+				imp.m_stream,
+				imp,
+				imp.m_bones.getD(),
+				vertexShape ? static_cast<cuColliderData<CudaPerVertexShape>>(*vertexShape->m_imp) : s_emptyVertexData,
+				vertexShape ? vertexShape->m_imp->m_tree.m_numNodes : 0,
+				vertexShape ? vertexShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
+				vertexShape ? vertexShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr,
+				triangleShape ? static_cast<cuColliderData<CudaPerTriangleShape>>(*triangleShape->m_imp) : s_emptyTriangleData,
+				triangleShape ? triangleShape->m_imp->m_tree.m_numNodes : 0,
+				triangleShape ? triangleShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
+				triangleShape ? triangleShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr).check(__FUNCTION__);
+		}
+
+		// End capture and instantiate
+		if (!imp.m_graphCaptured)
+		{
+			cuStreamEndCapture(imp.m_stream, &imp.m_graph).check(__FUNCTION__);
+			cuGraphInstantiate(&imp.m_graphExec, imp.m_graph).check(__FUNCTION__);
+			imp.m_graphCaptured = true;
+		}
 	}
 
 	CudaInterface::CudaInterface()

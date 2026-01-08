@@ -1135,6 +1135,52 @@ namespace hdt
         return p;
     }
 
+    // CUDA Graph API for reducing kernel launch overhead
+    cuResult cuStreamBeginCapture(void* stream)
+    {
+        cudaStream_t* s = reinterpret_cast<cudaStream_t*>(stream);
+        return cudaStreamBeginCapture(*s, cudaStreamCaptureModeGlobal);
+    }
+
+    cuResult cuStreamEndCapture(void* stream, void** graph)
+    {
+        cudaStream_t* s = reinterpret_cast<cudaStream_t*>(stream);
+        cudaGraph_t* g = reinterpret_cast<cudaGraph_t*>(graph);
+        return cudaStreamEndCapture(*s, g);
+    }
+
+    cuResult cuGraphInstantiate(void** graphExec, void* graph)
+    {
+        cudaGraphExec_t* ge = reinterpret_cast<cudaGraphExec_t*>(graphExec);
+        cudaGraph_t g = reinterpret_cast<cudaGraph_t>(graph);
+        return cudaGraphInstantiate(ge, g, nullptr, nullptr, 0);
+    }
+
+    cuResult cuGraphLaunch(void* graphExec, void* stream)
+    {
+        cudaGraphExec_t ge = reinterpret_cast<cudaGraphExec_t>(graphExec);
+        cudaStream_t* s = reinterpret_cast<cudaStream_t*>(stream);
+        return cudaGraphLaunch(ge, *s);
+    }
+
+    void cuGraphExecDestroy(void* graphExec)
+    {
+        if (graphExec)
+        {
+            cudaGraphExec_t ge = reinterpret_cast<cudaGraphExec_t>(graphExec);
+            cudaGraphExecDestroy(ge);
+        }
+    }
+
+    void cuGraphDestroy(void* graph)
+    {
+        if (graph)
+        {
+            cudaGraph_t g = reinterpret_cast<cudaGraph_t>(graph);
+            cudaGraphDestroy(g);
+        }
+    }
+
     template cuResult cuRunCollision<eNone, CudaPerVertexShape>(
         void*, int, bool, cuCollisionSetup*, cuColliderData<CudaPerVertexShape>, cuColliderData<CudaPerVertexShape>,
         cuCollisionBodyData, cuCollisionBodyData, cuMergeBuffer);

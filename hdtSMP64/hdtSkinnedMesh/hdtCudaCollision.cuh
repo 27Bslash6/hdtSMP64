@@ -330,4 +330,12 @@ namespace hdt
 	int cuGetDevice();
 
 	void* cuDevicePointer(void* ptr);
+
+	// CUDA Graph API for reducing kernel launch overhead
+	cuResult cuStreamBeginCapture(void* stream);
+	cuResult cuStreamEndCapture(void* stream, void** graph);
+	cuResult cuGraphInstantiate(void** graphExec, void* graph);
+	cuResult cuGraphLaunch(void* graphExec, void* stream);
+	void cuGraphExecDestroy(void* graphExec);
+	void cuGraphDestroy(void* graph);
 }
