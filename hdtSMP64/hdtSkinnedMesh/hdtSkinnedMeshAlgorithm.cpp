@@ -515,11 +515,8 @@ namespace hdt
 				if (asize > bsize)
 				{
 					list.reserve(std::max<size_t>(bsize, list.capacity()));
-					for (auto i = bbeg; i < bend; ++i)
-					{
-						if (i->collideWith(aabbA))
-							list.push_back(i);
-					}
+					// AVX2 batch collision filtering - process 2 AABBs at a time
+					Aabb::collideWithMany(aabbA, bbeg, bsize, std::back_inserter(list));
 
 					for (auto i = abeg; i < aend; ++i)
 					{
@@ -543,12 +540,9 @@ namespace hdt
 				}
 				else
 				{
-					list.reserve(std::max<size_t>(bsize, list.capacity()));
-					for (auto i = abeg; i < aend; ++i)
-					{
-						if (i->collideWith(aabbB))
-							list.push_back(i);
-					}
+					list.reserve(std::max<size_t>(asize, list.capacity()));
+					// AVX2 batch collision filtering - process 2 AABBs at a time
+					Aabb::collideWithMany(aabbB, abeg, asize, std::back_inserter(list));
 
 					for (auto j = bbeg; j < bend; ++j)
 					{

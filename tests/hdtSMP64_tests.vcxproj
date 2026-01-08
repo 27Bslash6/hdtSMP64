@@ -81,6 +81,7 @@
     <ClCompile Include="test_main.cpp" />
     <ClCompile Include="unit\test_config.cpp" />
     <ClCompile Include="unit\test_collision.cpp" />
+    <ClCompile Include="unit\test_aabb_simd.cpp" />
     <ClCompile Include="unit\test_non_hookean.cpp" />
     <ClCompile Include="unit\test_dispatcher.cpp" />
     <ClCompile Include="unit\test_serialization.cpp" />
