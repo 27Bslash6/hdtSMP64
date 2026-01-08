@@ -672,7 +672,7 @@ namespace hdt
 			: m_x(body0->m_skinnedBones.size()),
 			m_y(body1->m_skinnedBones.size()),
 			m_dynx(body0->m_cudaObject->m_imp->m_numDynamicBones),
-			m_stream(),
+			m_stream(body0->m_cudaObject->m_imp->m_stream),  // Reuse body's stream instead of creating new one
 			m_buffer(m_dynx * m_y + m_x * body1->m_cudaObject->m_imp->m_numDynamicBones)
 		{
 			m_buffer.zero(m_stream);
@@ -784,7 +784,7 @@ namespace hdt
 			return { m_buffer.getD(), m_x, m_y, m_dynx };
 		}
 
-		CudaStream m_stream;
+		CudaStream& m_stream;  // Reference to body's stream (no create/destroy overhead)
 
 	private:
 		int m_x;
