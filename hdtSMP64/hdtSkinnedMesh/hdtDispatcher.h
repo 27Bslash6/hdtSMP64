@@ -4,6 +4,7 @@
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 #include <ppl.h>
 #include <ppltasks.h>
+#include <concurrent_vector.h>
 #include <vector>
 
 namespace hdt
@@ -42,11 +43,16 @@ namespace hdt
 
 		void clearAllManifold();
 
+#ifdef CUDA
+		// Sync and apply collision results from previous frame
+		// Called at START of physics step, before prediction, to allow GPU overlap with solve
+		void syncPreviousCollisionResults();
+#endif
+
 		std::mutex m_lock;
 		std::vector<std::pair<SkinnedMeshBody*, SkinnedMeshBody*>> m_pairs;
 #ifdef CUDA
-		std::vector<std::function<void()>> m_immediateFuncs;
-		std::vector<std::function<void()>> m_delayedFuncs;
+		concurrency::concurrent_vector<std::function<void()>> m_delayedFuncs;
 #endif
 	};
 }

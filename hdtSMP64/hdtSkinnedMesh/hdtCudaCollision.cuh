@@ -274,6 +274,12 @@ namespace hdt
 
 	void cuFreeHost(void* buf);
 
+	// CUDA 12.9 stream-ordered allocation (async, lock-free)
+	cuResult cuInitMemoryPool(int deviceId);
+	cuResult cuGetDeviceBufferAsync(void** buf, size_t size, void* stream);
+	cuResult cuFreeDeviceAsync(void* buf, void* stream);
+	cuResult cuTrimMemoryPool();
+
 	cuResult cuCopyToDevice(void* dst, void* src, size_t n, void* stream);
 
 	cuResult cuCopyToHost(void* dst, void* src, size_t n, void* stream);
@@ -324,4 +330,12 @@ namespace hdt
 	int cuGetDevice();
 
 	void* cuDevicePointer(void* ptr);
+
+	// CUDA Graph API for reducing kernel launch overhead
+	cuResult cuStreamBeginCapture(void* stream);
+	cuResult cuStreamEndCapture(void* stream, void** graph);
+	cuResult cuGraphInstantiate(void** graphExec, void* graph);
+	cuResult cuGraphLaunch(void* graphExec, void* stream);
+	void cuGraphExecDestroy(void* graphExec);
+	void cuGraphDestroy(void* graph);
 }

@@ -1,6 +1,8 @@
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtCollider.h"
+#include "../hdtTracy.h"
 #include <memory>
+#include <vector>
 
 #ifdef CUDA
 #include <numeric>
@@ -388,8 +390,12 @@ namespace hdt
 
 			std::vector<std::pair<ColliderTree*, ColliderTree*>> pairs;
 			pairs.reserve(c0->colliders.size() + c1->colliders.size());
-			c0->checkCollisionL(c1, pairs);
+			{
+				HDT_ZONE_SCOPED_N("TreeTraversal");
+				c0->checkCollisionL(c1, pairs);
+			}
 			if (pairs.empty()) return 0;
+			HDT_PLOT("CollisionPairs", static_cast<int64_t>(pairs.size()));
 
 			decltype(auto) func = [this](const std::pair<ColliderTree*, ColliderTree*>& pair)
 			{
@@ -417,27 +423,18 @@ namespace hdt
 				// Colliders in A that intersect full bounding box of B. Compute a new bounding box for just those - this
 				// can be MUCH smaller than the original bounding box for A (consider the case where we have two spheres
 				// colliding, offset by an equal amount in all three axes).
-				for (auto i = abeg; i < aend; ++i)
-				{
-					if (i->collideWith(aabbB))
-					{
-						listA.push_back(i);
-						aabbA.merge(*i);
-					}
-				}
+				// Use batched SIMD collision detection (AVX-512: 4 at a time, AVX2: 2 at a time)
+				Aabb::collideWithMany(aabbB, abeg, asize, std::back_inserter(listA));
+				for (Aabb* aabb : listA)
+					aabbA.merge(*aabb);
 
 				// Colliders in B that intersect the new bounding box for A. Compute a new bounding box for those too.
 				if (listA.size())
 				{
 					aabbB.invalidate();
-					for (auto i = bbeg; i < bend; ++i)
-					{
-						if (i->collideWith(aabbA))
-						{
-							listB.push_back(i);
-							aabbB.merge(*i);
-						}
-					}
+					Aabb::collideWithMany(aabbA, bbeg, bsize, std::back_inserter(listB));
+					for (Aabb* aabb : listB)
+						aabbB.merge(*aabb);
 				}
 
 				// Remove any colliders from A that don't intersect the new bounding box for B
@@ -454,9 +451,16 @@ namespace hdt
 			};
 
 			if (pairs.size() >= std::thread::hardware_concurrency())
+			{
+				HDT_ZONE_SCOPED_N("ParallelCollide");
 				// FIXME PROFILING This is the line where we spend the most time in the whole mod.
 				concurrency::parallel_for_each(pairs.begin(), pairs.end(), func);
-			else for (auto& i : pairs) func(i);
+			}
+			else
+			{
+				HDT_ZONE_SCOPED_N("SequentialCollide");
+				for (auto& i : pairs) func(i);
+			}
 
 			return numResults;
 		}
@@ -502,11 +506,8 @@ namespace hdt
 				if (asize > bsize)
 				{
 					list.reserve(std::max<size_t>(bsize, list.capacity()));
-					for (auto i = bbeg; i < bend; ++i)
-					{
-						if (i->collideWith(aabbA))
-							list.push_back(i);
-					}
+					// AVX2 batch collision filtering - process 2 AABBs at a time
+					Aabb::collideWithMany(aabbA, bbeg, bsize, std::back_inserter(list));
 
 					for (auto i = abeg; i < aend; ++i)
 					{
@@ -530,12 +531,9 @@ namespace hdt
 				}
 				else
 				{
-					list.reserve(std::max<size_t>(bsize, list.capacity()));
-					for (auto i = abeg; i < aend; ++i)
-					{
-						if (i->collideWith(aabbB))
-							list.push_back(i);
-					}
+					list.reserve(std::max<size_t>(asize, list.capacity()));
+					// AVX2 batch collision filtering - process 2 AABBs at a time
+					Aabb::collideWithMany(aabbB, abeg, asize, std::back_inserter(list));
 
 					for (auto j = bbeg; j < bend; ++j)
 					{
@@ -587,6 +585,7 @@ namespace hdt
 	void SkinnedMeshAlgorithm::MergeBuffer::doMerge(SkinnedMeshShape* a, SkinnedMeshShape* b,
 		CollisionResult* collision, int count)
 	{
+		HDT_ZONE_SCOPED_N("MergeCollisions");
 		for (int i = 0; i < count; ++i)
 		{
 			auto& res = collision[i];
@@ -634,6 +633,7 @@ namespace hdt
 	void SkinnedMeshAlgorithm::MergeBuffer::apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1,
 		CollisionDispatcher* dispatcher)
 	{
+		HDT_ZONE_SCOPED_N("ApplyManifolds");
 		for (int i = 0; i < body0->m_skinnedBones.size(); ++i)
 		{
 			if (!body1->canCollideWith(body0->m_skinnedBones[i].ptr)) continue;
@@ -698,34 +698,39 @@ namespace hdt
 		if (pairs.empty()) return;
 		int npairs = pairs.size();
 
-		// Create buffers for collision processing
 		CudaCollisionPair<T::CudaType> collisionPair(
 			shape0->m_cudaObject.get(),
 			shape1->m_cudaObject.get(),
 			npairs);
 
 		// Set up data for each pair of collision trees
-		for (int i = 0; i < npairs; ++i)
 		{
-			auto a = pairs[i].first;
-			auto b = pairs[i].second;
-			auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
-			auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
-
-			if (asize > 0 && bsize > 0)
+			HDT_ZONE_SCOPED_N("AddCollisionPairs");
+			for (int i = 0; i < npairs; ++i)
 			{
-				collisionPair.addPair(
-					pairs[i].first->cbuf - shape0->m_colliders.data(),
-					pairs[i].second->cbuf - shape1->m_colliders.data(),
-					asize,
-					bsize,
-					a->aabbMe,
-					b->aabbMe);
+				auto a = pairs[i].first;
+				auto b = pairs[i].second;
+				auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
+				auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
+
+				if (asize > 0 && bsize > 0)
+				{
+					collisionPair.addPair(
+						pairs[i].first->cbuf - shape0->m_colliders.data(),
+						pairs[i].second->cbuf - shape1->m_colliders.data(),
+						asize,
+						bsize,
+						a->aabbMe,
+						b->aabbMe);
+				}
 			}
 		}
 
 		// Run the kernel
-		collisionPair.launch(cudaMerge.get(), Swap);
+		{
+			HDT_ZONE_SCOPED_N("KernelLaunch");
+			collisionPair.launch(cudaMerge.get(), Swap);
+		}
 	}
 
 	std::function<void()> SkinnedMeshAlgorithm::queueCollision(
@@ -733,21 +738,33 @@ namespace hdt
 		SkinnedMeshBody* body1,
 		CollisionDispatcher* dispatcher)
 	{
-		std::shared_ptr<CudaMergeBuffer> cudaMerge = std::make_shared<CudaMergeBuffer>(body0, body1);
+		HDT_ZONE_SCOPED_N("queueCollision");
 
-		if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
+		std::shared_ptr<CudaMergeBuffer> cudaMerge;
 		{
-			launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
-			launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+			HDT_ZONE_SCOPED_N("CreateMergeBuffer");
+			cudaMerge = std::make_shared<CudaMergeBuffer>(body0, body1);
 		}
-		else if (body0->m_shape->asPerTriangleShape())
-			launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
-		else if (body1->m_shape->asPerTriangleShape())
-			launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
-		else
-			launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), cudaMerge);
 
-		cudaMerge->launchTransfer();
+		{
+			HDT_ZONE_SCOPED_N("LaunchKernels");
+			if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
+			{
+				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+			}
+			else if (body0->m_shape->asPerTriangleShape())
+				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
+			else if (body1->m_shape->asPerTriangleShape())
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+			else
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), cudaMerge);
+		}
+
+		{
+			HDT_ZONE_SCOPED_N("LaunchTransfer");
+			cudaMerge->launchTransfer();
+		}
 
 		std::weak_ptr<CudaBody> weak0 = body0->m_cudaObject;
 		std::weak_ptr<CudaBody> weak1 = body1->m_cudaObject;
@@ -765,27 +782,33 @@ namespace hdt
 	void SkinnedMeshAlgorithm::processCollision(SkinnedMeshBody* body0, SkinnedMeshBody* body1,
 		CollisionDispatcher* dispatcher)
 	{
-		MergeBuffer merge;
-		merge.alloc(body0->m_skinnedBones.size(), body1->m_skinnedBones.size());
+		HDT_ZONE_SCOPED_N("ProcessCollision");
 
-		auto collision = std::make_unique<CollisionResult[]>(MaxCollisionCount);
+		// Thread-local buffers to avoid per-call allocations (86K+ calls per frame)
+		thread_local MergeBuffer merge;
+		thread_local std::vector<CollisionResult> collisionBuffer(MaxCollisionCount);
+
+		merge.ensureCapacity(body0->m_skinnedBones.size(), body1->m_skinnedBones.size());
+		merge.clear();
+
+		CollisionResult* collision = collisionBuffer.data();
 		if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
 		{
 			processCollision(body0->m_shape->asPerTriangleShape(), body1->m_shape->asPerVertexShape(), merge,
-				collision.get());
+				collision);
 			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), merge,
-				collision.get());
+				collision);
 		}
 		else if (body0->m_shape->asPerTriangleShape())
 			processCollision(body0->m_shape->asPerTriangleShape(), body1->m_shape->asPerVertexShape(), merge,
-				collision.get());
+				collision);
 		else if (body1->m_shape->asPerTriangleShape())
 			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), merge,
-				collision.get());
-		else processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), merge, collision.get());
+				collision);
+		else processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), merge, collision);
 
 		merge.apply(body0, body1, dispatcher);
-		merge.release();
+		// No release needed - thread_local persists and reuses memory
 	}
 
 	void SkinnedMeshAlgorithm::registerAlgorithm(btCollisionDispatcherMt* dispatcher)

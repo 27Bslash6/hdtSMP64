@@ -1,5 +1,7 @@
 #include "hdtSkyrimPhysicsWorld.h"
 #include "hdtLog.h"
+#include "hdtTracy.h"
+#include "hdtSkinnedMesh/hdtConstraintGroup.h"
 #include <ppl.h>
 #include "Offsets.h"
 #include "PluginInterfaceImpl.h"
@@ -66,6 +68,21 @@ namespace hdt
 
 	void SkyrimPhysicsWorld::doUpdate(float interval)
 	{
+		HDT_FRAME_MARK;
+		HDT_ZONE_SCOPED_N("hdtSMP::doUpdate");
+
+#ifdef HDT_TRACY_ENABLE
+		static bool tracyWasConnected = false;
+		bool tracyIsConnected = HDT_IS_CONNECTED;
+		if (!tracyWasConnected && tracyIsConnected) {
+			_MESSAGE("Tracy profiler connected - capturing performance data");
+		}
+		else if (tracyWasConnected && !tracyIsConnected) {
+			_MESSAGE("Tracy profiler disconnected");
+		}
+		tracyWasConnected = tracyIsConnected;
+#endif
+
 		_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 
 		// Time passed since last computation
@@ -105,6 +122,7 @@ namespace hdt
 
 	void SkyrimPhysicsWorld::doUpdate2ndStep(float interval, const float tick, const float remainingTimeStep)
 	{
+		HDT_ZONE_SCOPED_N("hdtSMP::doUpdate2ndStep");
 		if (m_suspended || m_isStasis)
 			return;
 
@@ -145,8 +163,17 @@ namespace hdt
 
 	void SkyrimPhysicsWorld::suspendSimulationUntilFinished(std::function<void(void)> process)
 	{
+		HDT_ZONE_SCOPED_N("SuspendSimulation");
 		this->m_isStasis = true;
-		process();
+		try {
+			process();
+		}
+		catch (const std::exception& e) {
+			_ERROR("Exception during suspended simulation: %s", e.what());
+		}
+		catch (...) {
+			_ERROR("Unknown exception during suspended simulation");
+		}
 		this->m_isStasis = false;
 	}
 
@@ -300,7 +327,26 @@ namespace hdt
 
 	void SkyrimPhysicsWorld::resetSystems()
 	{
+		HDT_ZONE_SCOPED_N("ResetSystems");
 		std::lock_guard<decltype(m_lock)> l(m_lock);
+
+		// Log performance config on reset
+		_MESSAGE("=== SMP Physics Reset ===");
+		_MESSAGE("  Solver: numIterations=%d, groupIterations=%d, MLCP=%s, erp=%.3f",
+			getSolverInfo().m_numIterations,
+			ConstraintGroup::MaxIterations,
+			ConstraintGroup::EnableMLCP ? "ON" : "OFF",
+			getSolverInfo().m_erp);
+		_MESSAGE("  Timing: min_fps=%d (tick=%.4fs), maxSubSteps=%d, realTime=%s",
+			min_fps, m_timeTick, m_maxSubSteps,
+			m_useRealTime ? "ON" : "OFF");
+		_MESSAGE("  Limits: clampRotations=%s (limit=%.1f rad/s), unclampedResets=%s (angle=%.1f)",
+			m_clampRotations ? "ON" : "OFF", m_rotationSpeedLimit,
+			m_unclampedResets ? "ON" : "OFF", m_unclampedResetAngle);
+		_MESSAGE("  Active: systems=%zu, wind=%s (strength=%.1f)",
+			m_systems.size(),
+			m_enableWind ? "ON" : "OFF", m_windStrength);
+
 		for (auto& i : m_systems)
 			i->readTransform(RESET_PHYSICS);
 	}
@@ -360,7 +406,9 @@ namespace hdt
 			m_SMPProcessingTimeInMainLoop += (endTime - startTime) / static_cast<float>(ticks.QuadPart) * 1e3;
 			m_averageSMPProcessingTimeInMainLoop = (m_averageSMPProcessingTimeInMainLoop * (m_sampleSize - 1) + m_SMPProcessingTimeInMainLoop) / m_sampleSize;
 			float totalSMPTime = m_averageSMPProcessingTimeInMainLoop + m_2ndStepAverageProcessingTime;
-			HDT_LOG_INFO("smp cost in main loop (msecs): %2.2g, cost outside main loop: %2.2g, percentage outside vs total: %2.2f%%", m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime, 100. * m_2ndStepAverageProcessingTime / totalSMPTime);
+			HDT_LOG_INFO("Physics timing: %.2f ms main thread | %.2f ms async | %.1f%% async of total %.2f ms",
+			m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime,
+			100. * m_2ndStepAverageProcessingTime / totalSMPTime, totalSMPTime);
 		}
 		else
 			m_tasks.wait();

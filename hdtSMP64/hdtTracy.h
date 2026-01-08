@@ -31,7 +31,20 @@
 // Optional: Enable frame image capture
 // #define TRACY_NO_FRAME_IMAGE
 
+// Save and undefine CUDA macro - conflicts with Tracy's GpuContextType::CUDA enum
+#ifdef CUDA
+#pragma push_macro("CUDA")
+#undef CUDA
+#define HDT_RESTORE_CUDA
+#endif
+
 #include <tracy/Tracy.hpp>
+
+// Restore CUDA macro
+#ifdef HDT_RESTORE_CUDA
+#pragma pop_macro("CUDA")
+#undef HDT_RESTORE_CUDA
+#endif
 
 // Zone profiling macros
 #define HDT_ZONE_SCOPED           ZoneScoped
@@ -62,6 +75,9 @@
 #define HDT_MESSAGE(text, len)    TracyMessage(text, len)
 #define HDT_MESSAGE_L(text)       TracyMessageL(text)
 
+// Connection status
+#define HDT_IS_CONNECTED          TracyIsConnected
+
 #else // HDT_TRACY_ENABLE not defined
 
 // No-op versions - zero overhead when profiling disabled
@@ -86,5 +102,7 @@
 
 #define HDT_MESSAGE(text, len)    (void)0
 #define HDT_MESSAGE_L(text)       (void)0
+
+#define HDT_IS_CONNECTED          false
 
 #endif // HDT_TRACY_ENABLE

@@ -335,8 +335,12 @@ namespace hdt
 							// wind is a linear reduction, with a minimum floor since objects may have a minimum distance
 							// windfactor = 0 when dist <= m_distanceForNoWind, = 1 when dist >= m_distanceForMaxWind, and is linear with dist between these 2 values.
 							const auto windFactor = std::clamp((dist - world->m_distanceForNoWind) / (world->m_distanceForMaxWind - world->m_distanceForNoWind), 0.f, 1.f);
-							if (!btFuzzyZero(windFactor - i.getWindFactor())) {
-								_DMESSAGE("%s blocked by %s with distance %2.2g; setting windFactor %2.2g.", i.name(), object->m_name, dist, windFactor);
+							const auto windDelta = std::abs(windFactor - i.getWindFactor());
+							if (!btFuzzyZero(windDelta)) {
+								// Only log significant changes (>10%) to reduce spam
+								if (windDelta > 0.1f) {
+									_DMESSAGE("%s blocked by %s with distance %2.2g; setting windFactor %2.2g.", i.name(), object->m_name, dist, windFactor);
+								}
 								i.updateWindFactor(windFactor);
 							}
 						}
@@ -378,11 +382,46 @@ namespace hdt
 			if (activeSkeletons > 0) {
 				averageTimePerSkeletonInMainLoop = averageProcessingTimeInMainLoop / activeSkeletons;
 			}
-			HDT_LOG_INFO("msecs/activeSkeleton %2.2g activeSkeletons/maxActive/total %d/%d/%zu processTimeInMainLoop/targetTime %2.2g/%2.2g", averageTimePerSkeletonInMainLoop, activeSkeletons, maxActiveSkeletons, m_skeletons.size(), averageProcessingTimeInMainLoop, target_time);
+			HDT_LOG_INFO("Skeleton metrics: %d active / %d max / %zu total | %.2f ms/skeleton | %.2f ms used / %.2f ms budget",
+			activeSkeletons, maxActiveSkeletons, m_skeletons.size(),
+			averageTimePerSkeletonInMainLoop, averageProcessingTimeInMainLoop, target_time);
 			if (m_autoAdjustMaxSkeletons) {
-				maxActiveSkeletons += target_time > averageProcessingTimeInMainLoop ? 2 : -2;
-				// clamp the value to the m_maxActiveSkeletons value
-				maxActiveSkeletons = std::clamp(maxActiveSkeletons, 1, m_maxActiveSkeletons);
+				const float margin = target_time - averageProcessingTimeInMainLoop;
+				const float absMargin = std::abs(margin);
+				const int oldMax = maxActiveSkeletons;
+
+				// Tick down increase cooldown
+				if (m_framesToNextIncrease > 0) --m_framesToNextIncrease;
+
+				// Hysteresis: only adjust if margin exceeds threshold (2ms)
+				// Proportional: larger margin = larger step (but capped)
+				// Asymmetric: decrease faster than increase (avoid stutter)
+				constexpr float hysteresis = 2.0f;  // ms threshold before adjusting
+				constexpr int increaseCooldown = 2;  // metric cycles between increases (~2 sec at 60fps)
+				if (absMargin > hysteresis) {
+					int step = 0;
+					if (margin > 0 && m_framesToNextIncrease <= 0) {
+						// Under budget: increase cautiously (+1 per 1ms headroom, cooldown between increases)
+						step = std::max(1, static_cast<int>(margin / 1.0f));
+						step = std::min(step, 1);  // cap at +1
+					} else if (margin < 0) {
+						// Over budget: decrease aggressively (-1 per 1ms overage, no cooldown)
+						step = -std::max(1, static_cast<int>(absMargin / 1.0f));
+						step = std::max(step, -3);  // cap at -3
+					}
+
+					if (step != 0) {
+						maxActiveSkeletons += step;
+						maxActiveSkeletons = std::clamp(maxActiveSkeletons, 1, m_maxActiveSkeletons);
+
+						if (maxActiveSkeletons != oldMax) {
+							if (step > 0) m_framesToNextIncrease = increaseCooldown;
+							HDT_LOG_INFO("Auto-scaling: %s from %d to %d (%s budget by %.2f ms, step %+d)",
+								step > 0 ? "increasing" : "decreasing", oldMax, maxActiveSkeletons,
+								step > 0 ? "under" : "over", absMargin, step);
+						}
+					}
+				}
 				frameCount = 1;
 			}
 			else if (maxActiveSkeletons != m_maxActiveSkeletons)

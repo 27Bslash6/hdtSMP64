@@ -2,6 +2,7 @@
 #include "hdtSkinnedMeshBody.h"
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtFrameTimer.h"
+#include "../hdtTracy.h"
 #ifdef CUDA
 #include "hdtCudaInterface.h"
 #endif
@@ -68,7 +69,9 @@ namespace hdt
 	void CollisionDispatcher::dispatchAllCollisionPairs(btOverlappingPairCache* pairCache,
 		const btDispatcherInfo& dispatchInfo, btDispatcher* dispatcher)
 	{
+		HDT_ZONE_SCOPED_N("DispatchCollisionPairs");
 		auto size = pairCache->getNumOverlappingPairs();
+		HDT_ZONE_VALUE(static_cast<int64_t>(size));
 		if (!size) return;
 
 		m_pairs.reserve(size);
@@ -187,37 +190,50 @@ namespace hdt
 					});
 			}
 
-			// FIXME: This is probably broken if the current CUDA device changes and any tasks haven't finished yet.
-			// But delayed collisions are disabled for now anyway.
-			for (auto f : m_delayedFuncs)
-			{
-				f();
-			}
+			// NOTE: Sync of previous frame's collision results is now done in syncPreviousCollisionResults()
+			// which is called at the START of physics step, allowing GPU collision to overlap with CPU solve
 
 			CudaInterface::instance()->setCurrentDevice();
-			for (auto o : to_update)
 			{
-				o.first->updateBones();
-				CudaInterface::launchInternalUpdate(
-					o.first->m_cudaObject,
-					o.second.first ? o.second.first->m_cudaObject : nullptr,
-					o.second.second ? o.second.second->m_cudaObject : nullptr);
+				HDT_ZONE_SCOPED_N("LaunchInternalUpdates");
+				// Fully parallel: updateBones (CPU) + CUDA launches (mutex-protected graph capture)
+				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
+					{
+						CudaInterface::instance()->setCurrentDevice();
+						o.first->updateBones();
+						CudaInterface::launchInternalUpdate(
+							o.first->m_cudaObject,
+							o.second.first ? o.second.first->m_cudaObject : nullptr,
+							o.second.second ? o.second.second->m_cudaObject : nullptr);
+					});
 			}
 
 			// Update the aggregate parts of the AABB trees
-			for (auto o : to_update)
 			{
-				o.first->m_cudaObject->synchronize();
+				HDT_ZONE_SCOPED_N("SyncAndTreeUpdates");
 
-				if (o.second.first)
 				{
-					o.second.first->m_cudaObject->updateTree();
+					HDT_ZONE_SCOPED_N("GlobalGpuSync");
+					// Single global sync instead of N per-body syncs
+					CudaInterface::instance()->synchronize();
 				}
-				if (o.second.second)
+
 				{
-					o.second.second->m_cudaObject->updateTree();
+					HDT_ZONE_SCOPED_N("ParallelTreeUpdates");
+					// Tree updates are CPU work - can run in parallel
+					concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
+						{
+							if (o.second.first)
+							{
+								o.second.first->m_cudaObject->updateTree();
+							}
+							if (o.second.second)
+							{
+								o.second.second->m_cudaObject->updateTree();
+							}
+							o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
+						});
 				}
-				o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
 			}
 		}
 		else
@@ -244,40 +260,27 @@ namespace hdt
 		{
 			CudaInterface::instance()->clearBufferPool();
 
-			// Launch collision checking
-			m_delayedFuncs.reserve(m_pairs.size());
-			m_immediateFuncs.reserve(m_pairs.size());
-
-			for (int i = 0; i < m_pairs.size(); ++i)
+			// Launch collision checking - parallelized for better CPU utilization
 			{
-				auto& pair = m_pairs[i];
-				if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
-				{
-					if (!pair.first->m_shape->asPerTriangleShape() || !pair.second->m_shape->asPerTriangleShape())
+				HDT_ZONE_SCOPED_N("CudaQueueCollisions");
+				const int pairCount = static_cast<int>(m_pairs.size());
+
+				// All collisions are now delayed - results applied next frame
+				// This eliminates the GlobalResultsSync bottleneck (was 17% of frame time)
+				concurrency::parallel_for(0, pairCount, [this](int i)
 					{
-						m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
-					}
-					else if (pair.first->m_shape->asPerTriangleShape() && pair.second->m_shape->asPerTriangleShape())
-					{
-						m_immediateFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
-					}
-				}
+						auto& pair = m_pairs[i];
+						if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
+						{
+							m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
+						}
+					});
 			}
 
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 
-			for (auto f : m_immediateFuncs)
-			{
-				f();
-			}
-			m_immediateFuncs.clear();
-#ifndef CUDA_DELAYED_COLLISIONS
-			for (auto f : m_delayedFuncs)
-			{
-				f();
-			}
-			m_delayedFuncs.clear();
-#endif
+			// No sync needed - all collision results are applied next frame
+			// GPU work continues asynchronously while we proceed with constraint solving
 		}
 		else
 		{
@@ -297,6 +300,23 @@ namespace hdt
 
 		FrameTimer::instance()->addManifoldCount(getNumManifolds());
 		FrameTimer::instance()->logEvent(FrameTimer::e_End);
+	}
+
+	void CollisionDispatcher::syncPreviousCollisionResults()
+	{
+		// Sync and apply collision results from previous frame
+		// Called at START of physics step (before prediction) to allow GPU overlap with solve
+		if (!m_delayedFuncs.empty())
+		{
+			HDT_ZONE_SCOPED_N("SyncPreviousCollisions");
+			CudaInterface::instance()->synchronize();
+
+			for (auto& f : m_delayedFuncs)
+			{
+				f();
+			}
+			m_delayedFuncs.clear();
+		}
 	}
 #else
 			});

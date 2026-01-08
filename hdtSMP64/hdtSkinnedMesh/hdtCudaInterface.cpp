@@ -1,5 +1,6 @@
 #ifdef CUDA
 #include "hdtCudaInterface.h"
+#include "../hdtTracy.h"
 
 #include <ppl.h>
 #include <immintrin.h>
@@ -387,6 +388,13 @@ namespace hdt
 			body->m_bones.reset(m_bones.get(), NullDeleter<Bone[]>());
 		}
 
+		~Imp()
+		{
+			// Clean up CUDA graph resources
+			cuGraphExecDestroy(m_graphExec);
+			cuGraphDestroy(m_graph);
+		}
+
 		void synchronize()
 		{
 			cuSynchronize(m_stream).check(__FUNCTION__);
@@ -417,6 +425,11 @@ namespace hdt
 		int m_numVertices;
 		int m_numDynamicBones;
 		CudaBuffer<cuBone, Bone> m_bones;
+
+		// CUDA Graph for internal update (reduces kernel launch overhead)
+		void* m_graph = nullptr;        // cudaGraph_t
+		void* m_graphExec = nullptr;    // cudaGraphExec_t
+		bool m_graphCaptured = false;
 	};
 
 	CudaBody::CudaBody(SkinnedMeshBody* body)
@@ -659,7 +672,7 @@ namespace hdt
 			: m_x(body0->m_skinnedBones.size()),
 			m_y(body1->m_skinnedBones.size()),
 			m_dynx(body0->m_cudaObject->m_imp->m_numDynamicBones),
-			m_stream(),
+			m_stream(body0->m_cudaObject->m_imp->m_stream),  // Reuse body's stream instead of creating new one
 			m_buffer(m_dynx * m_y + m_x * body1->m_cudaObject->m_imp->m_numDynamicBones)
 		{
 			m_buffer.zero(m_stream);
@@ -701,6 +714,8 @@ namespace hdt
 
 		void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher)
 		{
+			HDT_ZONE_SCOPED_N("MergeBuffer::apply");
+
 			// Checking can-collide-with and no-collide-with involves a list search, so just do it once for each bone
 			std::vector<bool> canCollide0(body0->m_skinnedBones.size());
 			for (int i = 0; i < body0->m_skinnedBones.size(); ++i)
@@ -713,7 +728,7 @@ namespace hdt
 				canCollide1[i] = body0->canCollideWith(body1->m_skinnedBones[i].ptr);
 			}
 
-			cuSynchronize(m_stream).check(__FUNCTION__);
+			// NOTE: StreamSync removed - GlobalResultsSync in dispatcher syncs all streams before apply loop
 
 			int* map0 = body0->m_cudaObject->m_imp->m_boneMap.get();
 			int* map1 = body1->m_cudaObject->m_imp->m_boneMap.get();
@@ -771,7 +786,7 @@ namespace hdt
 			return { m_buffer.getD(), m_x, m_y, m_dynx };
 		}
 
-		CudaStream m_stream;
+		CudaStream& m_stream;  // Reference to body's stream (no create/destroy overhead)
 
 	private:
 		int m_x;
@@ -973,21 +988,61 @@ namespace hdt
 			BoundingBoxArray(nullptr, 0),
 			0,
 			{ 0, 0 } };
+		// Mutex for graph capture - CUDA graph capture isn't thread-safe across streams
+		static std::mutex s_graphCaptureMutex;
 
-		body->m_imp->m_bones.toDevice(body->m_imp->m_stream);
+		auto& imp = *body->m_imp;
 
-		cuInternalUpdate(
-			body->m_imp->m_stream,
-			*body->m_imp,
-			body->m_imp->m_bones.getD(),
-			vertexShape ? static_cast<cuColliderData<CudaPerVertexShape>>(*vertexShape->m_imp) : s_emptyVertexData,
-			vertexShape ? vertexShape->m_imp->m_tree.m_numNodes : 0,
-			vertexShape ? vertexShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
-			vertexShape ? vertexShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr,
-			triangleShape ? static_cast<cuColliderData<CudaPerTriangleShape>>(*triangleShape->m_imp) : s_emptyTriangleData,
-			triangleShape ? triangleShape->m_imp->m_tree.m_numNodes : 0,
-			triangleShape ? triangleShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
-			triangleShape ? triangleShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr).check(__FUNCTION__);
+		// Fast path: Use CUDA Graph if already captured (thread-safe, no lock needed)
+		if (imp.m_graphCaptured && imp.m_graphExec)
+		{
+			HDT_ZONE_SCOPED_N("GraphLaunch");
+			cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+			return;
+		}
+
+		// Slow path: Need to capture graph (serialize with mutex)
+		std::lock_guard<std::mutex> lock(s_graphCaptureMutex);
+
+		// Double-check after acquiring lock
+		if (imp.m_graphCaptured && imp.m_graphExec)
+		{
+			cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+			return;
+		}
+
+		// First call: capture the graph
+		{
+			HDT_ZONE_SCOPED_N("GraphCapture");
+			cuStreamBeginCapture(imp.m_stream).check(__FUNCTION__);
+		}
+
+		// Memory transfer and kernel launches (captured into graph)
+		{
+			HDT_ZONE_SCOPED_N("BonesToDevice");
+			imp.m_bones.toDevice(imp.m_stream);
+		}
+
+		{
+			HDT_ZONE_SCOPED_N("cuInternalUpdateKernel");
+			cuInternalUpdate(
+				imp.m_stream,
+				imp,
+				imp.m_bones.getD(),
+				vertexShape ? static_cast<cuColliderData<CudaPerVertexShape>>(*vertexShape->m_imp) : s_emptyVertexData,
+				vertexShape ? vertexShape->m_imp->m_tree.m_numNodes : 0,
+				vertexShape ? vertexShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
+				vertexShape ? vertexShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr,
+				triangleShape ? static_cast<cuColliderData<CudaPerTriangleShape>>(*triangleShape->m_imp) : s_emptyTriangleData,
+				triangleShape ? triangleShape->m_imp->m_tree.m_numNodes : 0,
+				triangleShape ? triangleShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
+				triangleShape ? triangleShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr).check(__FUNCTION__);
+		}
+
+		// End capture and instantiate
+		cuStreamEndCapture(imp.m_stream, &imp.m_graph).check(__FUNCTION__);
+		cuGraphInstantiate(&imp.m_graphExec, imp.m_graph).check(__FUNCTION__);
+		imp.m_graphCaptured = true;
 	}
 
 	CudaInterface::CudaInterface()

@@ -2,6 +2,7 @@
 
 #include "hdtSkinnedMeshShape.h"
 #include "hdtDispatcher.h"
+#include <cstring>
 #ifdef CUDA
 #include "hdtCudaInterface.h"
 
@@ -77,9 +78,11 @@ namespace hdt
 		{
 			MergeBuffer()
 			{
-				mergeStride = mergeSize = 0;
+				mergeStride = mergeSize = capacity = 0;
 				buffer = nullptr;
 			}
+
+			~MergeBuffer() { release(); }
 
 			CollisionMerge* begin() const { return buffer; }
 			CollisionMerge* end() const { return buffer + mergeSize; }
@@ -89,9 +92,29 @@ namespace hdt
 				mergeStride = y;
 				mergeSize = x * y;
 				buffer = new CollisionMerge[mergeSize];
+				capacity = mergeSize;
 			}
 
-			void release() { if (buffer) { delete[] buffer; buffer = nullptr; } }
+			// Ensure buffer can hold x*y elements, only reallocate if needed
+			void ensureCapacity(int x, int y)
+			{
+				mergeStride = y;
+				mergeSize = x * y;
+				if (mergeSize > capacity)
+				{
+					delete[] buffer;
+					buffer = new CollisionMerge[mergeSize];
+					capacity = mergeSize;
+				}
+			}
+
+			// Clear buffer contents without deallocating
+			void clear()
+			{
+				std::memset(buffer, 0, mergeSize * sizeof(CollisionMerge));
+			}
+
+			void release() { if (buffer) { delete[] buffer; buffer = nullptr; capacity = 0; } }
 
 			CollisionMerge* get(int x, int y) { return &buffer[x * mergeStride + y]; }
 
@@ -100,6 +123,7 @@ namespace hdt
 
 			int mergeStride;
 			int mergeSize;
+			int capacity;
 			CollisionMerge* buffer;
 #ifdef CUDA
 			std::mutex lock;

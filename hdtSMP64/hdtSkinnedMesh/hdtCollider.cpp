@@ -124,11 +124,10 @@ namespace hdt
 	{
 		if (numCollider)
 		{
-			Aabb aabb = *this->aabb;
-			auto aabbEnd = this->aabb + numCollider;
-			for (auto i = this->aabb + 1; i < aabbEnd; ++i)
-				aabb.merge(*i);
-			aabbMe = aabb;
+			// Use AVX2 batch merge for efficiency
+			aabbMe = *this->aabb;
+			if (numCollider > 1)
+				aabbMe.mergeMany(this->aabb + 1, numCollider - 1);
 		}
 #ifdef CUDA
 		else
