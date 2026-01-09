@@ -243,6 +243,8 @@ namespace hdt
 		int m_maxActiveSkeletons = 20; // The maximum active skeletons; hard limit
 		int m_framesToNextIncrease = 0; // Cooldown frames before next skeleton increase allowed
 		float m_minCullingDistance = 500; // The distance from the camera under which we never cull the skeletons.
+		bool m_windowHadFocus = true; // Track window focus to avoid auto-scaling during alt-tab
+		float m_smoothedMargin = 0.0f; // EMA-smoothed margin for auto-adjustment stability
 
 		// @brief Depending on this setting, we avoid to calculate the physics of the PC when it is in 1st person view.
 		bool m_disable1stPersonViewPhysics = false;
