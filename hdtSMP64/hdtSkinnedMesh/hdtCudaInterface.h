@@ -1,12 +1,13 @@
 #pragma once
 #ifdef CUDA
 
-#include "hdtSkinnedMeshShape.h"
 #include "hdtDispatcher.h"
-#include <string>
-#include <variant>
+#include "hdtSkinnedMeshShape.h"
+
 #include <atomic>
 #include <mutex>
+#include <string>
+#include <variant>
 
 namespace hdt
 {
@@ -16,6 +17,7 @@ namespace hdt
 		friend class CudaPerVertexShape;
 		friend class CudaInterface;
 		friend class CudaMergeBuffer;
+
 	public:
 		CudaBody(SkinnedMeshBody* body);
 		void synchronize();
@@ -25,12 +27,13 @@ namespace hdt
 		class Imp;
 		std::shared_ptr<Imp> m_imp;
 	};
-	
+
 	class CudaPerTriangleShape
 	{
-		template <typename T>
+		template<typename T>
 		friend class CudaCollisionPair;
 		friend class CudaInterface;
+
 	public:
 		class Imp;
 
@@ -44,9 +47,10 @@ namespace hdt
 
 	class CudaPerVertexShape
 	{
-		template <typename T>
+		template<typename T>
 		friend class CudaCollisionPair;
 		friend class CudaInterface;
+
 	public:
 		class Imp;
 
@@ -60,8 +64,9 @@ namespace hdt
 
 	class CudaMergeBuffer
 	{
-		template <typename T>
+		template<typename T>
 		friend class CudaCollisionPair;
+
 	public:
 		class Imp;
 
@@ -75,22 +80,13 @@ namespace hdt
 		std::shared_ptr<Imp> m_imp;
 	};
 
-	template <typename T>
+	template<typename T>
 	class CudaCollisionPair
 	{
 	public:
-		CudaCollisionPair(
-			CudaPerVertexShape* shapeA,
-			T* shapeB,
-			int numCollisionPairs);
+		CudaCollisionPair(CudaPerVertexShape* shapeA, T* shapeB, int numCollisionPairs);
 
-		void addPair(
-			int offsetA,
-			int offsetB,
-			int sizeA,
-			int sizeB,
-			const Aabb& aabbA,
-			const Aabb& aabbB);
+		void addPair(int offsetA, int offsetB, int sizeA, int sizeB, const Aabb& aabbA, const Aabb& aabbB);
 
 		void launch(CudaMergeBuffer* merge, bool swap);
 
@@ -110,7 +106,8 @@ namespace hdt
 	static constexpr size_t CUDA_MAX_COLLISION_PAIRS = 2'000'000;
 
 	// Info about a collision pair for result routing
-	struct CollisionPairInfo {
+	struct CollisionPairInfo
+	{
 		// Shape references for routing results back
 		CudaPerVertexShape* shapeA = nullptr;
 		std::variant<CudaPerVertexShape*, CudaPerTriangleShape*> shapeB;
@@ -130,33 +127,45 @@ namespace hdt
 		bool swapped = false;
 
 		// Check if bodies are still valid
-		bool bodiesValid() const {
-			return cudaBody0.lock() && cudaBody1.lock();
-		}
+		bool bodiesValid() const { return cudaBody0.lock() && cudaBody1.lock(); }
 	};
 
 	// CPU-side batch pair metadata (no CUDA types exposed in header)
-	struct CpuBatchPairs {
+	struct CpuBatchPairs
+	{
 		std::vector<CollisionPairInfo> pairsVV;
 		std::vector<CollisionPairInfo> pairsVT;
 
-		void clear() {
+		void clear()
+		{
 			pairsVV.clear();
 			pairsVT.clear();
 		}
 
-		void reserve(size_t expectedPairs) {
+		void reserve(size_t expectedPairs)
+		{
 			pairsVV.reserve(expectedPairs / 2);
 			pairsVT.reserve(expectedPairs / 2);
 		}
 
-		size_t totalPairs() const {
-			return pairsVV.size() + pairsVT.size();
-		}
+		size_t totalPairs() const { return pairsVV.size() + pairsVT.size(); }
+	};
+
+	// Pending collision result for deferred application
+	struct PendingCollisionResult
+	{
+		std::shared_ptr<CudaMergeBuffer> mergeBuffer;
+		SkinnedMeshBody* body0;
+		SkinnedMeshBody* body1;
+		std::weak_ptr<CudaBody> cudaBody0;
+		std::weak_ptr<CudaBody> cudaBody1;
+
+		bool bodiesValid() const { return cudaBody0.lock() && cudaBody1.lock(); }
 	};
 
 	// Manages batched collision detection
-	class BatchedCollisionManager {
+	class BatchedCollisionManager
+	{
 	public:
 		BatchedCollisionManager() = default;
 
@@ -165,9 +174,7 @@ namespace hdt
 
 		// Add a collision pair to the batch
 		// Returns false if limit reached or invalid input
-		bool addCollisionPair(
-			SkinnedMeshBody* body0,
-			SkinnedMeshBody* body1);
+		bool addCollisionPair(SkinnedMeshBody* body0, SkinnedMeshBody* body1);
 
 		// Merge thread-local batches into global batch
 		void mergeThreadLocalBatch();
@@ -189,16 +196,15 @@ namespace hdt
 
 	private:
 		// Accumulate a VV pair into thread-local batch
-		void accumulateVV(
-			SkinnedMeshBody* body0,
-			SkinnedMeshBody* body1,
-			bool swapped);
+		void accumulateVV(SkinnedMeshBody* body0, SkinnedMeshBody* body1, bool swapped);
 
 		// Accumulate a VT pair into thread-local batch
-		void accumulateVT(
-			SkinnedMeshBody* body0,
-			SkinnedMeshBody* body1,
-			bool swapped);
+		void accumulateVT(SkinnedMeshBody* body0, SkinnedMeshBody* body1, bool swapped);
+
+		// Launch collision for a single pair (called from launchBatch)
+		template<bool Swap, typename T>
+		void launchSingleCollision(PerVertexShape* vertexShape, T* otherShape,
+								   std::shared_ptr<CudaMergeBuffer> mergeBuffer);
 
 		CpuBatchPairs m_pairs;
 
@@ -213,6 +219,9 @@ namespace hdt
 
 		// Last frame's pair count for pre-allocation
 		size_t m_lastFramePairCount = 0;
+
+		// Pending results from launched collisions (for deferred apply)
+		std::vector<PendingCollisionResult> m_pendingResults;
 	};
 
 	// Metrics for diagnosing CUDA performance variance
@@ -252,7 +261,7 @@ namespace hdt
 	public:
 		static bool enableCuda;
 		static int currentDevice;
-		static bool collectMetrics;  // Toggle via smp metrics command
+		static bool collectMetrics; // Toggle via smp metrics command
 
 		static CudaInterface* instance();
 
@@ -270,10 +279,9 @@ namespace hdt
 		static CudaGraphMetrics& graphMetrics();
 		static void resetMetrics();
 
-		static void launchInternalUpdate(
-			std::shared_ptr<CudaBody> body,
-			std::shared_ptr<CudaPerVertexShape> vertexShape,
-			std::shared_ptr<CudaPerTriangleShape> triangleShape);
+		static void launchInternalUpdate(std::shared_ptr<CudaBody> body,
+										 std::shared_ptr<CudaPerVertexShape> vertexShape,
+										 std::shared_ptr<CudaPerTriangleShape> triangleShape);
 
 		//======================================================================
 		// BATCHED COLLISION API
@@ -303,10 +311,9 @@ namespace hdt
 		BatchedCollisionManager& batchedCollisions() { return m_batchedCollisions; }
 
 	private:
-
 		CudaInterface();
 		bool m_enabled;
 		BatchedCollisionManager m_batchedCollisions;
 	};
-}
+} // namespace hdt
 #endif

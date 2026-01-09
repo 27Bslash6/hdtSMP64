@@ -994,19 +994,29 @@ namespace hdt
 	// BATCHED COLLISION MANAGER IMPLEMENTATION
 	//==========================================================================
 
+	// Forward declarations for rate-limited warning counters (defined near accumulate functions)
+	extern std::atomic<int> s_skippedPairsVV;
+	extern std::atomic<int> s_skippedPairsVT;
+
 	void BatchedCollisionManager::beginBatch()
 	{
 		// Clear global batch data
 		m_pairs.clear();
+		m_pendingResults.clear();
 
 		// Pre-allocate based on previous frame (with 20% margin)
 		if (m_lastFramePairCount > 0) {
 			size_t estimate = std::min(static_cast<size_t>(m_lastFramePairCount * 1.2), CUDA_MAX_COLLISION_PAIRS);
 			m_pairs.reserve(estimate);
+			m_pendingResults.reserve(estimate);
 		}
 
 		// Reset atomic counter
 		m_totalPairs.store(0);
+
+		// Reset skip warning counters (log once per batch cycle)
+		s_skippedPairsVV.store(0);
+		s_skippedPairsVT.store(0);
 	}
 
 	bool BatchedCollisionManager::addCollisionPair(SkinnedMeshBody* body0, SkinnedMeshBody* body1)
@@ -1058,12 +1068,28 @@ namespace hdt
 		return true;
 	}
 
+	// Rate-limited warning counter for skipped pairs
+	static std::atomic<int> s_skippedPairsVV{0};
+	static std::atomic<int> s_skippedPairsVT{0};
+
 	void BatchedCollisionManager::accumulateVV(SkinnedMeshBody* body0, SkinnedMeshBody* body1, bool swapped)
 	{
 		// Create pair info
 		CollisionPairInfo info;
-		info.shapeA = body0->m_shape->asPerVertexShape()->m_cudaObject.get();
-		info.shapeB = body1->m_shape->asPerVertexShape()->m_cudaObject.get();
+
+		// Get vertex shapes - must be valid for VV collision
+		auto perVertex0 = body0->m_shape->asPerVertexShape();
+		auto perVertex1 = body1->m_shape->asPerVertexShape();
+		if (!perVertex0 || !perVertex0->m_cudaObject || !perVertex1 || !perVertex1->m_cudaObject) {
+			// Invalid vertex shapes - skip this pair (rate-limited warning)
+			if (s_skippedPairsVV.fetch_add(1) == 0) {
+				_DMESSAGE("BatchedCollisionManager: Skipping VV pair with null CUDA object");
+			}
+			return;
+		}
+
+		info.shapeA = perVertex0->m_cudaObject.get();
+		info.shapeB = perVertex1->m_cudaObject.get();
 		info.body0 = body0;
 		info.body1 = body1;
 		info.cudaBody0 = body0->m_cudaObject;
@@ -1082,15 +1108,35 @@ namespace hdt
 	{
 		// Create pair info
 		CollisionPairInfo info;
-		info.shapeA = body0->m_shape->asPerVertexShape()->m_cudaObject.get();
 
-		// ShapeB is the triangle shape
-		if (swapped) {
-			// body0 has the triangle shape (we swapped)
-			info.shapeB = body0->m_shape->asPerTriangleShape()->m_cudaObject.get();
+		// Get vertex shape from body0 - may be direct per-vertex or from triangle shape's vertex collision
+		auto perVertex0 = body0->m_shape->asPerVertexShape();
+		auto perTri0 = body0->m_shape->asPerTriangleShape();
+		if (perVertex0 && perVertex0->m_cudaObject) {
+			info.shapeA = perVertex0->m_cudaObject.get();
+		}
+		else if (perTri0 && perTri0->m_verticesCollision && perTri0->m_verticesCollision->m_cudaObject) {
+			info.shapeA = perTri0->m_verticesCollision->m_cudaObject.get();
 		}
 		else {
-			info.shapeB = body1->m_shape->asPerTriangleShape()->m_cudaObject.get();
+			// No valid vertex shape - skip this pair
+			if (s_skippedPairsVT.fetch_add(1) == 0) {
+				_DMESSAGE("BatchedCollisionManager: Skipping VT pair - no valid vertex shape");
+			}
+			return;
+		}
+
+		// Get triangle shape from body1
+		auto perTri1 = body1->m_shape->asPerTriangleShape();
+		if (perTri1 && perTri1->m_cudaObject) {
+			info.shapeB = perTri1->m_cudaObject.get();
+		}
+		else {
+			// No valid triangle shape - skip this pair
+			if (s_skippedPairsVT.fetch_add(1) == 0) {
+				_DMESSAGE("BatchedCollisionManager: Skipping VT pair - no valid triangle shape");
+			}
+			return;
 		}
 
 		info.body0 = body0;
@@ -1113,9 +1159,48 @@ namespace hdt
 		// Thread-local approach was problematic with PPL parallel_for
 	}
 
+	// Launch collision for a single body pair - mirrors launchCollision from hdtSkinnedMeshAlgorithm.cpp
+	template<bool Swap, typename T>
+	void BatchedCollisionManager::launchSingleCollision(PerVertexShape* shape0, T* shape1,
+														std::shared_ptr<CudaMergeBuffer> cudaMerge)
+	{
+		ColliderTree* c0 = &shape0->m_tree;
+		ColliderTree* c1 = &shape1->m_tree;
+
+		std::vector<std::pair<ColliderTree*, ColliderTree*>> pairs;
+		pairs.reserve(c0->colliders.size() + c1->colliders.size());
+		c0->checkCollisionL(c1, pairs);
+		if (pairs.empty())
+			return;
+		int npairs = pairs.size();
+
+		CudaCollisionPair<typename T::CudaType> collisionPair(shape0->m_cudaObject.get(), shape1->m_cudaObject.get(),
+															  npairs);
+
+		// Set up data for each pair of collision trees
+		for (int i = 0; i < npairs; ++i) {
+			auto a = pairs[i].first;
+			auto b = pairs[i].second;
+			auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
+			auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
+
+			if (asize > 0 && bsize > 0) {
+				collisionPair.addPair(pairs[i].first->cbuf - shape0->m_colliders.data(),
+									  pairs[i].second->cbuf - shape1->m_colliders.data(), asize, bsize, a->aabbMe,
+									  b->aabbMe);
+			}
+		}
+
+		// Run the kernel
+		collisionPair.launch(cudaMerge.get(), Swap);
+	}
+
 	void BatchedCollisionManager::launchBatch()
 	{
 		HDT_ZONE_SCOPED_N("BatchedLaunchCollisions");
+
+		// Clear previous pending results
+		m_pendingResults.clear();
 
 		size_t totalPairs = m_pairs.totalPairs();
 		if (totalPairs == 0) {
@@ -1126,44 +1211,108 @@ namespace hdt
 		// Record pair count for next frame's pre-allocation
 		m_lastFramePairCount = totalPairs;
 
-		// For now, fall back to per-pair processing since we need to restructure
-		// the kernel to handle batched body pairs. This is a stepping stone.
-		//
-		// TODO: Implement true batched kernel that processes all pairs in 2-3 launches
-		// For now, this just collects pairs - actual collision still uses old path
+		// Pre-allocate for expected results
+		m_pendingResults.reserve(totalPairs);
 
-		m_hasPendingResults = true;
+		// Process VV pairs
+		{
+			HDT_ZONE_SCOPED_N("LaunchVVPairs");
+			for (const auto& pairInfo : m_pairs.pairsVV) {
+				if (!pairInfo.bodiesValid())
+					continue;
+
+				auto body0 = pairInfo.body0;
+				auto body1 = pairInfo.body1;
+
+				// Get shapes for tree traversal
+				auto vertexShape0 = body0->m_shape->asPerVertexShape();
+				auto vertexShape1 = body1->m_shape->asPerVertexShape();
+				if (!vertexShape0 || !vertexShape1)
+					continue;
+
+				// Create merge buffer and launch collision
+				auto mergeBuffer = std::make_shared<CudaMergeBuffer>(body0, body1);
+				launchSingleCollision<false>(vertexShape0, vertexShape1, mergeBuffer);
+				mergeBuffer->launchTransfer();
+
+				// Store for later application
+				m_pendingResults.push_back({mergeBuffer, body0, body1, pairInfo.cudaBody0, pairInfo.cudaBody1});
+			}
+		}
+
+		// Process VT pairs
+		{
+			HDT_ZONE_SCOPED_N("LaunchVTPairs");
+			for (const auto& pairInfo : m_pairs.pairsVT) {
+				if (!pairInfo.bodiesValid())
+					continue;
+
+				auto body0 = pairInfo.body0;
+				auto body1 = pairInfo.body1;
+
+				// For VT, body0 should have vertex shape and body1 should have triangle shape
+				// But if swapped, roles are reversed
+				SkinnedMeshBody* vertexBody = pairInfo.swapped ? body1 : body0;
+				SkinnedMeshBody* triangleBody = pairInfo.swapped ? body0 : body1;
+
+				// Get vertex shape (may be from triangle body's m_verticesCollision)
+				PerVertexShape* vertexShape = nullptr;
+				auto directVertex = vertexBody->m_shape->asPerVertexShape();
+				auto vertexFromTri = vertexBody->m_shape->asPerTriangleShape();
+				if (directVertex) {
+					vertexShape = directVertex;
+				}
+				else if (vertexFromTri && vertexFromTri->m_verticesCollision) {
+					vertexShape = vertexFromTri->m_verticesCollision;
+				}
+
+				auto triangleShape = triangleBody->m_shape->asPerTriangleShape();
+				if (!vertexShape || !triangleShape)
+					continue;
+
+				// Create merge buffer and launch collision
+				auto mergeBuffer = std::make_shared<CudaMergeBuffer>(body0, body1);
+				if (pairInfo.swapped) {
+					launchSingleCollision<true>(vertexShape, triangleShape, mergeBuffer);
+				}
+				else {
+					launchSingleCollision<false>(vertexShape, triangleShape, mergeBuffer);
+				}
+				mergeBuffer->launchTransfer();
+
+				// Store for later application
+				m_pendingResults.push_back({mergeBuffer, body0, body1, pairInfo.cudaBody0, pairInfo.cudaBody1});
+			}
+		}
+
+		m_hasPendingResults = !m_pendingResults.empty();
+		HDT_ZONE_VALUE(static_cast<int64_t>(m_pendingResults.size()));
 	}
 
 	void BatchedCollisionManager::applyResults(CollisionDispatcher* dispatcher)
 	{
 		HDT_ZONE_SCOPED_N("BatchedApplyResults");
 
-		if (!m_hasPendingResults) {
+		if (!m_hasPendingResults || m_pendingResults.empty()) {
 			return;
 		}
 
-		// Process VV results
-		for (const auto& pair : m_pairs.pairsVV) {
+		HDT_ZONE_VALUE(static_cast<int64_t>(m_pendingResults.size()));
+
+		// Apply all pending collision results
+		for (auto& result : m_pendingResults) {
 			// CRITICAL: Check bodies still exist via CUDA object weak_ptr
-			if (!pair.bodiesValid()) {
+			if (!result.bodiesValid()) {
 				// Body was destroyed between gather and apply - skip
 				continue;
 			}
 
-			// TODO: Apply results from m_hostMergeBuffer[pair.mergeBufferOffset]
-			// For now, results are applied via the old path
+			// Apply merge buffer results to physics manifolds
+			result.mergeBuffer->apply(result.body0, result.body1, dispatcher);
 		}
 
-		// Process VT results (same pattern)
-		for (const auto& pair : m_pairs.pairsVT) {
-			if (!pair.bodiesValid()) {
-				continue;
-			}
-
-			// TODO: Apply results from m_hostMergeBuffer[pair.mergeBufferOffset]
-		}
-
+		// Clear pending results after application
+		m_pendingResults.clear();
 		m_hasPendingResults = false;
 	}
 

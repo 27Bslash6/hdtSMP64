@@ -1,7 +1,9 @@
 #include "hdtDispatcher.h"
-#include "hdtSkinnedMeshBody.h"
-#include "hdtSkinnedMeshAlgorithm.h"
+
 #include "hdtFrameTimer.h"
+#include "hdtSkinnedMeshAlgorithm.h"
+#include "hdtSkinnedMeshBody.h"
+
 #include "../hdtTracy.h"
 #ifdef CUDA
 #include "hdtCudaInterface.h"
@@ -22,8 +24,7 @@ namespace hdt
 	void CollisionDispatcher::clearAllManifold()
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		for (int i = 0; i < m_manifoldsPtr.size(); ++i)
-		{
+		for (int i = 0; i < m_manifoldsPtr.size(); ++i) {
 			auto manifold = m_manifoldsPtr[i];
 			manifold->~btPersistentManifold();
 			if (m_persistentManifoldPoolAllocator->validPtr(manifold))
@@ -50,34 +51,34 @@ namespace hdt
 		auto shape0 = dynamic_cast<const SkinnedMeshBody*>(body0);
 		auto shape1 = dynamic_cast<const SkinnedMeshBody*>(body1);
 
-		if (shape0 || shape1)
-		{
+		if (shape0 || shape1) {
 			return hdt::needsCollision(shape0, shape1);
 		}
 		if (body0->isStaticOrKinematicObject() && body1->isStaticOrKinematicObject())
 			return false;
-		if (body0->checkCollideWith(body1) || body1->checkCollideWith(body0))
-		{
+		if (body0->checkCollideWith(body1) || body1->checkCollideWith(body0)) {
 			auto rb0 = static_cast<SkinnedMeshBone*>(body0->getUserPointer());
 			auto rb1 = static_cast<SkinnedMeshBone*>(body1->getUserPointer());
 
 			return rb0->canCollideWith(rb1) && rb1->canCollideWith(rb0);
 		}
-		else return false;
+		else
+			return false;
 	}
 
 	void CollisionDispatcher::dispatchAllCollisionPairs(btOverlappingPairCache* pairCache,
-		const btDispatcherInfo& dispatchInfo, btDispatcher* dispatcher)
+														const btDispatcherInfo& dispatchInfo, btDispatcher* dispatcher)
 	{
 		HDT_ZONE_SCOPED_N("DispatchCollisionPairs");
 		auto size = pairCache->getNumOverlappingPairs();
 		HDT_ZONE_VALUE(static_cast<int64_t>(size));
-		if (!size) return;
+		if (!size)
+			return;
 
 		m_pairs.reserve(size);
 		auto pairs = pairCache->getOverlappingPairArrayPtr();
 #ifdef CUDA
-		using UpdateMap = std::unordered_map<SkinnedMeshBody*, std::pair<PerVertexShape*, PerTriangleShape*> >;
+		using UpdateMap = std::unordered_map<SkinnedMeshBody*, std::pair<PerVertexShape*, PerTriangleShape*>>;
 		UpdateMap to_update;
 		// Find bodies and meshes that need collision checking. We want to keep them together in a map so they can
 		// be grouped by CUDA stream
@@ -88,44 +89,45 @@ namespace hdt
 		std::unordered_set<PerVertexShape*> vertex_shapes;
 		std::unordered_set<PerTriangleShape*> triangle_shapes;
 
-		concurrency::parallel_for(0, size, [&](int i)
+		concurrency::parallel_for(
+			0, size,
+			[&](int i)
 #endif
-			{
-				auto& pair = pairs[i];
+		{
+			auto& pair = pairs[i];
 
-				auto shape0 = dynamic_cast<SkinnedMeshBody*>(static_cast<btCollisionObject*>(pair.m_pProxy0->m_clientObject));
-				auto shape1 = dynamic_cast<SkinnedMeshBody*>(static_cast<btCollisionObject*>(pair.m_pProxy1->m_clientObject));
+			auto shape0 =
+				dynamic_cast<SkinnedMeshBody*>(static_cast<btCollisionObject*>(pair.m_pProxy0->m_clientObject));
+			auto shape1 =
+				dynamic_cast<SkinnedMeshBody*>(static_cast<btCollisionObject*>(pair.m_pProxy1->m_clientObject));
 
-				if (shape0 || shape1)
-				{
-					if (hdt::needsCollision(shape0, shape1) && shape0->isBoundingSphereCollided(shape1))
-					{
+			if (shape0 || shape1) {
+				if (hdt::needsCollision(shape0, shape1) && shape0->isBoundingSphereCollided(shape1)) {
 #ifdef CUDA
-						auto it0 = to_update.insert({ shape0, {nullptr, nullptr} }).first;
-						auto it1 = to_update.insert({ shape1, {nullptr, nullptr} }).first;
+					auto it0 = to_update.insert({shape0, {nullptr, nullptr}}).first;
+					auto it1 = to_update.insert({shape1, {nullptr, nullptr}}).first;
 #else
 						HDT_LOCK_GUARD(l, lock);
 						bodies.insert(shape0);
 						bodies.insert(shape1);
 #endif
-						m_pairs.push_back(std::make_pair(shape0, shape1));
+					m_pairs.push_back(std::make_pair(shape0, shape1));
 
-						auto a = shape0->m_shape->asPerTriangleShape();
-						auto b = shape1->m_shape->asPerTriangleShape();
+					auto a = shape0->m_shape->asPerTriangleShape();
+					auto b = shape1->m_shape->asPerTriangleShape();
 #ifdef CUDA
-						if (a)
-							it0->second.second = a;
-						else
-							it0->second.first = shape0->m_shape->asPerVertexShape();
-						if (b)
-							it1->second.second = b;
-						else
-							it1->second.first = shape1->m_shape->asPerVertexShape();
-						if (a && b)
-						{
-							it0->second.first = a->m_verticesCollision;
-							it1->second.first = b->m_verticesCollision;
-						}
+					if (a)
+						it0->second.second = a;
+					else
+						it0->second.first = shape0->m_shape->asPerVertexShape();
+					if (b)
+						it1->second.second = b;
+					else
+						it1->second.first = shape1->m_shape->asPerVertexShape();
+					if (a && b) {
+						it0->second.first = a->m_verticesCollision;
+						it1->second.first = b->m_verticesCollision;
+					}
 #else
 						if (a)
 							triangle_shapes.insert(a);
@@ -135,55 +137,55 @@ namespace hdt
 							triangle_shapes.insert(b);
 						else
 							vertex_shapes.insert(shape1->m_shape->asPerVertexShape());
-						if (a && b)
-						{
+						if (a && b) {
 							vertex_shapes.insert(a->m_verticesCollision);
 							vertex_shapes.insert(b->m_verticesCollision);
 						}
 #endif
-					}
 				}
-				else getNearCallback()(pair, *this, dispatchInfo);
-#ifdef CUDA
 			}
-		bool haveCuda = CudaInterface::instance()->hasCuda() && (!FrameTimer::instance()->running() || FrameTimer::instance()->cudaFrame());
+			else
+				getNearCallback()(pair, *this, dispatchInfo);
+#ifdef CUDA
+		}
+		bool haveCuda = CudaInterface::instance()->hasCuda() &&
+						(!FrameTimer::instance()->running() || FrameTimer::instance()->cudaFrame());
 		FrameTimer::instance()->logEvent(FrameTimer::e_Start);
-		if (haveCuda)
-		{
+		if (haveCuda) {
 			bool initialized = true;
 			int deviceId = CudaInterface::currentDevice;
 
 			// Build simple vectors of the things to update, and determine whether any new CUDA objects need
 			// to be created - either because there isn't one already, or because it's on the wrong device
-			for (auto& o : to_update)
-			{
-				initialized &= static_cast<bool>(o.first->m_cudaObject) && o.first->m_cudaObject->deviceId() == deviceId;
-				if (o.second.first)
-				{
-					initialized &= static_cast<bool>(o.second.first->m_cudaObject) && o.second.first->m_cudaObject->deviceId() == deviceId;
+			for (auto& o : to_update) {
+				initialized &= static_cast<bool>(o.first->m_cudaObject) &&
+							   o.first->m_cudaObject->deviceId() == deviceId;
+				if (o.second.first) {
+					initialized &= static_cast<bool>(o.second.first->m_cudaObject) &&
+								   o.second.first->m_cudaObject->deviceId() == deviceId;
 				}
-				if (o.second.second)
-				{
-					initialized &= static_cast<bool>(o.second.second->m_cudaObject) && o.second.second->m_cudaObject->deviceId() == deviceId;
+				if (o.second.second) {
+					initialized &= static_cast<bool>(o.second.second->m_cudaObject) &&
+								   o.second.second->m_cudaObject->deviceId() == deviceId;
 				}
 			}
 
 			// Create any new CUDA objects if necessary
-			if (!initialized)
-			{
-				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [deviceId](UpdateMap::value_type& o)
-					{
+			if (!initialized) {
+				concurrency::parallel_for_each(
+					to_update.begin(), to_update.end(), [deviceId](UpdateMap::value_type& o) {
 						CudaInterface::instance()->setCurrentDevice();
 
-						if (!o.first->m_cudaObject || o.first->m_cudaObject->deviceId() != deviceId)
-						{
+						if (!o.first->m_cudaObject || o.first->m_cudaObject->deviceId() != deviceId) {
 							o.first->m_cudaObject.reset(new CudaBody(o.first));
 						}
-						if (o.second.first && (!o.second.first->m_cudaObject || o.second.first->m_cudaObject->deviceId() != deviceId))
+						if (o.second.first &&
+							(!o.second.first->m_cudaObject || o.second.first->m_cudaObject->deviceId() != deviceId))
 						{
 							o.second.first->m_cudaObject.reset(new CudaPerVertexShape(o.second.first));
 						}
-						if (o.second.second && (!o.second.second->m_cudaObject || o.second.second->m_cudaObject->deviceId() != deviceId))
+						if (o.second.second &&
+							(!o.second.second->m_cudaObject || o.second.second->m_cudaObject->deviceId() != deviceId))
 						{
 							o.second.second->m_cudaObject.reset(new CudaPerTriangleShape(o.second.second));
 						}
@@ -197,15 +199,13 @@ namespace hdt
 			{
 				HDT_ZONE_SCOPED_N("LaunchInternalUpdates");
 				// Fully parallel: updateBones (CPU) + CUDA launches (mutex-protected graph capture)
-				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
-					{
-						CudaInterface::instance()->setCurrentDevice();
-						o.first->updateBones();
-						CudaInterface::launchInternalUpdate(
-							o.first->m_cudaObject,
-							o.second.first ? o.second.first->m_cudaObject : nullptr,
-							o.second.second ? o.second.second->m_cudaObject : nullptr);
-					});
+				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
+					CudaInterface::instance()->setCurrentDevice();
+					o.first->updateBones();
+					CudaInterface::launchInternalUpdate(o.first->m_cudaObject,
+														o.second.first ? o.second.first->m_cudaObject : nullptr,
+														o.second.second ? o.second.second->m_cudaObject : nullptr);
+				});
 			}
 
 			// Update the aggregate parts of the AABB trees
@@ -221,86 +221,66 @@ namespace hdt
 				{
 					HDT_ZONE_SCOPED_N("ParallelTreeUpdates");
 					// Tree updates are CPU work - can run in parallel
-					concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
-						{
-							if (o.second.first)
-							{
-								o.second.first->m_cudaObject->updateTree();
-							}
-							if (o.second.second)
-							{
-								o.second.second->m_cudaObject->updateTree();
-							}
-							o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
-						});
+					concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
+						if (o.second.first) {
+							o.second.first->m_cudaObject->updateTree();
+						}
+						if (o.second.second) {
+							o.second.second->m_cudaObject->updateTree();
+						}
+						o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
+					});
 				}
 			}
 		}
-		else
-		{
-			concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o)
-				{
-					o.first->internalUpdate();
-					if (o.second.first)
-					{
-						o.second.first->internalUpdate();
-					}
-					if (o.second.second)
-					{
-						o.second.second->internalUpdate();
-					}
-					o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
-				});
+		else {
+			concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
+				o.first->internalUpdate();
+				if (o.second.first) {
+					o.second.first->internalUpdate();
+				}
+				if (o.second.second) {
+					o.second.second->internalUpdate();
+				}
+				o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
+			});
 		}
 
 		FrameTimer::instance()->logEvent(FrameTimer::e_Internal);
-		m_delayedFuncs.clear();
-
-		if (haveCuda)
-		{
+		if (haveCuda) {
 			CudaInterface::instance()->clearBufferPool();
 
 			// Begin batched collision gathering
 			CudaInterface::instance()->beginCollisionBatch();
 
-			// Launch collision checking - parallelized for better CPU utilization
+			// Gather collision pairs - parallelized for CPU utilization
 			{
-				HDT_ZONE_SCOPED_N("CudaQueueCollisions");
+				HDT_ZONE_SCOPED_N("CudaGatherPairs");
 				const int pairCount = static_cast<int>(m_pairs.size());
 
-				// All collisions are now delayed - results applied next frame
-				// This eliminates the GlobalResultsSync bottleneck (was 17% of frame time)
-				concurrency::parallel_for(0, pairCount, [this](int i)
-					{
-						auto& pair = m_pairs[i];
-						if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
-						{
-							// Add to batched collision system (for future batched processing)
-							CudaInterface::instance()->addCollisionPair(pair.first, pair.second);
-
-							// Still use old path for actual collision detection (until batched kernel is ready)
-							m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
-						}
-
-					});
+				// Gather all collision pairs into batched system
+				concurrency::parallel_for(0, pairCount, [this](int i) {
+					auto& pair = m_pairs[i];
+					if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree)) {
+						// Add to batched collision system
+						CudaInterface::instance()->addCollisionPair(pair.first, pair.second);
+					}
+				});
 			}
 
-			// Launch batched collision kernels (stub for now - will replace queueCollision path)
+			// Launch batched collision kernels (processes all pairs collected above)
 			CudaInterface::instance()->launchCollisionBatch();
 
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 
-			// No sync needed - all collision results are applied next frame
+			// No sync needed - collision results applied at start of next frame
 			// GPU work continues asynchronously while we proceed with constraint solving
 		}
-		else
-		{
+		else {
 			// Now we can process the collisions
-			concurrency::parallel_for_each(m_pairs.begin(), m_pairs.end(),
-				[this](std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i)
-				{
-					if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree))
-					{
+			concurrency::parallel_for_each(
+				m_pairs.begin(), m_pairs.end(), [this](std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
+					if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree)) {
 						SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
 					}
 				});
@@ -317,43 +297,32 @@ namespace hdt
 	{
 		// Sync and apply collision results from previous frame
 		// Called at START of physics step (before prediction) to allow GPU overlap with solve
-		if (!m_delayedFuncs.empty())
-		{
+		if (CudaInterface::instance()->hasCollisionResults()) {
 			HDT_ZONE_SCOPED_N("SyncPreviousCollisions");
 			CudaInterface::instance()->synchronize();
 
-			for (auto& f : m_delayedFuncs)
-			{
-				f();
-			}
-			m_delayedFuncs.clear();
+			// Apply batched collision results
+			CudaInterface::instance()->applyCollisionResults(this);
 		}
 	}
 #else
 			});
 		FrameTimer::instance()->logEvent(FrameTimer::e_Start);
-		concurrency::parallel_for_each(bodies.begin(), bodies.end(), [](SkinnedMeshBody* shape)
-		{
-			shape->internalUpdate();
-		});
-		concurrency::parallel_for_each(vertex_shapes.begin(), vertex_shapes.end(), [](PerVertexShape* shape)
-		{
-			shape->internalUpdate();
-		});
-		concurrency::parallel_for_each(triangle_shapes.begin(), triangle_shapes.end(), [](PerTriangleShape* shape)
-		{
-			shape->internalUpdate();
-		});
-		for (auto body : bodies)
-		{
+		concurrency::parallel_for_each(bodies.begin(), bodies.end(),
+									   [](SkinnedMeshBody* shape) { shape->internalUpdate(); });
+		concurrency::parallel_for_each(vertex_shapes.begin(), vertex_shapes.end(),
+									   [](PerVertexShape* shape) { shape->internalUpdate(); });
+		concurrency::parallel_for_each(triangle_shapes.begin(), triangle_shapes.end(),
+									   [](PerTriangleShape* shape) { shape->internalUpdate(); });
+		for (auto body : bodies) {
 			body->m_bulletShape.m_aabb = body->m_shape->m_tree.aabbAll;
 		}
 		FrameTimer::instance()->logEvent(FrameTimer::e_Internal);
-		concurrency::parallel_for_each(m_pairs.begin(), m_pairs.end(), [&, this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i)
-		{
-			if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree))
-				SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
-		});
+		concurrency::parallel_for_each(m_pairs.begin(), m_pairs.end(),
+									   [&, this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
+										   if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree))
+											   SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
+									   });
 		FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 		m_pairs.clear();
 		FrameTimer::instance()->addManifoldCount(getNumManifolds());
@@ -375,4 +344,4 @@ namespace hdt
 	{
 		return btCollisionDispatcherMt::getInternalManifoldPointer();
 	}
-}
+} // namespace hdt
