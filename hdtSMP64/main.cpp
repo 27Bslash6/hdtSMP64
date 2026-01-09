@@ -20,6 +20,8 @@
 #include <regex>
 
 #include <shlobj_core.h>
+#include <DbgHelp.h>
+#pragma comment(lib, "DbgHelp.lib")
 #include "skse64/GameRTTI.h"
 #include "skse64_common/BranchTrampoline.h"
 
@@ -743,6 +745,95 @@ namespace hdt
 		}
 	}
 
+	// Global crash handler - logs crash info before game's handler takes over
+	static LONG WINAPI hdtCrashHandler(PEXCEPTION_POINTERS ex)
+	{
+		// Only log actual crashes, not C++ exceptions or breakpoints
+		DWORD code = ex->ExceptionRecord->ExceptionCode;
+		if (code == EXCEPTION_ACCESS_VIOLATION ||
+			code == EXCEPTION_ARRAY_BOUNDS_EXCEEDED ||
+			code == EXCEPTION_STACK_OVERFLOW ||
+			code == EXCEPTION_ILLEGAL_INSTRUCTION ||
+			code == EXCEPTION_IN_PAGE_ERROR ||
+			code == EXCEPTION_INT_DIVIDE_BY_ZERO ||
+			code == EXCEPTION_PRIV_INSTRUCTION)
+		{
+			_FATALERROR("=== HDT-SMP CRASH DETECTED ===");
+			_FATALERROR("Exception Code: 0x%08X", code);
+			_FATALERROR("Exception Addr: 0x%p", ex->ExceptionRecord->ExceptionAddress);
+
+			if (code == EXCEPTION_ACCESS_VIOLATION && ex->ExceptionRecord->NumberParameters >= 2)
+			{
+				const char* op = ex->ExceptionRecord->ExceptionInformation[0] == 0 ? "reading" : "writing";
+				_FATALERROR("Access violation %s address: 0x%p", op, (void*)ex->ExceptionRecord->ExceptionInformation[1]);
+			}
+
+			// Log registers
+			CONTEXT* ctx = ex->ContextRecord;
+			_FATALERROR("RIP=0x%p RSP=0x%p RBP=0x%p", (void*)ctx->Rip, (void*)ctx->Rsp, (void*)ctx->Rbp);
+			_FATALERROR("RAX=0x%p RBX=0x%p RCX=0x%p RDX=0x%p", (void*)ctx->Rax, (void*)ctx->Rbx, (void*)ctx->Rcx, (void*)ctx->Rdx);
+
+			// Capture stack trace with symbol names
+			HANDLE process = GetCurrentProcess();
+			SymInitialize(process, NULL, TRUE);
+
+			_FATALERROR("Stack trace:");
+			void* stack[32];
+			USHORT frames = CaptureStackBackTrace(0, 32, stack, NULL);
+
+			char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+			PSYMBOL_INFO symbol = (PSYMBOL_INFO)symbolBuffer;
+			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+			symbol->MaxNameLen = MAX_SYM_NAME;
+
+			HMODULE hMod = GetModuleHandleA("hdtSMP64.dll");
+			ULONGLONG dllBase = hMod ? (ULONGLONG)hMod : 0;
+
+			for (USHORT i = 0; i < frames; i++)
+			{
+				DWORD64 address = (DWORD64)stack[i];
+				DWORD64 displacement = 0;
+
+				if (SymFromAddr(process, address, &displacement, symbol))
+				{
+					_FATALERROR("  [%02d] %s+0x%llX (0x%p)", i, symbol->Name, displacement, stack[i]);
+				}
+				else if (dllBase && address >= dllBase && address < dllBase + 0x1000000)
+				{
+					_FATALERROR("  [%02d] hdtSMP64.dll+0x%llX (0x%p)", i, address - dllBase, stack[i]);
+				}
+				else
+				{
+					_FATALERROR("  [%02d] 0x%p", i, stack[i]);
+				}
+			}
+
+			if (hMod)
+			{
+				_FATALERROR("hdtSMP64.dll base: 0x%p (crash offset: 0x%llX)",
+					hMod, (ULONGLONG)ex->ExceptionRecord->ExceptionAddress - dllBase);
+			}
+
+			SymCleanup(process);
+
+			_FATALERROR("=== END CRASH INFO ===");
+		}
+
+		// Continue search - let game's handler deal with it
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+
+	static PVOID g_vehHandle = nullptr;
+
+	static void installCrashHandler()
+	{
+		g_vehHandle = AddVectoredExceptionHandler(1, hdtCrashHandler);
+		if (g_vehHandle)
+		{
+			_MESSAGE("HDT-SMP crash handler installed");
+		}
+	}
+
 	/* This function is the most prone to SEH exceptions. */
 	static bool enclosedLoadConfig(const SKSEInterface* skse)
 	{
@@ -763,6 +854,7 @@ namespace hdt
 #ifdef ANNIVERSARY_EDITION
 			hdt::gLog.OpenRelative(CSIDL_MYDOCUMENTS, "\\My Games\\Skyrim Special Edition\\SKSE\\hdtSMP64.log");
 			hdt::gLog.SetLogLevel(IDebugLog::LogLevel::kLevel_Message);
+			installCrashHandler();  // Install VEH crash handler early
 			_MESSAGE("hdtSMP64 v%lu", hdt::hdtSMP64Version);
 			_MESSAGE("  Build: %s %s", hdt::BuildInfo::GetBuildDate(), hdt::BuildInfo::GetBuildTime());
 			_MESSAGE("  Target: %s | %s | %s", hdt::BuildInfo::GetGameVersionString(), hdt::BuildInfo::GetCudaStatus(), hdt::BuildInfo::GetAVXLevel());
@@ -950,6 +1042,7 @@ extern "C" {
 #endif
 		);
 		hdt::gLog.SetLogLevel(IDebugLog::LogLevel::kLevel_Message);
+		installCrashHandler();  // Install VEH crash handler early
 
 		_MESSAGE("hdtSMP64 v%lu", hdt::hdtSMP64Version);
 		_MESSAGE("  Build: %s %s", hdt::BuildInfo::GetBuildDate(), hdt::BuildInfo::GetBuildTime());

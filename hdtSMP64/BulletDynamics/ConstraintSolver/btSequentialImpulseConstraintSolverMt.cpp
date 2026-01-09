@@ -23,7 +23,7 @@ subject to the following restrictions:
 #include "BulletDynamics/Dynamics/btRigidBody.h"
 
 bool btSequentialImpulseConstraintSolverMt::s_allowNestedParallelForLoops = false;  // some task schedulers don't like nested loops
-int btSequentialImpulseConstraintSolverMt::s_minimumContactManifoldsForBatching = 250;
+int btSequentialImpulseConstraintSolverMt::s_minimumContactManifoldsForBatching = 4;
 int btSequentialImpulseConstraintSolverMt::s_minBatchSize = 50;
 int btSequentialImpulseConstraintSolverMt::s_maxBatchSize = 100;
 btBatchedConstraints::BatchingMethod btSequentialImpulseConstraintSolverMt::s_contactBatchingMethod = btBatchedConstraints::BATCHING_METHOD_SPATIAL_GRID_2D;
@@ -393,8 +393,23 @@ void btSequentialImpulseConstraintSolverMt::internalCollectContactManifoldCached
 	{
 		btContactManifoldCachedInfo* cachedInfo = &cachedInfoArray[i];
 		btPersistentManifold* manifold = manifoldPtr[i];
+
+		// Safety check: skip invalid manifolds
+		if (!manifold)
+		{
+			cachedInfo->numTouchingContacts = 0;
+			continue;
+		}
+
 		btCollisionObject* colObj0 = (btCollisionObject*)manifold->getBody0();
 		btCollisionObject* colObj1 = (btCollisionObject*)manifold->getBody1();
+
+		// Safety check: skip manifolds with NULL bodies
+		if (!colObj0 || !colObj1)
+		{
+			cachedInfo->numTouchingContacts = 0;
+			continue;
+		}
 
 		int solverBodyIdA = getOrInitSolverBodyThreadsafe(*colObj0, infoGlobal.m_timeStep);
 		int solverBodyIdB = getOrInitSolverBodyThreadsafe(*colObj1, infoGlobal.m_timeStep);
@@ -835,6 +850,19 @@ btScalar btSequentialImpulseConstraintSolverMt::solveGroupCacheFriendlySetup(
 	const btContactSolverInfo& infoGlobal,
 	btIDebugDraw* debugDrawer)
 {
+	// FIX: Clear batch structures at start of frame to prevent stale data from previous frames
+	// causing crashes when batching state changes between frames
+	m_batchedContactConstraints.m_constraintIndices.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_batches.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_phases.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_phaseGrainSize.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_phaseOrder.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_constraintIndices.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_batches.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_phases.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_phaseGrainSize.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_phaseOrder.resizeNoInitialize(0);
+
 	m_numFrictionDirections = (infoGlobal.m_solverMode & SOLVER_USE_2_FRICTION_DIRECTIONS) ? 2 : 1;
 	m_useBatching = false;
 	if (numManifolds >= s_minimumContactManifoldsForBatching &&
@@ -905,7 +933,6 @@ void btSequentialImpulseConstraintSolverMt::solveGroupCacheFriendlySplitImpulseI
 			{
 				const btBatchedConstraints& batchedCons = m_batchedContactConstraints;
 				ContactSplitPenetrationImpulseSolverLoop loop(this, &batchedCons);
-				btScalar leastSquaresResidual = 0.f;
 				for (int iiPhase = 0; iiPhase < batchedCons.m_phases.size(); ++iiPhase)
 				{
 					int iPhase = batchedCons.m_phaseOrder[iiPhase];
@@ -1040,7 +1067,7 @@ btScalar btSequentialImpulseConstraintSolverMt::resolveMultipleContactFrictionCo
 			int iEnd = iBegin + m_numFrictionDirections;
 			for (int iFriction = iBegin; iFriction < iEnd; ++iFriction)
 			{
-				btSolverConstraint& solveManifold = m_tmpSolverContactFrictionConstraintPool[iFriction++];
+				btSolverConstraint& solveManifold = m_tmpSolverContactFrictionConstraintPool[iFriction];
 				btAssert(solveManifold.m_frictionIndex == iContact);
 
 				solveManifold.m_lowerLimit = -(solveManifold.m_friction * totalImpulse);
