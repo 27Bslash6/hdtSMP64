@@ -53,7 +53,7 @@
 ### Installation
 1. Install SKSE64 for your game version
 2. Copy `hdtSMP64.dll` to `Data/SKSE/Plugins/`
-3. Copy `configs/configs.xml` to `Data/SKSE/Plugins/`
+3. Copy `configs/configs.xml` to `Data/SKSE/Plugins/hdtSkinnedMeshConfigs/`
 4. (Optional) Enable CUDA in configs.xml or via console
 
 ### Console Commands
@@ -194,14 +194,14 @@ git checkout master
 In Visual Studio, open hdtSMP64 project properties:
 
 **C/C++ > Additional Include Directories:**
-```
+```text
 D:\Dev\Detours\include
 D:\Dev\bullet3\src
 D:\Dev\skse64_2_00_19\src
 ```
 
 **Linker > Additional Library Directories:**
-```
+```text
 D:\Dev\bullet3\lib\Release
 D:\Dev\Detours\lib.X64
 ```
@@ -248,7 +248,7 @@ See [Nexus bug reports](https://nexusmods.com/skyrimspecialedition/mods/57339?ta
 
 ## Fork History
 
-```
+```text
 hydrogensaysHDT/hdt-skyrimse-mods (original)
     └── aers/hdtSMP64
         └── Karonar1/hdtSMP64

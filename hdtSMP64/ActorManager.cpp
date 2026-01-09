@@ -244,14 +244,21 @@ namespace hdt
 	RelocAddr<_Actor_CalculateLOS> Actor_CalculateLOS(offset::Actor_CalculateLOS);
 
 	// Check if the game window has focus (avoids auto-scaling issues during alt-tab)
+	// Note: Relies on Windows.h via SKSE's IPrefix.h (included in hdtPrefix.h)
 	inline bool isGameWindowFocused()
 	{
+#ifdef SKYRIMVR
+		// VR: GetForegroundWindow() returns the VR compositor/runtime window, not the game.
+		// This would cause auto-scaling to permanently pause. Skip focus gating in VR.
+		return true;
+#else
 		HWND foreground = GetForegroundWindow();
 		if (!foreground) return false;
 
 		DWORD foregroundPid = 0;
 		GetWindowThreadProcessId(foreground, &foregroundPid);
 		return foregroundPid == GetCurrentProcessId();
+#endif
 	}
 
 
