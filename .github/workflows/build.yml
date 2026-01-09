@@ -2,12 +2,13 @@ name: Build and Test
 
 on:
   push:
-    branches: [master, test, feature/*]
+    branches: [master, test]  # Only direct pushes to main branches
   pull_request:
-    branches: [master, test]
+    branches: [master, test]  # PRs trigger their own checks
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Use head_ref for PRs (branch name), ref for pushes - dedupes push+PR on same branch
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:

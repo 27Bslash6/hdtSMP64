@@ -243,6 +243,25 @@ namespace hdt
 	typedef NiAVObject* (*_Actor_CalculateLOS)(Actor* aActor, NiPoint3* aTargetPosition, NiPoint3* aRayHitPosition, float aViewCone);
 	RelocAddr<_Actor_CalculateLOS> Actor_CalculateLOS(offset::Actor_CalculateLOS);
 
+	// Check if the game window has focus (avoids auto-scaling issues during alt-tab)
+	// Note: Relies on Windows.h via SKSE's IPrefix.h (included in hdtPrefix.h)
+	inline bool isGameWindowFocused()
+	{
+#ifdef SKYRIMVR
+		// VR: GetForegroundWindow() returns the VR compositor/runtime window, not the game.
+		// This would cause auto-scaling to permanently pause. Skip focus gating in VR.
+		return true;
+#else
+		HWND foreground = GetForegroundWindow();
+		if (!foreground) return false;
+
+		DWORD foregroundPid = 0;
+		GetWindowThreadProcessId(foreground, &foregroundPid);
+		return foregroundPid == GetCurrentProcessId();
+#endif
+	}
+
+
 	inline NiNode* ActorManager::getCameraNode()
 	{
 #ifdef SKYRIMVR
@@ -386,43 +405,74 @@ namespace hdt
 			activeSkeletons, maxActiveSkeletons, m_skeletons.size(),
 			averageTimePerSkeletonInMainLoop, averageProcessingTimeInMainLoop, target_time);
 			if (m_autoAdjustMaxSkeletons) {
-				const float margin = target_time - averageProcessingTimeInMainLoop;
-				const float absMargin = std::abs(margin);
-				const int oldMax = maxActiveSkeletons;
+				const bool windowHasFocus = isGameWindowFocused();
 
-				// Tick down increase cooldown
-				if (m_framesToNextIncrease > 0) --m_framesToNextIncrease;
+				// Handle focus changes - skip auto-adjustment when window unfocused
+				if (!windowHasFocus) {
+					if (m_windowHadFocus) {
+						HDT_LOG_INFO("Auto-scaling: paused (window lost focus)");
+						m_smoothedMargin = 0.0f;  // Reset EMA when focus lost
+					}
+					m_windowHadFocus = false;
+					frameCount = 1;
+				} else {
+					// Window has focus - check if just regained
+					if (!m_windowHadFocus) {
+						// Focus regained - resume from previous count, just reset EMA to avoid stale data
+						m_smoothedMargin = 0.0f;
+						HDT_LOG_INFO("Auto-scaling: resumed at %d (focus regained)", maxActiveSkeletons);
+					}
+					m_windowHadFocus = true;
 
-				// Hysteresis: only adjust if margin exceeds threshold (2ms)
-				// Proportional: larger margin = larger step (but capped)
-				// Asymmetric: decrease faster than increase (avoid stutter)
-				constexpr float hysteresis = 2.0f;  // ms threshold before adjusting
-				constexpr int increaseCooldown = 2;  // metric cycles between increases (~2 sec at 60fps)
-				if (absMargin > hysteresis) {
-					int step = 0;
-					if (margin > 0 && m_framesToNextIncrease <= 0) {
-						// Under budget: increase cautiously (+1 per 1ms headroom, cooldown between increases)
-						step = std::max(1, static_cast<int>(margin / 1.0f));
-						step = std::min(step, 1);  // cap at +1
-					} else if (margin < 0) {
-						// Over budget: decrease aggressively (-1 per 1ms overage, no cooldown)
-						step = -std::max(1, static_cast<int>(absMargin / 1.0f));
-						step = std::max(step, -3);  // cap at -3
+					// margin is already smoothed via sampleSize EMA in hdtSkyrimPhysicsWorld
+					const float margin = target_time - averageProcessingTimeInMainLoop;
+
+					// Outlier rejection: skip samples with extreme margins (console open, etc.)
+					// If margin is way outside normal range (>10x budget), it's likely a timing anomaly
+					constexpr float outlierThreshold = 10.0f;  // 10x budget = clear anomaly
+					const bool isOutlier = std::abs(margin) > (target_time * outlierThreshold);
+
+					if (!isOutlier) {
+						m_smoothedMargin = margin;  // No double-smoothing; sampleSize controls response
 					}
 
-					if (step != 0) {
-						maxActiveSkeletons += step;
-						maxActiveSkeletons = std::clamp(maxActiveSkeletons, 1, m_maxActiveSkeletons);
+					const float absMargin = std::abs(m_smoothedMargin);
+					const int oldMax = maxActiveSkeletons;
 
-						if (maxActiveSkeletons != oldMax) {
-							if (step > 0) m_framesToNextIncrease = increaseCooldown;
-							HDT_LOG_INFO("Auto-scaling: %s from %d to %d (%s budget by %.2f ms, step %+d)",
-								step > 0 ? "increasing" : "decreasing", oldMax, maxActiveSkeletons,
-								step > 0 ? "under" : "over", absMargin, step);
+					// Tick down increase cooldown
+					if (m_framesToNextIncrease > 0) --m_framesToNextIncrease;
+
+					// Hysteresis: only adjust if margin exceeds threshold (2ms)
+					// Proportional: larger margin = larger step (but capped)
+					// Asymmetric: decrease faster than increase (avoid stutter)
+					constexpr float hysteresis = 2.0f;  // ms threshold before adjusting
+					constexpr int increaseCooldown = 2;  // metric cycles between increases (~2 sec at 60fps)
+					if (absMargin > hysteresis) {
+						int step = 0;
+						if (m_smoothedMargin > 0 && m_framesToNextIncrease <= 0) {
+							// Under budget: increase cautiously (+1 per 1ms headroom, cooldown between increases)
+							step = std::max(1, static_cast<int>(m_smoothedMargin / 1.0f));
+							step = std::min(step, 1);  // cap at +1
+						} else if (m_smoothedMargin < 0) {
+							// Over budget: decrease aggressively (-1 per 1ms overage, no cooldown)
+							step = -std::max(1, static_cast<int>(absMargin / 1.0f));
+							step = std::max(step, -3);  // cap at -3
+						}
+
+						if (step != 0) {
+							maxActiveSkeletons += step;
+							maxActiveSkeletons = std::clamp(maxActiveSkeletons, 1, m_maxActiveSkeletons);
+
+							if (maxActiveSkeletons != oldMax) {
+								if (step > 0) m_framesToNextIncrease = increaseCooldown;
+								HDT_LOG_INFO("Auto-scaling: %s from %d to %d (%s budget by %.2f ms, step %+d)",
+									step > 0 ? "increasing" : "decreasing", oldMax, maxActiveSkeletons,
+									step > 0 ? "under" : "over", absMargin, step);
+							}
 						}
 					}
+					frameCount = 1;
 				}
-				frameCount = 1;
 			}
 			else if (maxActiveSkeletons != m_maxActiveSkeletons)
 				maxActiveSkeletons = m_maxActiveSkeletons;

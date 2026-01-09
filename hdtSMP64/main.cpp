@@ -15,6 +15,9 @@
 #include "PluginInterfaceImpl.h"
 
 #include <numeric>
+#include <sstream>
+#include <fstream>
+#include <regex>
 
 #include <shlobj_core.h>
 #include "skse64/GameRTTI.h"
@@ -342,6 +345,82 @@ namespace hdt
 		}
 	}
 
+	// Helper to update a single XML tag value (line-based for robustness)
+	// Handles whitespace variations and preserves indentation
+	bool updateXmlTag(std::string& content, const char* tag, const std::string& value)
+	{
+		std::string openTag = std::string("<") + tag + ">";
+		std::string closeTag = std::string("</") + tag + ">";
+
+		std::istringstream stream(content);
+		std::ostringstream result;
+		std::string line;
+		bool found = false;
+		bool firstLine = true;
+
+		while (std::getline(stream, line)) {
+			if (!firstLine) result << "\n";
+			firstLine = false;
+
+			// Check if this line contains our tag (not in a comment)
+			size_t openPos = line.find(openTag);
+			size_t closePos = line.find(closeTag);
+			size_t commentPos = line.find("<!--");
+
+			// Only match if both tags found and not inside a comment
+			if (openPos != std::string::npos && closePos != std::string::npos &&
+				openPos < closePos &&
+				(commentPos == std::string::npos || openPos < commentPos)) {
+				// Preserve leading whitespace
+				size_t indent = line.find_first_not_of(" \t");
+				if (indent == std::string::npos) indent = 0;
+				result << line.substr(0, indent) << openTag << value << closeTag;
+				found = true;
+			} else {
+				result << line;
+			}
+		}
+
+		if (found) {
+			content = result.str();
+		}
+		return found;
+	}
+
+	bool saveCurrentConfig()
+	{
+		const char* configPath = "data/skse/plugins/hdtSkinnedMeshConfigs/configs.xml";
+
+		// Read current config
+		std::ifstream inFile(configPath);
+		if (!inFile.is_open()) {
+			return false;
+		}
+		std::stringstream buffer;
+		buffer << inFile.rdbuf();
+		std::string content = buffer.str();
+		inFile.close();
+
+		auto world = SkyrimPhysicsWorld::get();
+		auto actor = ActorManager::instance();
+
+		// Update values
+		int percentageForConfig = world->m_percentageOfFrameTime / 10; // Convert back to 1-100 scale
+		updateXmlTag(content, "percentageOfFrameTime", std::to_string(percentageForConfig));
+		updateXmlTag(content, "maximumActiveSkeletons", std::to_string(actor->m_maxActiveSkeletons));
+		updateXmlTag(content, "autoAdjustMaxSkeletons", actor->m_autoAdjustMaxSkeletons ? "true" : "false");
+
+		// Write back
+		std::ofstream outFile(configPath);
+		if (!outFile.is_open()) {
+			return false;
+		}
+		outFile << content;
+		outFile.close();
+
+		return true;
+	}
+
 	bool SMPDebug_Execute(const ObScriptParam* paramInfo, ScriptData* scriptData, TESObjectREFR* thisObj,
 		TESObjectREFR* containingObj, Script* scriptObj, ScriptLocals* locals, double& result,
 		UInt32& opcodeOffsetPtr)
@@ -354,6 +433,23 @@ namespace hdt
 		if (!ObScript_ExtractArgs(paramInfo, scriptData, opcodeOffsetPtr, thisObj, containingObj, scriptObj, locals, buffer, buffer2))
 		{
 			return false;
+		}
+
+		// Show help when called with no arguments
+		if (buffer[0] == '\0')
+		{
+			Console_Print("[HDT-SMP] Commands:");
+			Console_Print("  smp fps [N]     - Set/show target FPS (30-240)");
+			Console_Print("  smp skeletons [N] - Set/show max skeletons");
+			Console_Print("  smp autoscale   - Toggle auto-scaling");
+			Console_Print("  smp save        - Save settings to configs.xml");
+			Console_Print("  smp stats       - Show performance stats");
+			Console_Print("  smp reset|reload|on|off - Control physics");
+#ifdef CUDA
+			Console_Print("  smp gpu|cuda    - CUDA controls");
+#endif
+			Console_Print("  smp timing|metrics|list|detail - Diagnostics");
+			return true;
 		}
 
 		if (_strnicmp(buffer, "reset", MAX_PATH) == 0)
@@ -374,6 +470,93 @@ namespace hdt
 			HDT_LOG_INFO("Console command: config reloaded via 'smp reload'");
 			return true;
 		}
+		if (_strnicmp(buffer, "fps", MAX_PATH) == 0)
+		{
+			auto world = SkyrimPhysicsWorld::get();
+			auto actor = ActorManager::instance();
+
+			if (buffer2[0] != '\0')
+			{
+				int targetFps = atoi(buffer2);
+				if (targetFps >= 30 && targetFps <= 240)
+				{
+					// Calculate percentage to give 30% of target frame time to SMP
+					// percentage = (min_fps / target_fps) * 300
+					int newPercentage = static_cast<int>((world->min_fps * 300.0f) / targetFps);
+					newPercentage = std::clamp(newPercentage, 50, 1000);
+					world->m_percentageOfFrameTime = newPercentage;
+
+					float budgetMs = world->m_timeTick * newPercentage;
+					Console_Print("[HDT-SMP] Target: %d FPS (%.1fms budget, %d%% of frame)",
+						targetFps, budgetMs, newPercentage / 10);
+				}
+				else
+				{
+					Console_Print("[HDT-SMP] Invalid FPS (use 30-240)");
+				}
+			}
+			else
+			{
+				// Show current target FPS equivalent
+				float budgetMs = world->m_timeTick * world->m_percentageOfFrameTime;
+				int effectiveFps = static_cast<int>((world->min_fps * 300.0f) / world->m_percentageOfFrameTime);
+				Console_Print("[HDT-SMP] Current: ~%d FPS target (%.1fms budget)", effectiveFps, budgetMs);
+				Console_Print("[HDT-SMP] Usage: smp fps <30-240>");
+			}
+			return true;
+		}
+		if (_strnicmp(buffer, "skeletons", MAX_PATH) == 0)
+		{
+			auto actor = ActorManager::instance();
+
+			if (buffer2[0] != '\0')
+			{
+				int maxSkel = atoi(buffer2);
+				if (maxSkel >= 1 && maxSkel <= 100)
+				{
+					actor->m_maxActiveSkeletons = maxSkel;
+					Console_Print("[HDT-SMP] Max skeletons: %d (auto-adjust: %s)",
+						maxSkel, actor->m_autoAdjustMaxSkeletons ? "ON" : "OFF");
+				}
+				else
+				{
+					Console_Print("[HDT-SMP] Invalid count (use 1-100)");
+				}
+			}
+			else
+			{
+				Console_Print("[HDT-SMP] Max skeletons: %d (auto-adjust: %s)",
+					actor->m_maxActiveSkeletons, actor->m_autoAdjustMaxSkeletons ? "ON" : "OFF");
+				Console_Print("[HDT-SMP] Usage: smp skeletons <1-100>");
+			}
+			return true;
+		}
+		if (_strnicmp(buffer, "autoscale", MAX_PATH) == 0)
+		{
+			auto actor = ActorManager::instance();
+			actor->m_autoAdjustMaxSkeletons = !actor->m_autoAdjustMaxSkeletons;
+			Console_Print("[HDT-SMP] Auto-scale: %s", actor->m_autoAdjustMaxSkeletons ? "ON" : "OFF");
+			return true;
+		}
+		if (_strnicmp(buffer, "save", MAX_PATH) == 0)
+		{
+			auto world = SkyrimPhysicsWorld::get();
+			auto actor = ActorManager::instance();
+
+			if (saveCurrentConfig())
+			{
+				int effectiveFps = static_cast<int>((world->min_fps * 300.0f) / world->m_percentageOfFrameTime);
+				Console_Print("[HDT-SMP] Saved to configs.xml:");
+				Console_Print("  Target: ~%d FPS (%d%% of frame)", effectiveFps, world->m_percentageOfFrameTime / 10);
+				Console_Print("  Max skeletons: %d", actor->m_maxActiveSkeletons);
+				Console_Print("  Auto-scale: %s", actor->m_autoAdjustMaxSkeletons ? "ON" : "OFF");
+			}
+			else
+			{
+				Console_Print("[HDT-SMP] Failed to save config (file not found or read-only)");
+			}
+			return true;
+		}
 #ifdef CUDA
 		if (_strnicmp(buffer, "gpu", MAX_PATH) == 0)
 		{
@@ -385,6 +568,37 @@ namespace hdt
 			else
 			{
 				Console_Print("CUDA collision disabled");
+			}
+			return true;
+		}
+		if (_strnicmp(buffer, "cuda", MAX_PATH) == 0)
+		{
+			// Toggle CUDA metrics collection or show report
+			if (buffer2[0] != '\0' && _strnicmp(buffer2, "reset", MAX_PATH) == 0)
+			{
+				CudaInterface::resetMetrics();
+				Console_Print("[CUDA] Metrics reset");
+			}
+			else if (CudaInterface::collectMetrics)
+			{
+				// Was collecting - stop and show report
+				CudaInterface::collectMetrics = false;
+				Console_Print("[CUDA] Metrics collection stopped");
+				auto report = CudaInterface::graphMetrics().report();
+				// Print each line separately for console
+				std::istringstream iss(report);
+				std::string line;
+				while (std::getline(iss, line))
+				{
+					Console_Print("%s", line.c_str());
+				}
+			}
+			else
+			{
+				// Start collecting
+				CudaInterface::resetMetrics();
+				CudaInterface::collectMetrics = true;
+				Console_Print("[CUDA] Metrics collection started (run 'smp cuda' again to see results)");
 			}
 			return true;
 		}
@@ -422,13 +636,42 @@ namespace hdt
 		if (_strnicmp(buffer, "stats", MAX_PATH) == 0)
 		{
 			auto world = SkyrimPhysicsWorld::get();
-			Console_Print("[HDT-SMP] Performance Stats:");
-			Console_Print("  Main loop avg: %.3f ms", world->m_averageSMPProcessingTimeInMainLoop);
-			Console_Print("  2nd step avg: %.3f ms", world->m_2ndStepAverageProcessingTime);
-			Console_Print("  Total avg: %.3f ms", world->m_averageSMPProcessingTimeInMainLoop + world->m_2ndStepAverageProcessingTime);
+			Console_Print("[HDT-SMP] Performance:");
+			Console_Print("  Main: %.3f ms | 2nd: %.3f ms | Total: %.3f ms",
+				world->m_averageSMPProcessingTimeInMainLoop,
+				world->m_2ndStepAverageProcessingTime,
+				world->m_averageSMPProcessingTimeInMainLoop + world->m_2ndStepAverageProcessingTime);
 			float fps = 1000.0f / (world->m_averageSMPProcessingTimeInMainLoop + world->m_2ndStepAverageProcessingTime + 0.001f);
-			Console_Print("  Max theoretical FPS (SMP only): %.1f", fps > 1000 ? 1000.0f : fps);
-			Console_Print("  Metrics logging: %s", world->m_forceMetrics ? "ON" : "OFF");
+			Console_Print("  Max SMP FPS: %.1f | Metrics: %s", fps > 1000 ? 1000.0f : fps, world->m_forceMetrics ? "ON" : "OFF");
+
+			Console_Print("[HDT-SMP] Solver:");
+			Console_Print("  Iterations: %d | GroupIter: %d | MLCP: %s | ERP: %.3f",
+				world->getSolverInfo().m_numIterations,
+				ConstraintGroup::MaxIterations,
+				ConstraintGroup::EnableMLCP ? "ON" : "OFF",
+				world->getSolverInfo().m_erp);
+			Console_Print("  MinFPS: %d (%.4fs) | MaxSubSteps: %d",
+				world->min_fps, world->m_timeTick, world->m_maxSubSteps);
+
+			auto skeletons = ActorManager::instance()->getSkeletons();
+			size_t activeSkeletons = 0, armors = 0, activeArmors = 0, activeCollisionMeshes = 0;
+			for (auto skeleton : skeletons)
+			{
+				if (skeleton.state > ActorManager::SkeletonState::e_SkeletonActive)
+					activeSkeletons++;
+				for (const auto armor : skeleton.getArmors())
+				{
+					armors++;
+					if (armor.state() == ActorManager::ItemState::e_Active)
+					{
+						activeArmors++;
+						activeCollisionMeshes += armor.meshes().size();
+					}
+				}
+			}
+			Console_Print("[HDT-SMP] Actors:");
+			Console_Print("  Skeletons: %d/%d | Armors: %d/%d | Meshes: %d",
+				activeSkeletons, skeletons.size(), activeArmors, armors, activeCollisionMeshes);
 			return true;
 		}
 		if (_strnicmp(buffer, "dumptree", MAX_PATH) == 0)
@@ -477,55 +720,9 @@ namespace hdt
 			return true;
 		}
 
-		auto skeletons = ActorManager::instance()->getSkeletons();
-
-		size_t activeSkeletons = 0;
-		size_t armors = 0;
-		size_t headParts = 0;
-		size_t activeArmors = 0;
-		size_t activeHeadParts = 0;
-		size_t activeCollisionMeshes = 0;
-
-		for (auto skeleton : skeletons)
-		{
-			if (skeleton.state > ActorManager::SkeletonState::e_SkeletonActive)
-				activeSkeletons++;
-
-			for (const auto armor : skeleton.getArmors())
-			{
-				armors++;
-
-				if (armor.state() == ActorManager::ItemState::e_Active)
-				{
-					activeArmors++;
-
-					activeCollisionMeshes += armor.meshes().size();
-				}
-			}
-
-			if (skeleton.head.headNode)
-			{
-				for (const auto headpart : skeleton.head.headParts)
-				{
-					headParts++;
-
-					if (headpart.state() == ActorManager::ItemState::e_Active)
-					{
-						activeHeadParts++;
-
-						activeCollisionMeshes += headpart.meshes().size();
-					}
-				}
-			}
-		}
-
-		Console_Print("[HDT-SMP] tracked skeletons: %d", skeletons.size());
-		Console_Print("[HDT-SMP] active skeletons: %d", activeSkeletons);
-		Console_Print("[HDT-SMP] tracked armor addons: %d", armors);
-		Console_Print("[HDT-SMP] tracked head parts: %d", headParts);
-		Console_Print("[HDT-SMP] active armor addons: %d", activeArmors);
-		Console_Print("[HDT-SMP] active head parts: %d", activeHeadParts);
-		Console_Print("[HDT-SMP] active collision meshes: %d", activeCollisionMeshes);
+		// Unknown command - show help hint
+		Console_Print("[HDT-SMP] Unknown command: %s", buffer);
+		Console_Print("[HDT-SMP] Type 'smp' for help");
 		return true;
 	}
 
@@ -685,18 +882,21 @@ namespace hdt
 		}
 		if (hijackedCommand)
 		{
-			static ObScriptParam params[1];
+			static ObScriptParam params[2];
 			params[0].typeID = ObScriptParam::kType_String;
-			params[0].typeStr = "String (optional)";
+			params[0].typeStr = "Command (optional)";
 			params[0].isOptional = 1;
+			params[1].typeID = ObScriptParam::kType_String;
+			params[1].typeStr = "Argument (optional)";
+			params[1].isOptional = 1;
 
 			ObScriptCommand cmd = *hijackedCommand;
 
 			cmd.longName = "SMPDebug";
 			cmd.shortName = "smp";
-			cmd.helpText = "smp <reset|reload|on|off|list|detail|dumptree|timing [frames]|metrics|stats>";
+			cmd.helpText = "smp [command] - Type 'smp' for command list";
 			cmd.needsParent = 0;
-			cmd.numParams = 1;
+			cmd.numParams = 2;
 			cmd.params = params;
 			cmd.execute = hdt::SMPDebug_Execute;
 			cmd.flags = 0;
