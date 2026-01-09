@@ -345,18 +345,46 @@ namespace hdt
 		}
 	}
 
-	// Helper to update a single XML tag value in a string
+	// Helper to update a single XML tag value (line-based for robustness)
+	// Handles whitespace variations and preserves indentation
 	bool updateXmlTag(std::string& content, const char* tag, const std::string& value)
 	{
-		std::string pattern = std::string("<") + tag + ">([^<]*)</" + tag + ">";
-		std::string replacement = std::string("<") + tag + ">" + value + "</" + tag + ">";
-		std::regex re(pattern);
-		std::string result = std::regex_replace(content, re, replacement);
-		if (result != content) {
-			content = result;
-			return true;
+		std::string openTag = std::string("<") + tag + ">";
+		std::string closeTag = std::string("</") + tag + ">";
+
+		std::istringstream stream(content);
+		std::ostringstream result;
+		std::string line;
+		bool found = false;
+		bool firstLine = true;
+
+		while (std::getline(stream, line)) {
+			if (!firstLine) result << "\n";
+			firstLine = false;
+
+			// Check if this line contains our tag (not in a comment)
+			size_t openPos = line.find(openTag);
+			size_t closePos = line.find(closeTag);
+			size_t commentPos = line.find("<!--");
+
+			// Only match if both tags found and not inside a comment
+			if (openPos != std::string::npos && closePos != std::string::npos &&
+				openPos < closePos &&
+				(commentPos == std::string::npos || openPos < commentPos)) {
+				// Preserve leading whitespace
+				size_t indent = line.find_first_not_of(" \t");
+				if (indent == std::string::npos) indent = 0;
+				result << line.substr(0, indent) << openTag << value << closeTag;
+				found = true;
+			} else {
+				result << line;
+			}
 		}
-		return false;
+
+		if (found) {
+			content = result.str();
+		}
+		return found;
 	}
 
 	bool saveCurrentConfig()
