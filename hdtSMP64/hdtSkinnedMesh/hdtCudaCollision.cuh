@@ -40,11 +40,11 @@ namespace hdt
 			: m_ok(true) {}
 #endif
 #else
-		bool check(std::string context)
+		bool check(const char* context)  // const char* avoids heap allocation from __FUNCTION__
 		{
 			if (!m_ok)
 			{
-				_MESSAGE("%s: %s", context.c_str(), m_message.c_str());
+				_MESSAGE("%s: %s", context, m_message.c_str());
 			}
 			return m_ok;
 		}
@@ -260,6 +260,7 @@ namespace hdt
 		int x;
 		int y;
 		int dynx;
+		size_t bufferSize;  // Total buffer size for bounds checking
 	};
 
 	cuResult cuCreateStream(void** ptr);
@@ -314,12 +315,17 @@ namespace hdt
 	cuResult cuSynchronize(void* stream = nullptr);
 
 	cuResult cuCreateEvent(void** ptr);
+	cuResult cuCreateEventWithFlags(void** ptr, unsigned int flags);
 
 	void cuDestroyEvent(void* ptr);
 
 	void cuRecordEvent(void* ptr, void* stream);
 
 	void cuWaitEvent(void* ptr);
+
+	float cuEventElapsedTime(void* startEvent, void* endEvent);
+
+	bool cuEventQuery(void* ptr);  // Returns true if event completed
 
 	void cuInitialize();
 
@@ -335,6 +341,7 @@ namespace hdt
 	cuResult cuStreamBeginCapture(void* stream);
 	cuResult cuStreamEndCapture(void* stream, void** graph);
 	cuResult cuGraphInstantiate(void** graphExec, void* graph);
+	cuResult cuGraphUpload(void* graphExec, void* stream);  // Pre-upload to reduce first-launch latency
 	cuResult cuGraphLaunch(void* graphExec, void* stream);
 	void cuGraphExecDestroy(void* graphExec);
 	void cuGraphDestroy(void* graph);
