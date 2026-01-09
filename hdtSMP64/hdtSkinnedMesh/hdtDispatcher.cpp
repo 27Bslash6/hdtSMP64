@@ -260,6 +260,9 @@ namespace hdt
 		{
 			CudaInterface::instance()->clearBufferPool();
 
+			// Begin batched collision gathering
+			CudaInterface::instance()->beginCollisionBatch();
+
 			// Launch collision checking - parallelized for better CPU utilization
 			{
 				HDT_ZONE_SCOPED_N("CudaQueueCollisions");
@@ -272,10 +275,18 @@ namespace hdt
 						auto& pair = m_pairs[i];
 						if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree))
 						{
+							// Add to batched collision system (for future batched processing)
+							CudaInterface::instance()->addCollisionPair(pair.first, pair.second);
+
+							// Still use old path for actual collision detection (until batched kernel is ready)
 							m_delayedFuncs.push_back(SkinnedMeshAlgorithm::queueCollision(pair.first, pair.second, this));
 						}
+
 					});
 			}
+
+			// Launch batched collision kernels (stub for now - will replace queueCollision path)
+			CudaInterface::instance()->launchCollisionBatch();
 
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 

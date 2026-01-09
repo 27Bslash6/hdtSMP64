@@ -5,6 +5,10 @@
 #include <ppl.h>
 #include <immintrin.h>
 #include <type_traits>
+#include <chrono>
+#include <vector>
+#include <algorithm>
+#include <cfloat>
 
 struct cudaStream_t;
 
@@ -941,6 +945,64 @@ namespace hdt
 
 	bool CudaInterface::enableCuda = false;
 	int CudaInterface::currentDevice = 0;
+	bool CudaInterface::collectMetrics = false;
+
+	// Global metrics instance
+	static CudaGraphMetrics s_graphMetrics;
+
+	CudaGraphMetrics& CudaInterface::graphMetrics()
+	{
+		return s_graphMetrics;
+	}
+
+	void CudaInterface::resetMetrics()
+	{
+		s_graphMetrics = CudaGraphMetrics{};
+	}
+
+	float CudaGraphMetrics::percentile(const float* data, int p) const
+	{
+		const int count = std::min(totalSamples, kSampleCount);
+		if (count == 0) return 0.0f;
+
+		// Copy to temp buffer for sorting
+		std::vector<float> sorted(data, data + count);
+		std::sort(sorted.begin(), sorted.end());
+
+		const int idx = std::min((p * count) / 100, count - 1);
+		return sorted[idx];
+	}
+
+	std::string CudaGraphMetrics::report() const
+	{
+		const int count = std::min(totalSamples, kSampleCount);
+		if (count == 0) return "No samples collected";
+
+		// Calculate CPU stats
+		float cpuSum = 0, cpuMin = FLT_MAX, cpuMax = 0;
+		float gpuSum = 0, gpuMin = FLT_MAX, gpuMax = 0;
+		for (int i = 0; i < count; i++)
+		{
+			cpuSum += cpuEnqueueUs[i];
+			cpuMin = std::min(cpuMin, cpuEnqueueUs[i]);
+			cpuMax = std::max(cpuMax, cpuEnqueueUs[i]);
+			gpuSum += gpuExecuteUs[i];
+			gpuMin = std::min(gpuMin, gpuExecuteUs[i]);
+			gpuMax = std::max(gpuMax, gpuExecuteUs[i]);
+		}
+
+		char buf[1024];
+		snprintf(buf, sizeof(buf),
+			"GraphLaunch Metrics (n=%d):\n"
+			"  CPU Enqueue: mean=%.1fus min=%.1fus max=%.1fus p50=%.1fus p99=%.1fus\n"
+			"  GPU Execute: mean=%.1fus min=%.1fus max=%.1fus p50=%.1fus p99=%.1fus\n"
+			"  Ratio (GPU/CPU): %.2fx",
+			count,
+			cpuSum / count, cpuMin, cpuMax, percentile(cpuEnqueueUs, 50), percentile(cpuEnqueueUs, 99),
+			gpuSum / count, gpuMin, gpuMax, percentile(gpuExecuteUs, 50), percentile(gpuExecuteUs, 99),
+			(gpuSum / count) / (cpuSum / count + 0.001f));
+		return buf;
+	}
 
 	CudaInterface* CudaInterface::instance()
 	{
@@ -997,7 +1059,65 @@ namespace hdt
 		if (imp.m_graphCaptured && imp.m_graphExec)
 		{
 			HDT_ZONE_SCOPED_N("GraphLaunch");
-			cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+
+			if (CudaInterface::collectMetrics)
+			{
+				// Per-thread measurement state for deferred GPU timing
+				static thread_local struct {
+					void* startEvent = nullptr;
+					void* endEvent = nullptr;
+					float lastCpuUs = 0;
+					int lastSampleIdx = -1;
+					bool pending = false;
+				} s_measure;
+
+				// Create events on first use
+				if (!s_measure.startEvent)
+				{
+					cuCreateEvent(&s_measure.startEvent);
+					cuCreateEvent(&s_measure.endEvent);
+				}
+
+				// Complete previous measurement if GPU work finished
+				if (s_measure.pending && cuEventQuery(s_measure.endEvent))
+				{
+					const float gpuMs = cuEventElapsedTime(s_measure.startEvent, s_measure.endEvent);
+					const float gpuUs = gpuMs * 1000.0f;
+
+					// Store GPU time at the same index as CPU time
+					if (s_measure.lastSampleIdx >= 0)
+					{
+						s_graphMetrics.gpuExecuteUs[s_measure.lastSampleIdx] = gpuUs;
+					}
+					s_measure.pending = false;
+				}
+
+				// Measure CPU enqueue time
+				cuRecordEvent(s_measure.startEvent, imp.m_stream);
+				const auto cpuStart = std::chrono::high_resolution_clock::now();
+
+				cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+
+				const auto cpuEnd = std::chrono::high_resolution_clock::now();
+				cuRecordEvent(s_measure.endEvent, imp.m_stream);
+
+				const float cpuUs = std::chrono::duration<float, std::micro>(cpuEnd - cpuStart).count();
+
+				// Record CPU time immediately, GPU time deferred
+				const int idx = s_graphMetrics.sampleIndex;
+				s_graphMetrics.cpuEnqueueUs[idx] = cpuUs;
+				s_graphMetrics.gpuExecuteUs[idx] = 0;  // Will be filled when event completes
+				s_graphMetrics.sampleIndex = (idx + 1) & (CudaGraphMetrics::kSampleCount - 1);
+				s_graphMetrics.totalSamples++;
+
+				s_measure.lastCpuUs = cpuUs;
+				s_measure.lastSampleIdx = idx;
+				s_measure.pending = true;
+			}
+			else
+			{
+				cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+			}
 			return;
 		}
 
@@ -1040,8 +1160,26 @@ namespace hdt
 		}
 
 		// End capture and instantiate
-		cuStreamEndCapture(imp.m_stream, &imp.m_graph).check(__FUNCTION__);
-		cuGraphInstantiate(&imp.m_graphExec, imp.m_graph).check(__FUNCTION__);
+		{
+			HDT_ZONE_SCOPED_N("GraphInstantiate");
+			cuStreamEndCapture(imp.m_stream, &imp.m_graph).check(__FUNCTION__);
+			cuGraphInstantiate(&imp.m_graphExec, imp.m_graph).check(__FUNCTION__);
+		}
+
+		// Pre-upload graph to device - eliminates first-launch upload latency
+		{
+			HDT_ZONE_SCOPED_N("GraphUpload");
+			cuGraphUpload(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+		}
+
+		// Warm-up launch to trigger any JIT compilation and cache warming
+		// This moves the P99 spike from production to initialization
+		{
+			HDT_ZONE_SCOPED_N("GraphWarmup");
+			cuGraphLaunch(imp.m_graphExec, imp.m_stream).check(__FUNCTION__);
+			cuSynchronize(imp.m_stream).check(__FUNCTION__);
+		}
+
 		imp.m_graphCaptured = true;
 	}
 
@@ -1056,5 +1194,226 @@ namespace hdt
 
 	template class CudaCollisionPair<CudaPerVertexShape>;
 	template class CudaCollisionPair<CudaPerTriangleShape>;
+
+	//==========================================================================
+	// BATCHED COLLISION MANAGER IMPLEMENTATION
+	//==========================================================================
+
+	void BatchedCollisionManager::beginBatch()
+	{
+		// Clear global batch data
+		m_pairs.clear();
+
+		// Pre-allocate based on previous frame (with 20% margin)
+		if (m_lastFramePairCount > 0) {
+			size_t estimate = std::min(
+				static_cast<size_t>(m_lastFramePairCount * 1.2),
+				CUDA_MAX_COLLISION_PAIRS);
+			m_pairs.reserve(estimate);
+		}
+
+		// Reset atomic counter
+		m_totalPairs.store(0);
+	}
+
+	bool BatchedCollisionManager::addCollisionPair(
+		SkinnedMeshBody* body0,
+		SkinnedMeshBody* body1)
+	{
+		// INPUT VALIDATION
+		if (!body0 || !body1) {
+			_DMESSAGE("BatchedCollisionManager::addCollisionPair: null body pointer");
+			return false;
+		}
+		if (!body0->m_shape || !body1->m_shape) {
+			_DMESSAGE("BatchedCollisionManager::addCollisionPair: null shape pointer");
+			return false;
+		}
+		if (!body0->m_cudaObject || !body1->m_cudaObject) {
+			_DMESSAGE("BatchedCollisionManager::addCollisionPair: null CUDA object");
+			return false;
+		}
+
+		// Resource limit check
+		size_t currentCount = m_totalPairs.fetch_add(1);
+		if (currentCount >= CUDA_MAX_COLLISION_PAIRS) {
+			_DMESSAGE("BatchedCollisionManager: Collision pair limit reached (%zu)", CUDA_MAX_COLLISION_PAIRS);
+			return false;
+		}
+
+		// Determine collision type based on shape types
+		bool hasTriA = body0->m_shape->asPerTriangleShape() != nullptr;
+		bool hasTriB = body1->m_shape->asPerTriangleShape() != nullptr;
+
+		// Route to appropriate batch (NO TV - use VT with swap flag)
+		if (!hasTriA && !hasTriB) {
+			// Vertex-Vertex
+			accumulateVV(body0, body1, /*swapped=*/false);
+		}
+		else if (!hasTriA && hasTriB) {
+			// Vertex-Triangle (normal order)
+			accumulateVT(body0, body1, /*swapped=*/false);
+		}
+		else if (hasTriA && !hasTriB) {
+			// Triangle-Vertex: use VT with swap flag
+			accumulateVT(body1, body0, /*swapped=*/true);
+		}
+		else {
+			// Both have triangles - need both passes
+			accumulateVT(body0, body1, /*swapped=*/false);
+			accumulateVT(body1, body0, /*swapped=*/true);
+		}
+
+		return true;
+	}
+
+	void BatchedCollisionManager::accumulateVV(
+		SkinnedMeshBody* body0,
+		SkinnedMeshBody* body1,
+		bool swapped)
+	{
+		// Create pair info
+		CollisionPairInfo info;
+		info.shapeA = body0->m_shape->asPerVertexShape()->m_cudaObject.get();
+		info.shapeB = body1->m_shape->asPerVertexShape()->m_cudaObject.get();
+		info.body0 = body0;
+		info.body1 = body1;
+		info.cudaBody0 = body0->m_cudaObject;
+		info.cudaBody1 = body1->m_cudaObject;
+		info.swapped = swapped;
+
+		// Thread-safe append to global batch with offset calculation
+		{
+			std::lock_guard<std::mutex> lock(m_mergeMutex);
+			info.mergeBufferOffset = m_pairs.pairsVV.size();
+			m_pairs.pairsVV.push_back(info);
+		}
+	}
+
+	void BatchedCollisionManager::accumulateVT(
+		SkinnedMeshBody* body0,
+		SkinnedMeshBody* body1,
+		bool swapped)
+	{
+		// Create pair info
+		CollisionPairInfo info;
+		info.shapeA = body0->m_shape->asPerVertexShape()->m_cudaObject.get();
+
+		// ShapeB is the triangle shape
+		if (swapped) {
+			// body0 has the triangle shape (we swapped)
+			info.shapeB = body0->m_shape->asPerTriangleShape()->m_cudaObject.get();
+		}
+		else {
+			info.shapeB = body1->m_shape->asPerTriangleShape()->m_cudaObject.get();
+		}
+
+		info.body0 = body0;
+		info.body1 = body1;
+		info.cudaBody0 = body0->m_cudaObject;
+		info.cudaBody1 = body1->m_cudaObject;
+		info.swapped = swapped;
+
+		// Thread-safe append to global batch with offset calculation
+		{
+			std::lock_guard<std::mutex> lock(m_mergeMutex);
+			info.mergeBufferOffset = m_pairs.pairsVV.size() + m_pairs.pairsVT.size();
+			m_pairs.pairsVT.push_back(info);
+		}
+	}
+
+	void BatchedCollisionManager::mergeThreadLocalBatch()
+	{
+		// No-op: Using direct mutex-protected append instead of thread-local batches
+		// Thread-local approach was problematic with PPL parallel_for
+	}
+
+	void BatchedCollisionManager::launchBatch()
+	{
+		HDT_ZONE_SCOPED_N("BatchedLaunchCollisions");
+
+		size_t totalPairs = m_pairs.totalPairs();
+		if (totalPairs == 0) {
+			m_hasPendingResults = false;
+			return;
+		}
+
+		// Record pair count for next frame's pre-allocation
+		m_lastFramePairCount = totalPairs;
+
+		// For now, fall back to per-pair processing since we need to restructure
+		// the kernel to handle batched body pairs. This is a stepping stone.
+		//
+		// TODO: Implement true batched kernel that processes all pairs in 2-3 launches
+		// For now, this just collects pairs - actual collision still uses old path
+
+		m_hasPendingResults = true;
+	}
+
+	void BatchedCollisionManager::applyResults(CollisionDispatcher* dispatcher)
+	{
+		HDT_ZONE_SCOPED_N("BatchedApplyResults");
+
+		if (!m_hasPendingResults) {
+			return;
+		}
+
+		// Process VV results
+		for (const auto& pair : m_pairs.pairsVV) {
+			// CRITICAL: Check bodies still exist via CUDA object weak_ptr
+			if (!pair.bodiesValid()) {
+				// Body was destroyed between gather and apply - skip
+				continue;
+			}
+
+			// TODO: Apply results from m_hostMergeBuffer[pair.mergeBufferOffset]
+			// For now, results are applied via the old path
+		}
+
+		// Process VT results (same pattern)
+		for (const auto& pair : m_pairs.pairsVT) {
+			if (!pair.bodiesValid()) {
+				continue;
+			}
+
+			// TODO: Apply results from m_hostMergeBuffer[pair.mergeBufferOffset]
+		}
+
+		m_hasPendingResults = false;
+	}
+
+	//==========================================================================
+	// CUDAINTERFACE BATCHED API WRAPPERS
+	//==========================================================================
+
+	void CudaInterface::beginCollisionBatch()
+	{
+		m_batchedCollisions.beginBatch();
+	}
+
+	bool CudaInterface::addCollisionPair(SkinnedMeshBody* body0, SkinnedMeshBody* body1)
+	{
+		return m_batchedCollisions.addCollisionPair(body0, body1);
+	}
+
+	void CudaInterface::mergeCollisionBatches()
+	{
+		m_batchedCollisions.mergeThreadLocalBatch();
+	}
+
+	void CudaInterface::launchCollisionBatch()
+	{
+		m_batchedCollisions.launchBatch();
+	}
+
+	void CudaInterface::applyCollisionResults(CollisionDispatcher* dispatcher)
+	{
+		m_batchedCollisions.applyResults(dispatcher);
+	}
+
+	bool CudaInterface::hasCollisionResults() const
+	{
+		return m_batchedCollisions.hasPendingResults();
+	}
 }
 #endif
