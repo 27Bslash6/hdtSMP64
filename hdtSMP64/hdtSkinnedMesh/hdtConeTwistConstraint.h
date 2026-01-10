@@ -3,15 +3,12 @@
 
 namespace hdt
 {
-	class ConeTwistConstraint
-		: public BoneScaleConstraint
-		  , public btConeTwistConstraint
+	class ConeTwistConstraint : public BoneScaleConstraint, public btConeTwistConstraint
 	{
 	public:
-
 		ConeTwistConstraint(SkinnedMeshBone* a, SkinnedMeshBone* b, const btTransform& frameInA,
-		                    const btTransform& frameInB);
+							const btTransform& frameInB);
 
 		void scaleConstraint() override;
 	};
-}
+} // namespace hdt

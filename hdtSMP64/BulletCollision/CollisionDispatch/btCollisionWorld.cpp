@@ -47,6 +47,7 @@ subject to the following restrictions:
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcher.h"
 #include "BulletCollision/BroadphaseCollision/btSimpleBroadphase.h"
 #include "BulletCollision/CollisionDispatch/btCollisionConfiguration.h"
+#include "../../hdtTracy.h"  // Tracy instrumentation for hdtSMP64
 
 ///for debug drawing
 
@@ -224,9 +225,15 @@ void btCollisionWorld::performDiscreteCollisionDetection()
 
 	btDispatcherInfo& dispatchInfo = getDispatchInfo();
 
-	updateAabbs();
+	{
+		HDT_ZONE_SCOPED_N("UpdateAabbs");
+		updateAabbs();
+	}
 
-	computeOverlappingPairs();
+	{
+		HDT_ZONE_SCOPED_N("ComputeOverlappingPairs");
+		computeOverlappingPairs();
+	}
 
 	btDispatcher* dispatcher = getDispatcher();
 	{

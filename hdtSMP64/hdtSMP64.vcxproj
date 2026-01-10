@@ -2385,7 +2385,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2446,7 +2446,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2507,7 +2507,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2574,7 +2574,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2641,7 +2641,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2704,7 +2704,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2767,7 +2767,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2838,7 +2838,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2907,7 +2907,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -2970,7 +2970,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3033,7 +3033,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3096,7 +3096,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3159,7 +3159,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3222,7 +3222,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3285,7 +3285,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3354,7 +3354,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3423,7 +3423,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3492,7 +3492,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3561,7 +3561,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3624,7 +3624,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3687,7 +3687,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3756,7 +3756,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3825,7 +3825,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3892,7 +3892,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -3959,7 +3959,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4026,7 +4026,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4093,7 +4093,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4160,7 +4160,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4227,7 +4227,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4300,7 +4300,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4373,7 +4373,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4446,7 +4446,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4519,7 +4519,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4582,7 +4582,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4645,7 +4645,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4714,7 +4714,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4783,7 +4783,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4846,7 +4846,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4909,7 +4909,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -4972,7 +4972,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5035,7 +5035,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5098,7 +5098,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5161,7 +5161,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5230,7 +5230,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5299,7 +5299,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5368,7 +5368,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5437,7 +5437,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5500,7 +5500,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5563,7 +5563,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5632,7 +5632,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5701,7 +5701,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5764,7 +5764,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5827,7 +5827,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5890,7 +5890,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -5953,7 +5953,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6016,7 +6016,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6079,7 +6079,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6148,7 +6148,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6217,7 +6217,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6286,7 +6286,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6355,7 +6355,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6413,7 +6413,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6471,7 +6471,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6530,7 +6530,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6589,7 +6589,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6647,7 +6647,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6704,7 +6704,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6768,7 +6768,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6832,7 +6832,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6896,7 +6896,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -6960,7 +6960,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7018,7 +7018,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7076,7 +7076,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7140,7 +7140,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7204,7 +7204,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7262,7 +7262,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7320,7 +7320,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7378,7 +7378,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7436,7 +7436,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7494,7 +7494,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7551,7 +7551,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7615,7 +7615,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7679,7 +7679,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7743,7 +7743,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7807,7 +7807,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7865,7 +7865,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7923,7 +7923,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -7987,7 +7987,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8051,7 +8051,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8109,7 +8109,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8167,7 +8167,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8225,7 +8225,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8283,7 +8283,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8341,7 +8341,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8398,7 +8398,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8462,7 +8462,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8526,7 +8526,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8590,7 +8590,7 @@
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -8653,7 +8653,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -8704,7 +8704,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -8755,7 +8755,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -8812,7 +8812,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -8869,7 +8869,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -8920,7 +8920,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -8971,7 +8971,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9022,7 +9022,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9073,7 +9073,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9124,7 +9124,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9174,7 +9174,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9231,7 +9231,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9288,7 +9288,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9345,7 +9345,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>hdtPrefix.h</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DETOURS_DIR)\include;$(SolutionDir)hdtSMP64;$(SolutionDir)external\enkiTS\src;$(SKSE_ROOT);$(SKSE_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -9670,6 +9670,7 @@
     <ClInclude Include="hdtSkinnedMesh\hdtCudaInterface.h" />
     <ClInclude Include="hdtSkinnedMesh\hdtCudaPlanarStruct.cuh" />
     <ClInclude Include="hdtSkinnedMesh\hdtDispatcher.h" />
+    <ClInclude Include="hdtSkinnedMesh\hdtEnkiTSScheduler.h" />
     <ClInclude Include="hdtSkinnedMesh\hdtFrameTimer.h" />
     <ClInclude Include="hdtSkinnedMesh\hdtGeneric6DofConstraint.h" />
     <ClInclude Include="hdtSkinnedMesh\hdtGroupConstraintSolver.h" />
@@ -9924,6 +9925,7 @@
     <ClCompile Include="LinearMath\TaskScheduler\btTaskScheduler.cpp" />
     <ClCompile Include="LinearMath\TaskScheduler\btThreadSupportPosix.cpp" />
     <ClCompile Include="LinearMath\TaskScheduler\btThreadSupportWin32.cpp" />
+    <ClCompile Include="hdtSkinnedMesh\enkiTS_TaskScheduler.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="WeatherManager.cpp" />
     <ClCompile Include="PluginInterfaceImpl.cpp" />

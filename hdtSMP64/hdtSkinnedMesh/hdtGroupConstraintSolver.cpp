@@ -1,5 +1,7 @@
 #include "hdtGroupConstraintSolver.h"
 
+#include "hdtEnkiTSScheduler.h"
+
 #include "../hdtTracy.h"
 
 #include <LinearMath/btCpuFeatureUtility.h>
@@ -249,7 +251,7 @@ namespace hdt
 		{
 			HDT_ZONE_SCOPED_N("GroupSetupIteration");
 			HDT_ZONE_VALUE(static_cast<int64_t>(m_groups.size()));
-			concurrency::parallel_for_each(m_groups.begin(), m_groups.end(), [&](ConstraintGroup* i) {
+			hdt_parallel_for_each(m_groups.begin(), m_groups.end(), [&](ConstraintGroup* i) {
 				i->setup(&m_tmpSolverBodyPool, infoGlobal);
 				i->iteration(bodies, numBodies, infoGlobal);
 			});
@@ -455,8 +457,7 @@ namespace hdt
 								: infoGlobal.m_numIterations;
 		if (iteration <= (maxIterations * 3 + 3) / 4) {
 			HDT_ZONE_SCOPED_N("SolveAllTasks");
-			concurrency::parallel_for_each(m_tasks.begin(), m_tasks.end(),
-										   [](const SolverTaskPtr& task) { task->solve(); });
+			hdt_parallel_for_each(m_tasks.begin(), m_tasks.end(), [](const SolverTaskPtr& task) { task->solve(); });
 		}
 		else {
 			HDT_ZONE_SCOPED_N("SolveSeparateTasks");
@@ -464,10 +465,10 @@ namespace hdt
 			std::mt19937 urng(rng());
 			std::shuffle(m_nonContactTasks.begin(), m_nonContactTasks.end(), urng);
 			std::shuffle(m_contactTasks.begin(), m_contactTasks.end(), urng);
-			concurrency::parallel_for_each(m_nonContactTasks.begin(), m_nonContactTasks.end(),
-										   [](const SolverTaskPtr& task) { task->solve(); });
-			concurrency::parallel_for_each(m_contactTasks.begin(), m_contactTasks.end(),
-										   [](const SolverTaskPtr& task) { task->solve(); });
+			hdt_parallel_for_each(m_nonContactTasks.begin(), m_nonContactTasks.end(),
+								  [](const SolverTaskPtr& task) { task->solve(); });
+			hdt_parallel_for_each(m_contactTasks.begin(), m_contactTasks.end(),
+								  [](const SolverTaskPtr& task) { task->solve(); });
 		}
 		return FLT_MAX;
 	}

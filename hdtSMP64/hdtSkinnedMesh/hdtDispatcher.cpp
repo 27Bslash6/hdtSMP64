@@ -4,6 +4,7 @@
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtSkinnedMeshBody.h"
 
+#include "../hdtLog.h"
 #include "../hdtTracy.h"
 #ifdef CUDA
 #include "hdtCudaInterface.h"
@@ -21,9 +22,9 @@
 
 namespace hdt
 {
-	void CollisionDispatcher::clearAllManifold()
+	// Internal version - caller must hold m_lock
+	void CollisionDispatcher::clearAllManifoldInternal()
 	{
-		std::lock_guard<decltype(m_lock)> l(m_lock);
 		for (int i = 0; i < m_manifoldsPtr.size(); ++i) {
 			auto manifold = m_manifoldsPtr[i];
 			manifold->~btPersistentManifold();
@@ -33,6 +34,12 @@ namespace hdt
 				btAlignedFree(manifold);
 		}
 		m_manifoldsPtr.clear();
+	}
+
+	void CollisionDispatcher::clearAllManifold()
+	{
+		std::lock_guard<decltype(m_lock)> l(m_lock);
+		clearAllManifoldInternal();
 	}
 
 	bool needsCollision(const SkinnedMeshBody* shape0, const SkinnedMeshBody* shape1)
@@ -72,6 +79,7 @@ namespace hdt
 		HDT_ZONE_SCOPED_N("DispatchCollisionPairs");
 		auto size = pairCache->getNumOverlappingPairs();
 		HDT_ZONE_VALUE(static_cast<int64_t>(size));
+		_VMESSAGE("dispatchAllCollisionPairs: entering with %d pairs", size);
 		if (!size)
 			return;
 
@@ -89,7 +97,7 @@ namespace hdt
 		std::unordered_set<PerVertexShape*> vertex_shapes;
 		std::unordered_set<PerTriangleShape*> triangle_shapes;
 
-		concurrency::parallel_for(
+		hdt_parallel_for(
 			0, size,
 			[&](int i)
 #endif
@@ -106,16 +114,10 @@ namespace hdt
 #ifdef CUDA
 					auto it0 = to_update.insert({shape0, {nullptr, nullptr}}).first;
 					auto it1 = to_update.insert({shape1, {nullptr, nullptr}}).first;
-#else
-						HDT_LOCK_GUARD(l, lock);
-						bodies.insert(shape0);
-						bodies.insert(shape1);
-#endif
 					m_pairs.push_back(std::make_pair(shape0, shape1));
 
 					auto a = shape0->m_shape->asPerTriangleShape();
 					auto b = shape1->m_shape->asPerTriangleShape();
-#ifdef CUDA
 					if (a)
 						it0->second.second = a;
 					else
@@ -129,6 +131,15 @@ namespace hdt
 						it1->second.first = b->m_verticesCollision;
 					}
 #else
+						// FIX: All shared state mutations must be inside the lock scope
+						// m_pairs.push_back was previously OUTSIDE the lock - data race!
+						HDT_LOCK_GUARD(l, lock);
+						bodies.insert(shape0);
+						bodies.insert(shape1);
+						m_pairs.push_back(std::make_pair(shape0, shape1));
+
+						auto a = shape0->m_shape->asPerTriangleShape();
+						auto b = shape1->m_shape->asPerTriangleShape();
 						if (a)
 							triangle_shapes.insert(a);
 						else
@@ -172,24 +183,23 @@ namespace hdt
 
 			// Create any new CUDA objects if necessary
 			if (!initialized) {
-				concurrency::parallel_for_each(
-					to_update.begin(), to_update.end(), [deviceId](UpdateMap::value_type& o) {
-						CudaInterface::instance()->setCurrentDevice();
+				hdt_parallel_for_each(to_update.begin(), to_update.end(), [deviceId](UpdateMap::value_type& o) {
+					CudaInterface::instance()->setCurrentDevice();
 
-						if (!o.first->m_cudaObject || o.first->m_cudaObject->deviceId() != deviceId) {
-							o.first->m_cudaObject.reset(new CudaBody(o.first));
-						}
-						if (o.second.first &&
-							(!o.second.first->m_cudaObject || o.second.first->m_cudaObject->deviceId() != deviceId))
-						{
-							o.second.first->m_cudaObject.reset(new CudaPerVertexShape(o.second.first));
-						}
-						if (o.second.second &&
-							(!o.second.second->m_cudaObject || o.second.second->m_cudaObject->deviceId() != deviceId))
-						{
-							o.second.second->m_cudaObject.reset(new CudaPerTriangleShape(o.second.second));
-						}
-					});
+					if (!o.first->m_cudaObject || o.first->m_cudaObject->deviceId() != deviceId) {
+						o.first->m_cudaObject.reset(new CudaBody(o.first));
+					}
+					if (o.second.first &&
+						(!o.second.first->m_cudaObject || o.second.first->m_cudaObject->deviceId() != deviceId))
+					{
+						o.second.first->m_cudaObject.reset(new CudaPerVertexShape(o.second.first));
+					}
+					if (o.second.second &&
+						(!o.second.second->m_cudaObject || o.second.second->m_cudaObject->deviceId() != deviceId))
+					{
+						o.second.second->m_cudaObject.reset(new CudaPerTriangleShape(o.second.second));
+					}
+				});
 			}
 
 			// NOTE: Sync of previous frame's collision results is now done in syncPreviousCollisionResults()
@@ -198,34 +208,51 @@ namespace hdt
 			CudaInterface::instance()->setCurrentDevice();
 			{
 				HDT_ZONE_SCOPED_N("LaunchInternalUpdates");
-				// Fully parallel: updateBones (CPU) + CUDA launches (mutex-protected graph capture)
-				concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
-					CudaInterface::instance()->setCurrentDevice();
-					o.first->updateBones();
-					CudaInterface::launchInternalUpdate(o.first->m_cudaObject,
-														o.second.first ? o.second.first->m_cudaObject : nullptr,
-														o.second.second ? o.second.second->m_cudaObject : nullptr);
-				});
-			}
 
-			// Update the aggregate parts of the AABB trees
-			{
-				HDT_ZONE_SCOPED_N("SyncAndTreeUpdates");
-
+				// Phase 1: Update bone transforms on CPU (parallel)
 				{
-					HDT_ZONE_SCOPED_N("GlobalGpuSync");
-					// Single global sync instead of N per-body syncs
-					CudaInterface::instance()->synchronize();
+					HDT_ZONE_SCOPED_N("UpdateBonesParallel");
+					hdt_parallel_for_each(to_update.begin(), to_update.end(),
+										  [](UpdateMap::value_type& o) { o.first->updateBones(); });
 				}
 
+				// Phase 2: Batch and launch GPU work (replaces per-body graph launches)
+				CudaInterface::instance()->beginInternalUpdateBatch();
+				for (auto& o : to_update) {
+					CudaInterface::instance()->addInternalUpdate(
+						o.first->m_cudaObject, o.second.first ? o.second.first->m_cudaObject : nullptr,
+						o.second.second ? o.second.second->m_cudaObject : nullptr);
+				}
+				CudaInterface::instance()->launchInternalUpdateBatch();
+
+				// Queue async copy of leaf AABBs to host (runs in parallel with GPU collision)
+				CudaInterface::instance()->queueLeafDownloads();
+			}
+
+			// ========================================================
+			// DOUBLE-BUFFER AABB PIPELINE
+			// Uses previous frame's leaf AABBs for CPU tree propagation
+			// Sync happens at frame START (syncPreviousCollisionResults) for max GPU overlap
+			// ========================================================
+			{
+				HDT_ZONE_SCOPED_N("TreeUpdatesFromPreviousFrame");
+
+				// First frame bootstrap: must sync to get initial AABBs
+				if (CudaInterface::instance()->hasFirstFrame()) {
+					HDT_ZONE_SCOPED_N("FirstFrameSync");
+					CudaInterface::instance()->synchronize();
+					CudaInterface::instance()->clearAllFirstFrames();
+				}
+
+				// Tree propagation uses PREVIOUS frame's leaf AABBs
+				// Sync already happened at frame START (syncPreviousCollisionResults)
 				{
 					HDT_ZONE_SCOPED_N("ParallelTreeUpdates");
-					// Tree updates are CPU work - can run in parallel
-					concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
-						if (o.second.first) {
+					hdt_parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
+						if (o.second.first && o.second.first->m_cudaObject) {
 							o.second.first->m_cudaObject->updateTree();
 						}
-						if (o.second.second) {
+						if (o.second.second && o.second.second->m_cudaObject) {
 							o.second.second->m_cudaObject->updateTree();
 						}
 						o.first->m_bulletShape.m_aabb = o.first->m_shape->m_tree.aabbAll;
@@ -234,7 +261,7 @@ namespace hdt
 			}
 		}
 		else {
-			concurrency::parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
+			hdt_parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
 				o.first->internalUpdate();
 				if (o.second.first) {
 					o.second.first->internalUpdate();
@@ -259,7 +286,7 @@ namespace hdt
 				const int pairCount = static_cast<int>(m_pairs.size());
 
 				// Gather all collision pairs into batched system
-				concurrency::parallel_for(0, pairCount, [this](int i) {
+				hdt_parallel_for(0, pairCount, [this](int i) {
 					auto& pair = m_pairs[i];
 					if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree)) {
 						// Add to batched collision system
@@ -273,17 +300,22 @@ namespace hdt
 
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 
-			// No sync needed - collision results applied at start of next frame
-			// GPU work continues asynchronously while we proceed with constraint solving
+			// Swap double buffers: current write buffer becomes next frame's read buffer
+			// This must happen AFTER all GPU launches but BEFORE frame end
+			CudaInterface::instance()->swapAllBuffers();
+
+			// Swap collision result buffers for 1-frame latency pipeline
+			// Results written this frame will be applied next frame after sync
+			CudaInterface::instance()->swapCollisionResultBuffers();
 		}
 		else {
 			// Now we can process the collisions
-			concurrency::parallel_for_each(
-				m_pairs.begin(), m_pairs.end(), [this](std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
-					if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree)) {
-						SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
-					}
-				});
+			hdt_parallel_for_each(m_pairs.begin(), m_pairs.end(),
+								  [this](std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
+									  if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree)) {
+										  SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
+									  }
+								  });
 			FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 		}
 
@@ -295,34 +327,40 @@ namespace hdt
 
 	void CollisionDispatcher::syncPreviousCollisionResults()
 	{
-		// Sync and apply collision results from previous frame
-		// Called at START of physics step (before prediction) to allow GPU overlap with solve
-		if (CudaInterface::instance()->hasCollisionResults()) {
-			HDT_ZONE_SCOPED_N("SyncPreviousCollisions");
-			CudaInterface::instance()->synchronize();
+		HDT_ZONE_SCOPED_N("SyncPreviousCollisionResults");
 
-			// Apply batched collision results
+		// SYNC AT FRAME START: Ensures previous frame's GPU work is complete.
+		// Both internal updates (double buffer) and collision use 1-frame latency.
+		// Sync is required to ensure GPU results are ready before CPU reads them.
+		// By syncing at frame START, GPU has maximum overlap time (~850μs typical).
+		{
+			HDT_ZONE_SCOPED_N("GpuSync");
+			CudaInterface::instance()->synchronize();
+		}
+
+		// Apply collision results (from previous frame, after GPU sync)
+		if (CudaInterface::instance()->hasCollisionResults()) {
+			HDT_ZONE_SCOPED_N("ApplyCollisionResults");
 			CudaInterface::instance()->applyCollisionResults(this);
 		}
 	}
 #else
 			});
 		FrameTimer::instance()->logEvent(FrameTimer::e_Start);
-		concurrency::parallel_for_each(bodies.begin(), bodies.end(),
-									   [](SkinnedMeshBody* shape) { shape->internalUpdate(); });
-		concurrency::parallel_for_each(vertex_shapes.begin(), vertex_shapes.end(),
-									   [](PerVertexShape* shape) { shape->internalUpdate(); });
-		concurrency::parallel_for_each(triangle_shapes.begin(), triangle_shapes.end(),
-									   [](PerTriangleShape* shape) { shape->internalUpdate(); });
+		hdt_parallel_for_each(bodies.begin(), bodies.end(), [](SkinnedMeshBody* shape) { shape->internalUpdate(); });
+		hdt_parallel_for_each(vertex_shapes.begin(), vertex_shapes.end(),
+							  [](PerVertexShape* shape) { shape->internalUpdate(); });
+		hdt_parallel_for_each(triangle_shapes.begin(), triangle_shapes.end(),
+							  [](PerTriangleShape* shape) { shape->internalUpdate(); });
 		for (auto body : bodies) {
 			body->m_bulletShape.m_aabb = body->m_shape->m_tree.aabbAll;
 		}
 		FrameTimer::instance()->logEvent(FrameTimer::e_Internal);
-		concurrency::parallel_for_each(m_pairs.begin(), m_pairs.end(),
-									   [&, this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
-										   if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree))
-											   SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
-									   });
+		hdt_parallel_for_each(m_pairs.begin(), m_pairs.end(),
+							  [&, this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
+								  if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree))
+									  SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
+							  });
 		FrameTimer::instance()->logEvent(FrameTimer::e_Launched);
 		m_pairs.clear();
 		FrameTimer::instance()->addManifoldCount(getNumManifolds());

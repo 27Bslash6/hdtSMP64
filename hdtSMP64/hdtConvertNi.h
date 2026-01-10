@@ -1,5 +1,6 @@
 #pragma once
 #include "hdtSkinnedMesh/hdtBulletHelper.h"
+
 #include "../hdtSSEUtils/NetImmerseUtils.h"
 
 namespace hdt
@@ -27,4 +28,4 @@ namespace hdt
 
 	static const float scaleRealWorld = 0.01425;
 	static const float scaleSkyrim = 1 / scaleRealWorld;
-}
+} // namespace hdt

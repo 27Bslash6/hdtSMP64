@@ -2,22 +2,18 @@
 
 #include "IEventDispatcher.h"
 
-#include <unordered_set>
 #include <mutex>
+#include <unordered_set>
 
 namespace hdt
 {
-	template <class Event = void>
+	template<class Event = void>
 	class EventDispatcherImpl : public IEventDispatcher<Event>
 	{
 	public:
-		EventDispatcherImpl()
-		{
-		}
+		EventDispatcherImpl() {}
 
-		~EventDispatcherImpl()
-		{
-		}
+		~EventDispatcherImpl() {}
 
 		void addListener(IEventListener<Event>*) override;
 		void removeListener(IEventListener<Event>*) override;
@@ -30,7 +26,7 @@ namespace hdt
 		bool m_cacheDirt = false;
 	};
 
-	template <class Event>
+	template<class Event>
 	void EventDispatcherImpl<Event>::addListener(IEventListener<Event>* listener)
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
@@ -38,7 +34,7 @@ namespace hdt
 		m_cacheDirt = true;
 	}
 
-	template <class Event>
+	template<class Event>
 	void EventDispatcherImpl<Event>::removeListener(IEventListener<Event>* listener)
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
@@ -46,12 +42,11 @@ namespace hdt
 		m_cacheDirt = true;
 	}
 
-	template <class Event>
+	template<class Event>
 	void EventDispatcherImpl<Event>::dispatch(const Event& event)
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		if (m_cacheDirt)
-		{
+		if (m_cacheDirt) {
 			m_caches.clear();
 			for (auto& i : m_listeners)
 				m_caches.push_back(i);
@@ -62,17 +57,13 @@ namespace hdt
 			i->onEvent(event);
 	}
 
-	template <>
+	template<>
 	class EventDispatcherImpl<void> : public IEventDispatcher<void>
 	{
 	public:
-		EventDispatcherImpl()
-		{
-		}
+		EventDispatcherImpl() {}
 
-		~EventDispatcherImpl()
-		{
-		}
+		~EventDispatcherImpl() {}
 
 		void addListener(IEventListener<void>*) override;
 		void removeListener(IEventListener<void>*) override;
@@ -88,8 +79,7 @@ namespace hdt
 	inline void EventDispatcherImpl<void>::dispatch()
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		if (m_cacheDirt)
-		{
+		if (m_cacheDirt) {
 			m_caches.clear();
 			for (auto& i : m_listeners)
 				m_caches.push_back(i);
@@ -99,4 +89,4 @@ namespace hdt
 		for (auto i : m_caches)
 			i->onEvent();
 	}
-}
+} // namespace hdt

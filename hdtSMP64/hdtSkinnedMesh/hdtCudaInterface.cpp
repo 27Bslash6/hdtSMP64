@@ -1,13 +1,13 @@
 #ifdef CUDA
 #include "hdtCudaInterface.h"
 
+#include "../hdtLog.h"
 #include "../hdtTracy.h"
 
 #include <algorithm>
 #include <cfloat>
 #include <chrono>
 #include <immintrin.h>
-#include <ppl.h>
 #include <type_traits>
 #include <vector>
 
@@ -82,6 +82,13 @@ namespace hdt
 				cuCopyToDevice(m_deviceData, m_hostData, m_size, stream).check(__FUNCTION__);
 			}
 
+			// Overload for raw stream pointer (used by batched operations that need to use
+			// a shared stream instead of per-body streams to avoid thread-affinity issues)
+			void toDevice(void* rawStream)
+			{
+				cuCopyToDevice(m_deviceData, m_hostData, m_size, rawStream).check(__FUNCTION__);
+			}
+
 			void toHost(CudaStream& stream)
 			{
 				cuCopyToHost(m_hostData, m_deviceData, m_size, stream).check(__FUNCTION__);
@@ -108,6 +115,9 @@ namespace hdt
 			CudaBuffer(int n) : m_size(n), m_allocatedSize(32 * (((n - 1) / 32) + 1)), m_buffer(m_allocatedSize) {}
 
 			void toDevice(CudaStream& stream) { m_buffer.toDevice(stream); }
+
+			// Overload for raw stream pointer (used by batched operations)
+			void toDevice(void* rawStream) { m_buffer.toDevice(rawStream); }
 
 			void toHost(CudaStream& stream) { m_buffer.toHost(stream); }
 
@@ -360,7 +370,9 @@ namespace hdt
 
 	public:
 		CudaColliderTree(ColliderTree* tree, CudaStream& stream)
-			: m_tree(tree), m_numNodes(nodeCount(*tree)), m_nodeData(m_numNodes), m_nodeAabbs(m_numNodes)
+			: m_tree(tree), m_numNodes(nodeCount(*tree)), m_nodeData(m_numNodes),
+			  m_leafAabbBuffers{CudaBuffer<cuAabb, Aabb>(m_numNodes), CudaBuffer<cuAabb, Aabb>(m_numNodes)},
+			  m_currentWriteBuffer(0), m_firstFrame(true)
 		{
 			unsigned int biggestNode = 0;
 			buildNodeData(*tree, m_nodeData.get(), biggestNode);
@@ -370,11 +382,43 @@ namespace hdt
 					  m_nodeData[m_numNodes - 1].first + m_nodeData[m_numNodes - 1].second);
 		}
 
-		void update() { updateBoundingBoxes(*m_tree, m_nodeAabbs); }
+		// Update tree using PREVIOUS frame's leaf AABBs (no sync required!)
+		// Zero-copy: GPU writes to buffer N, CPU reads buffer N-1's pinned host memory directly.
+		void update()
+		{
+			HDT_ZONE_SCOPED_N("TreeUpdate");
+			// Read from the OTHER buffer (previous frame's data) via zero-copy pinned memory
+			int readBuffer = 1 - m_currentWriteBuffer;
+			updateBoundingBoxes(*m_tree, m_leafAabbBuffers[readBuffer].get());
+		}
+
+		// Get the zero-copy pointer for GPU to write current frame's leaf AABBs
+		cuAabb* getCurrentWriteBuffer() { return m_leafAabbBuffers[m_currentWriteBuffer].getZ(); }
+
+		// No-op: Zero-copy means GPU writes directly to pinned host memory.
+		// No cudaMemcpyAsync needed - data is already in host-accessible memory.
+		void queueLeafDownload(void* /*stream*/)
+		{
+			// Zero-copy makes this unnecessary. GPU writes via getZ() go directly to
+			// the pinned host memory that get() returns. No copy required.
+		}
+
+		// Swap double buffers at frame end
+		// After this, currentWriteBuffer points to fresh buffer for next frame's GPU writes
+		void swapBuffers() { m_currentWriteBuffer = 1 - m_currentWriteBuffer; }
+
+		// Check if this is the first frame (need sync to bootstrap)
+		bool isFirstFrame() const { return m_firstFrame; }
+		void clearFirstFrame() { m_firstFrame = false; }
 
 		int m_numNodes;
 		CudaBuffer<NodePair> m_nodeData;
-		CudaBuffer<cuAabb, Aabb> m_nodeAabbs;
+
+		// Double-buffered leaf AABBs: GPU writes to current via getZ(), CPU reads previous via get()
+		// Zero-copy: getZ() returns device pointer to pinned host memory, get() returns host pointer
+		CudaBuffer<cuAabb, Aabb> m_leafAabbBuffers[2];
+		int m_currentWriteBuffer; // Index of buffer GPU writes to (0 or 1)
+		bool m_firstFrame;		  // True until first frame completes
 
 	private:
 		static int nodeCount(ColliderTree& tree)
@@ -389,7 +433,8 @@ namespace hdt
 		NodePair* buildNodeData(ColliderTree& tree, NodePair* nodeData, unsigned int& biggestNode)
 		{
 			if (tree.numCollider) {
-				*nodeData++ = {tree.aabb - m_tree->aabb, tree.numCollider};
+				// Use colliderOffset directly (no pointer subtraction needed)
+				*nodeData++ = {static_cast<unsigned int>(tree.colliderOffset), tree.numCollider};
 				biggestNode = std::max(biggestNode, tree.numCollider);
 			}
 			for (auto& child : tree.children) {
@@ -398,7 +443,7 @@ namespace hdt
 			return nodeData;
 		}
 
-		Aabb* updateBoundingBoxes(ColliderTree& tree, Aabb* boundingBoxes)
+		Aabb* updateBoundingBoxes(ColliderTree& tree, const Aabb* boundingBoxes)
 		{
 			if (tree.numCollider) {
 				tree.aabbMe = *boundingBoxes++;
@@ -411,7 +456,7 @@ namespace hdt
 				boundingBoxes = updateBoundingBoxes(child, boundingBoxes);
 				tree.aabbAll.merge(child.aabbAll);
 			}
-			return boundingBoxes;
+			return const_cast<Aabb*>(boundingBoxes);
 		}
 	};
 
@@ -475,6 +520,26 @@ namespace hdt
 		return m_imp->deviceId();
 	}
 
+	void CudaPerTriangleShape::queueLeafDownload(void* stream)
+	{
+		m_imp->m_tree.queueLeafDownload(stream);
+	}
+
+	void CudaPerTriangleShape::swapBuffers()
+	{
+		m_imp->m_tree.swapBuffers();
+	}
+
+	bool CudaPerTriangleShape::isFirstFrame() const
+	{
+		return m_imp->m_tree.isFirstFrame();
+	}
+
+	void CudaPerTriangleShape::clearFirstFrame()
+	{
+		m_imp->m_tree.clearFirstFrame();
+	}
+
 	class CudaPerVertexShape::Imp
 	{
 	public:
@@ -521,6 +586,26 @@ namespace hdt
 		return m_imp->deviceId();
 	}
 
+	void CudaPerVertexShape::queueLeafDownload(void* stream)
+	{
+		m_imp->m_tree.queueLeafDownload(stream);
+	}
+
+	void CudaPerVertexShape::swapBuffers()
+	{
+		m_imp->m_tree.swapBuffers();
+	}
+
+	bool CudaPerVertexShape::isFirstFrame() const
+	{
+		return m_imp->m_tree.isFirstFrame();
+	}
+
+	void CudaPerVertexShape::clearFirstFrame()
+	{
+		m_imp->m_tree.clearFirstFrame();
+	}
+
 	class CudaMergeBuffer::Imp
 	{
 	public:
@@ -533,26 +618,89 @@ namespace hdt
 						   static_cast<size_t>(m_x) * body1->m_cudaObject->m_imp->m_numDynamicBones)
 		{
 			m_buffer.zero(m_stream);
+
+			// SNAPSHOT BONE RIG TRANSFORMS at collision gather time
+			// These will be used when applying results (next frame after sync)
+			// to compute correct local coordinates from world collision points.
+			//
+			// We store m_rig.getWorldTransform() because that's what the physics solver
+			// uses to reconstruct world positions from local coordinates in btManifoldPoint.
+			// The GPU computes collision in world space, solver expects local space relative
+			// to m_rig.getWorldTransform().
+			//
+			// IMPORTANT: Initialize ALL entries to identity first (btTransform has no default init!)
+			m_transforms0.resize(body0->m_skinnedBones.size());
+			m_transforms1.resize(body1->m_skinnedBones.size());
+			for (size_t i = 0; i < m_transforms0.size(); ++i) {
+				m_transforms0[i].setIdentity();
+				if (body0->m_skinnedBones[i].ptr) {
+					m_transforms0[i] = body0->m_skinnedBones[i].ptr->m_rig.getWorldTransform();
+				}
+			}
+			for (size_t i = 0; i < m_transforms1.size(); ++i) {
+				m_transforms1[i].setIdentity();
+				if (body1->m_skinnedBones[i].ptr) {
+					m_transforms1[i] = body1->m_skinnedBones[i].ptr->m_rig.getWorldTransform();
+				}
+			}
 		}
 
 		void launchTransfer() { m_buffer.toHost(m_stream); }
 
-		void addManifold(cuCollisionMerge* c, SkinnedMeshBone* rb0, SkinnedMeshBone* rb1,
+		// Rate-limited warning counter for bad collision data
+		inline static std::atomic<int> s_badCollisionCount{0};
+
+		// Use STORED transforms (from collision time) for local coordinate conversion
+		void addManifold(cuCollisionMerge* c, SkinnedMeshBone* rb0, SkinnedMeshBone* rb1, int boneIdx0, int boneIdx1,
 						 CollisionDispatcher* dispatcher)
 		{
+			// Defense-in-depth: null check for bone pointers
+			if (!rb0 || !rb1) {
+				_DMESSAGE("[CUDA-COLL] addManifold: null bone pointer rb0=%p rb1=%p", rb0, rb1);
+				return;
+			}
+
 			if (c->weight < FLT_EPSILON)
 				return;
 
 			if (rb0 == rb1)
 				return;
 
+			// Validate bone indices
+			if (boneIdx0 < 0 || boneIdx0 >= static_cast<int>(m_transforms0.size()) || boneIdx1 < 0 ||
+				boneIdx1 >= static_cast<int>(m_transforms1.size()))
+			{
+				_DMESSAGE("[CUDA-COLL] addManifold: bone index out of range idx0=%d/%zu idx1=%d/%zu", boneIdx0,
+						  m_transforms0.size(), boneIdx1, m_transforms1.size());
+				return;
+			}
+
 			float invWeight = 1.0f / c->weight;
 
-			auto maniford = dispatcher->getNewManifold(&rb0->m_rig, &rb1->m_rig);
+			auto manifold = dispatcher->getNewManifold(&rb0->m_rig, &rb1->m_rig);
 			auto worldA = btVector4(c->posA.val) * invWeight;
 			auto worldB = btVector4(c->posB.val) * invWeight;
-			auto localA = rb0->m_rig.getWorldTransform().invXform(worldA);
-			auto localB = rb1->m_rig.getWorldTransform().invXform(worldB);
+
+			// USE STORED TRANSFORMS from collision time (not current transforms)
+			// This ensures consistent local coordinates despite 1-frame latency
+			auto localA = m_transforms0[boneIdx0].invXform(worldA);
+			auto localB = m_transforms1[boneIdx1].invXform(worldB);
+
+			// SANITY CHECK: Detect unreasonably large local coordinates (sign of transform mismatch)
+			constexpr float LOCAL_SANITY_LIMIT = 1000.0f; // Skyrim units, bones shouldn't be this far
+			if (localA.length() > LOCAL_SANITY_LIMIT || localB.length() > LOCAL_SANITY_LIMIT) {
+				int count = s_badCollisionCount.fetch_add(1);
+				if (count < 10 || (count % 1000 == 0)) {
+					_DMESSAGE("[CUDA-COLL] WARNING: Large local coords detected (count=%d)! "
+							  "localA=(%.1f,%.1f,%.1f) len=%.1f, localB=(%.1f,%.1f,%.1f) len=%.1f, "
+							  "worldA=(%.1f,%.1f,%.1f), worldB=(%.1f,%.1f,%.1f)",
+							  count, localA.x(), localA.y(), localA.z(), localA.length(), localB.x(), localB.y(),
+							  localB.z(), localB.length(), worldA.x(), worldA.y(), worldA.z(), worldB.x(), worldB.y(),
+							  worldB.z());
+				}
+				return; // Skip this bad manifold
+			}
+
 			auto normal = btVector4(c->normal.val) * invWeight;
 			if (normal.fuzzyZero())
 				return;
@@ -568,12 +716,31 @@ namespace hdt
 			newPt.m_combinedFriction = rb0->m_rig.getFriction() * rb1->m_rig.getFriction();
 			newPt.m_combinedRestitution = rb0->m_rig.getRestitution() * rb1->m_rig.getRestitution();
 			newPt.m_combinedRollingFriction = rb0->m_rig.getRollingFriction() * rb1->m_rig.getRollingFriction();
-			maniford->addManifoldPoint(newPt);
+			manifold->addManifoldPoint(newPt);
 		}
 
-		void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher)
+		// Takes locked CudaBody shared_ptrs directly to avoid TOCTOU race.
+		// The weak_ptrs stored at collision time are locked once by the caller (applyResults),
+		// then passed here - no reads from body->m_cudaObject.
+		void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, std::shared_ptr<CudaBody> cuda0,
+				   std::shared_ptr<CudaBody> cuda1, CollisionDispatcher* dispatcher)
 		{
 			HDT_ZONE_SCOPED_N("MergeBuffer::apply");
+
+			// CRITICAL: Check validity BEFORE accessing body pointers.
+			// If the owning SkinnedMeshBody started destruction, it sets m_valid=false.
+			// The body's other members (m_skinnedBones, etc.) may already be destroyed.
+			if (!cuda0->isValid() || !cuda1->isValid()) {
+				return; // Owner body is being destroyed, don't access its members
+			}
+
+			// Caller guarantees cuda0/cuda1 are valid locked shared_ptrs
+			if (!cuda0->m_imp || !cuda1->m_imp) {
+				return; // Imp not initialized - shouldn't happen but be safe
+			}
+
+			auto& imp0 = *cuda0->m_imp;
+			auto& imp1 = *cuda1->m_imp;
 
 			// Checking can-collide-with and no-collide-with involves a list search, so just do it once for each bone
 			std::vector<bool> canCollide0(body0->m_skinnedBones.size());
@@ -587,12 +754,12 @@ namespace hdt
 
 			// NOTE: StreamSync removed - GlobalResultsSync in dispatcher syncs all streams before apply loop
 
-			int* map0 = body0->m_cudaObject->m_imp->m_boneMap.get();
-			int* map1 = body1->m_cudaObject->m_imp->m_boneMap.get();
+			int* map0 = imp0.m_boneMap.get();
+			int* map1 = imp1.m_boneMap.get();
 
 			// First check each dynamic bone of body 0 against every bone of body 1
-			for (int dyn = 0; dyn < body0->m_cudaObject->m_imp->m_invBoneMap.size(); ++dyn) {
-				int i = body0->m_cudaObject->m_imp->m_invBoneMap[dyn];
+			for (int dyn = 0; dyn < imp0.m_invBoneMap.size(); ++dyn) {
+				int i = imp0.m_invBoneMap[dyn];
 				if (!canCollide0[i]) {
 					continue;
 				}
@@ -605,13 +772,13 @@ namespace hdt
 					cuCollisionMerge* c = m_buffer.get() + dyn * m_y + j;
 					auto rb0 = body0->m_skinnedBones[i].ptr;
 					auto rb1 = body1->m_skinnedBones[j].ptr;
-					addManifold(c, rb0, rb1, dispatcher);
+					addManifold(c, rb0, rb1, i, j, dispatcher); // Pass bone indices
 				}
 			}
 
 			// Then check each dynamic bone of body 1 against each kinematic bone of body 0
-			for (int dyn = 0; dyn < body1->m_cudaObject->m_imp->m_invBoneMap.size(); ++dyn) {
-				int j = body1->m_cudaObject->m_imp->m_invBoneMap[dyn];
+			for (int dyn = 0; dyn < imp1.m_invBoneMap.size(); ++dyn) {
+				int j = imp1.m_invBoneMap[dyn];
 				if (!canCollide1[j]) {
 					continue;
 				}
@@ -624,7 +791,7 @@ namespace hdt
 					cuCollisionMerge* c = m_buffer.get() + m_dynx * m_y + m_x * dyn + i;
 					auto rb0 = body0->m_skinnedBones[i].ptr;
 					auto rb1 = body1->m_skinnedBones[j].ptr;
-					addManifold(c, rb0, rb1, dispatcher);
+					addManifold(c, rb0, rb1, i, j, dispatcher); // Pass bone indices
 				}
 			}
 		}
@@ -639,6 +806,11 @@ namespace hdt
 		int m_dynx;
 		size_t m_bufferSize;
 		CudaPooledBuffer<cuCollisionMerge> m_buffer;
+
+		// Bone transforms captured at collision gather time
+		// Used for correct local coordinate conversion with 1-frame latency
+		std::vector<btTransform> m_transforms0;
+		std::vector<btTransform> m_transforms1;
 	};
 
 	CudaMergeBuffer::CudaMergeBuffer(SkinnedMeshBody* body0, SkinnedMeshBody* body1) : m_imp(new Imp(body0, body1)) {}
@@ -648,9 +820,10 @@ namespace hdt
 		m_imp->launchTransfer();
 	}
 
-	void CudaMergeBuffer::apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher)
+	void CudaMergeBuffer::apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, std::shared_ptr<CudaBody> cuda0,
+								std::shared_ptr<CudaBody> cuda1, CollisionDispatcher* dispatcher)
 	{
-		m_imp->apply(body0, body1, dispatcher);
+		m_imp->apply(body0, body1, cuda0, cuda1, dispatcher);
 	}
 
 	template<typename T>
@@ -756,18 +929,65 @@ namespace hdt
 	bool CudaInterface::enableCuda = false;
 	int CudaInterface::currentDevice = 0;
 	bool CudaInterface::collectMetrics = false;
+	bool CudaInterface::gpuTimingEnabled = false;
 
-	// Global metrics instance
+	// Global metrics instances
 	static CudaGraphMetrics s_graphMetrics;
+	static GpuTimingStats s_gpuTiming;
+
+	// GPU timing events for internal update batch - created lazily, reused across frames
+	static struct InternalUpdateTiming
+	{
+		void* startEvent = nullptr;
+		void* afterBonesEvent = nullptr;
+		void* afterKernelsEvent = nullptr;
+		bool initialized = false;
+		bool pending = false; // True if we have events recorded waiting for sync
+
+		void ensure()
+		{
+			if (!initialized) {
+				cuCreateEvent(&startEvent);
+				cuCreateEvent(&afterBonesEvent);
+				cuCreateEvent(&afterKernelsEvent);
+				initialized = true;
+			}
+		}
+	} s_internalTiming;
 
 	CudaGraphMetrics& CudaInterface::graphMetrics()
 	{
 		return s_graphMetrics;
 	}
 
+	GpuTimingStats& CudaInterface::gpuTiming()
+	{
+		return s_gpuTiming;
+	}
+
 	void CudaInterface::resetMetrics()
 	{
 		s_graphMetrics = CudaGraphMetrics{};
+		s_gpuTiming = GpuTimingStats{};
+	}
+
+	std::string GpuTimingStats::report() const
+	{
+		const int count = std::min(totalSamples, kSampleCount);
+		if (count == 0)
+			return "GPU Timing: No samples collected (enable with 'smp gputiming')";
+
+		char buf[512];
+		snprintf(buf, sizeof(buf),
+				 "GPU Timing (n=%d, mean of last 64):\n"
+				 "  Bones->Device:     %.3f ms\n"
+				 "  Internal Kernels:  %.3f ms\n"
+				 "  Collision Kernels: %.3f ms\n"
+				 "  Sync Wait:         %.3f ms\n"
+				 "  TOTAL GPU:         %.3f ms",
+				 count, mean(bonesToDeviceMs), mean(internalKernelsMs), mean(collisionKernelsMs), mean(syncWaitMs),
+				 mean(bonesToDeviceMs) + mean(internalKernelsMs) + mean(collisionKernelsMs));
+		return buf;
 	}
 
 	float CudaGraphMetrics::percentile(const float* data, int p) const
@@ -827,7 +1047,29 @@ namespace hdt
 
 	void CudaInterface::synchronize()
 	{
+		// Measure sync wait time if GPU timing enabled
+		const auto syncStart = std::chrono::high_resolution_clock::now();
+
 		cuSynchronize().check(__FUNCTION__);
+
+		// Collect GPU timing if enabled and we have pending measurements
+		if (gpuTimingEnabled && s_internalTiming.pending) {
+			const auto syncEnd = std::chrono::high_resolution_clock::now();
+			const float syncWaitMs = std::chrono::duration<float, std::milli>(syncEnd - syncStart).count();
+
+			// Get GPU execution times from events
+			const float bonesMs = cuEventElapsedTime(s_internalTiming.startEvent, s_internalTiming.afterBonesEvent);
+			const float kernelsMs =
+				cuEventElapsedTime(s_internalTiming.afterBonesEvent, s_internalTiming.afterKernelsEvent);
+
+			// For collision timing, we measure total GPU time minus internal update time
+			// (collision kernels overlap with internal updates on different streams)
+			// This is an approximation - for precise per-kernel timing would need per-stream events
+			const float collisionMs = 0.0f; // TODO: Add collision-specific events if needed
+
+			s_gpuTiming.addSample(bonesMs, kernelsMs, collisionMs, syncWaitMs);
+			s_internalTiming.pending = false;
+		}
 	}
 
 	void CudaInterface::clearBufferPool()
@@ -947,12 +1189,12 @@ namespace hdt
 										 : s_emptyVertexData,
 							 vertexShape ? vertexShape->m_imp->m_tree.m_numNodes : 0,
 							 vertexShape ? vertexShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
-							 vertexShape ? vertexShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr,
+							 vertexShape ? vertexShape->m_imp->m_tree.getCurrentWriteBuffer() : nullptr,
 							 triangleShape ? static_cast<cuColliderData<CudaPerTriangleShape>>(*triangleShape->m_imp)
 										   : s_emptyTriangleData,
 							 triangleShape ? triangleShape->m_imp->m_tree.m_numNodes : 0,
 							 triangleShape ? triangleShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
-							 triangleShape ? triangleShape->m_imp->m_tree.m_nodeAabbs.getZ() : nullptr)
+							 triangleShape ? triangleShape->m_imp->m_tree.getCurrentWriteBuffer() : nullptr)
 				.check(__FUNCTION__);
 		}
 
@@ -998,17 +1240,55 @@ namespace hdt
 	extern std::atomic<int> s_skippedPairsVV;
 	extern std::atomic<int> s_skippedPairsVT;
 
+	BatchedCollisionManager::BatchedCollisionManager()
+	{
+		// Initialize CUDA events for completion tracking (disabled timing for faster query)
+		for (int i = 0; i < 3; ++i) {
+			if (!cuCreateEventWithFlags(&m_completionEvents[i], 0x02).check("BatchedCollisionManager::ctor")) {
+				_DMESSAGE("[CUDA-PIPE] Failed to create completion event %d", i);
+				m_completionEvents[i] = nullptr;
+			}
+		}
+		m_eventsInitialized = true;
+		_DMESSAGE("[CUDA-PIPE] BatchedCollisionManager initialized with 3-buffer pipeline");
+	}
+
+	BatchedCollisionManager::~BatchedCollisionManager()
+	{
+		// Destroy CUDA events
+		for (int i = 0; i < 3; ++i) {
+			if (m_completionEvents[i]) {
+				cuDestroyEvent(m_completionEvents[i]);
+				m_completionEvents[i] = nullptr;
+			}
+		}
+		m_eventsInitialized = false;
+	}
+
+	bool BatchedCollisionManager::syncIfNeeded()
+	{
+		HDT_ZONE_SCOPED_N("SyncIfNeeded");
+
+		// NOTE: Sync is now done in syncPreviousCollisionResults() at frame start.
+		// This function is retained for potential future event-based sync optimization.
+		// Currently a no-op since the main sync path handles all GPU synchronization.
+		return false; // No sync performed here - sync happens at frame start
+	}
+
 	void BatchedCollisionManager::beginBatch()
 	{
-		// Clear global batch data
+		// Clear global batch data (pairs to process this frame)
 		m_pairs.clear();
-		m_pendingResults.clear();
+
+		// Note: m_pendingResults buffers are NOT cleared here.
+		// With 1-frame latency: current frame writes to writeIndex(), previous frame's
+		// results are in readIndex() (being applied after sync). Clearing happens in
+		// applyResults() after application, and in launchBatch() before writing.
 
 		// Pre-allocate based on previous frame (with 20% margin)
 		if (m_lastFramePairCount > 0) {
 			size_t estimate = std::min(static_cast<size_t>(m_lastFramePairCount * 1.2), CUDA_MAX_COLLISION_PAIRS);
 			m_pairs.reserve(estimate);
-			m_pendingResults.reserve(estimate);
 		}
 
 		// Reset atomic counter
@@ -1185,9 +1465,9 @@ namespace hdt
 			auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
 
 			if (asize > 0 && bsize > 0) {
-				collisionPair.addPair(pairs[i].first->cbuf - shape0->m_colliders.data(),
-									  pairs[i].second->cbuf - shape1->m_colliders.data(), asize, bsize, a->aabbMe,
-									  b->aabbMe);
+				// Use colliderOffset directly (no pointer subtraction needed)
+				collisionPair.addPair(pairs[i].first->colliderOffset, pairs[i].second->colliderOffset, asize, bsize,
+									  a->aabbMe, b->aabbMe);
 			}
 		}
 
@@ -1199,12 +1479,17 @@ namespace hdt
 	{
 		HDT_ZONE_SCOPED_N("BatchedLaunchCollisions");
 
-		// Clear previous pending results
-		m_pendingResults.clear();
+		_DMESSAGE("[CUDA-PIPE] launchBatch: frame=%d, writeIndex=%d", m_frameCount, writeIndex());
+
+		// Get write buffer for this frame's collision results
+		auto& writeBuffer = m_pendingResults[writeIndex()];
+
+		// Clear write buffer - it was last written 3 frames ago and cleared by applyResults,
+		// but clear again for safety during bootstrap or edge cases
+		writeBuffer.clear();
 
 		size_t totalPairs = m_pairs.totalPairs();
 		if (totalPairs == 0) {
-			m_hasPendingResults = false;
 			return;
 		}
 
@@ -1212,7 +1497,7 @@ namespace hdt
 		m_lastFramePairCount = totalPairs;
 
 		// Pre-allocate for expected results
-		m_pendingResults.reserve(totalPairs);
+		writeBuffer.reserve(totalPairs);
 
 		// Process VV pairs
 		{
@@ -1235,8 +1520,8 @@ namespace hdt
 				launchSingleCollision<false>(vertexShape0, vertexShape1, mergeBuffer);
 				mergeBuffer->launchTransfer();
 
-				// Store for later application
-				m_pendingResults.push_back({mergeBuffer, body0, body1, pairInfo.cudaBody0, pairInfo.cudaBody1});
+				// Store for later application (next frame after sync)
+				writeBuffer.push_back({mergeBuffer, body0, body1, pairInfo.cudaBody0, pairInfo.cudaBody1});
 			}
 		}
 
@@ -1280,40 +1565,91 @@ namespace hdt
 				}
 				mergeBuffer->launchTransfer();
 
-				// Store for later application
-				m_pendingResults.push_back({mergeBuffer, body0, body1, pairInfo.cudaBody0, pairInfo.cudaBody1});
+				// Store for later application (next frame after sync)
+				writeBuffer.push_back({mergeBuffer, body0, body1, pairInfo.cudaBody0, pairInfo.cudaBody1});
 			}
 		}
 
-		m_hasPendingResults = !m_pendingResults.empty();
-		HDT_ZONE_VALUE(static_cast<int64_t>(m_pendingResults.size()));
+		HDT_ZONE_VALUE(static_cast<int64_t>(writeBuffer.size()));
+
+		// NOTE: Event recording disabled - collision work runs on per-merge-buffer streams,
+		// not the default stream, so events can't track completion. See syncIfNeeded TODO.
+	}
+
+	void BatchedCollisionManager::swapResultBuffers()
+	{
+		// Advance frame count - this drives the triple buffer rotation:
+		//   writeIndex = m_frameCount % 3
+		//   readIndex = (m_frameCount + 2) % 3  (1 frame behind)
+		_DMESSAGE("[CUDA-PIPE] swapResultBuffers: frame %d -> %d", m_frameCount, m_frameCount + 1);
+		m_frameCount++;
 	}
 
 	void BatchedCollisionManager::applyResults(CollisionDispatcher* dispatcher)
 	{
 		HDT_ZONE_SCOPED_N("BatchedApplyResults");
 
-		if (!m_hasPendingResults || m_pendingResults.empty()) {
+		// 1-FRAME LATENCY: Apply results from previous frame (GPU complete after sync)
+		// Bone transforms stored in CudaMergeBuffer ensure correct local coordinates
+		// even though the actual bones may have moved since collision detection.
+		int ridx = readIndex();
+		int widx = writeIndex();
+
+		// DIAGNOSTIC: Track pending results buffer sizes
+		static int s_applyCounter = 0;
+		if (++s_applyCounter % 120 == 0) { // Every ~2 seconds
+			_MESSAGE("[CUDA-DIAG] Frame %d: pendingResults[0]=%zu, [1]=%zu, [2]=%zu, ridx=%d, widx=%d", m_frameCount,
+					 m_pendingResults[0].size(), m_pendingResults[1].size(), m_pendingResults[2].size(), ridx, widx);
+		}
+
+		// Need at least 1 frame to have data in read buffer
+		if (isBootstrapping()) {
 			return;
 		}
 
-		HDT_ZONE_VALUE(static_cast<int64_t>(m_pendingResults.size()));
+		// Get buffer from previous frame (GPU work complete after sync at frame start)
+		auto& readBuffer = m_pendingResults[ridx];
 
-		// Apply all pending collision results
-		for (auto& result : m_pendingResults) {
-			// CRITICAL: Check bodies still exist via CUDA object weak_ptr
-			if (!result.bodiesValid()) {
+		// Hold mutex while accessing pending results to prevent race with body destruction
+		std::lock_guard<std::mutex> lock(m_resultsMutex);
+
+		if (readBuffer.empty()) {
+			return;
+		}
+
+		HDT_ZONE_VALUE(static_cast<int64_t>(readBuffer.size()));
+
+		// Apply all pending collision results (from previous frame, now complete after sync)
+		for (auto& result : readBuffer) {
+			// CRITICAL: Lock weak_ptrs ONCE and use those locks throughout.
+			auto cuda0 = result.cudaBody0.lock();
+			auto cuda1 = result.cudaBody1.lock();
+			if (!cuda0 || !cuda1) {
 				// Body was destroyed between gather and apply - skip
 				continue;
 			}
 
-			// Apply merge buffer results to physics manifolds
-			result.mergeBuffer->apply(result.body0, result.body1, dispatcher);
+			// Pass the locked shared_ptrs directly - no further reads from body->m_cudaObject
+			result.mergeBuffer->apply(result.body0, result.body1, cuda0, cuda1, dispatcher);
 		}
 
-		// Clear pending results after application
-		m_pendingResults.clear();
-		m_hasPendingResults = false;
+		// Clear buffer after application
+		readBuffer.clear();
+	}
+
+	void BatchedCollisionManager::removePendingResultsFor(SkinnedMeshBody* body)
+	{
+		// Hold mutex while modifying pending results
+		std::lock_guard<std::mutex> lock(m_resultsMutex);
+
+		// Remove from ALL 3 buffers (body might have results in any stage of pipeline)
+		for (int i = 0; i < 3; ++i) {
+			auto& buffer = m_pendingResults[i];
+			auto it = std::remove_if(buffer.begin(), buffer.end(), [body](const PendingCollisionResult& r) {
+				return r.body0 == body || r.body1 == body;
+			});
+			buffer.erase(it, buffer.end());
+		}
 	}
 
 	//==========================================================================
@@ -1345,9 +1681,258 @@ namespace hdt
 		m_batchedCollisions.applyResults(dispatcher);
 	}
 
+	void CudaInterface::removePendingResultsFor(SkinnedMeshBody* body)
+	{
+		m_batchedCollisions.removePendingResultsFor(body);
+	}
+
 	bool CudaInterface::hasCollisionResults() const
 	{
 		return m_batchedCollisions.hasPendingResults();
+	}
+
+	bool CudaInterface::isCollisionBootstrapping() const
+	{
+		return m_batchedCollisions.isBootstrapping();
+	}
+
+	void CudaInterface::swapCollisionResultBuffers()
+	{
+		m_batchedCollisions.swapResultBuffers();
+	}
+
+	//==========================================================================
+	// BATCHED INTERNAL UPDATE MANAGER IMPLEMENTATION
+	//==========================================================================
+
+	BatchedInternalUpdateManager::~BatchedInternalUpdateManager()
+	{
+		if (m_batchStream) {
+			cuDestroyStream(m_batchStream);
+			m_batchStream = nullptr;
+		}
+	}
+
+	void BatchedInternalUpdateManager::ensureBatchStream()
+	{
+		int currentDevice = CudaInterface::currentDevice;
+
+		// Create or recreate stream if needed (device changed or not yet created)
+		if (!m_batchStream || m_batchStreamDevice != currentDevice) {
+			if (m_batchStream) {
+				cuDestroyStream(m_batchStream);
+				m_batchStream = nullptr;
+			}
+			cuCreateStream(&m_batchStream).check(__FUNCTION__);
+			m_batchStreamDevice = currentDevice;
+		}
+	}
+
+	void BatchedInternalUpdateManager::beginBatch()
+	{
+		m_workUnits.clear();
+
+		// Pre-allocate based on previous frame
+		if (m_lastFrameBodyCount > 0) {
+			m_workUnits.reserve(m_lastFrameBodyCount);
+		}
+	}
+
+	void BatchedInternalUpdateManager::addBody(std::shared_ptr<CudaBody> body,
+											   std::shared_ptr<CudaPerVertexShape> vertexShape,
+											   std::shared_ptr<CudaPerTriangleShape> triangleShape)
+	{
+		if (!body) {
+			return;
+		}
+
+		m_workUnits.push_back({body, vertexShape, triangleShape});
+	}
+
+	void BatchedInternalUpdateManager::launchBatch()
+	{
+		HDT_ZONE_SCOPED_N("BatchedInternalUpdates");
+
+		if (m_workUnits.empty()) {
+			return;
+		}
+
+		// CRITICAL FIX: Ensure we have a batch stream created on the MAIN thread.
+		// Using per-body streams (created during parallel_for_each on worker threads)
+		// causes CUDA driver crashes due to context/thread affinity issues.
+		// The original per-body graph launches worked because:
+		// 1. Graph capture happened on the worker thread that created the stream
+		// 2. cuGraphLaunch is designed to be thread-safe
+		// Direct kernel launches don't have the same thread-safety guarantees when
+		// using streams created by other threads.
+		ensureBatchStream();
+
+		// Record for next frame pre-allocation
+		m_lastFrameBodyCount = m_workUnits.size();
+		HDT_ZONE_VALUE(static_cast<int64_t>(m_workUnits.size()));
+
+		// Setup GPU timing if enabled
+		const bool timing = CudaInterface::gpuTimingEnabled;
+		if (timing) {
+			s_internalTiming.ensure();
+			cuRecordEvent(s_internalTiming.startEvent, m_batchStream);
+		}
+
+		// Empty collider data for bodies without shapes
+		static const cuColliderData<CudaPerVertexShape> s_emptyVertexData = {
+			VertexInputArray(nullptr, 0), BoundingBoxArray(nullptr, 0), 0, {0}};
+		static const cuColliderData<CudaPerTriangleShape> s_emptyTriangleData = {
+			TriangleInputArray(nullptr, 0), BoundingBoxArray(nullptr, 0), 0, {0, 0}};
+
+		// Phase 1: Upload all bone data to device using the batch stream
+		// All uploads are queued on the same stream, ensuring proper ordering
+		{
+			HDT_ZONE_SCOPED_N("BatchedBonesToDevice");
+			for (auto& work : m_workUnits) {
+				if (!work.body || !work.body->m_imp) {
+					continue; // Skip invalid work units
+				}
+				auto& imp = *work.body->m_imp;
+				// Use batch stream instead of per-body stream to avoid thread-affinity issues
+				imp.m_bones.toDevice(m_batchStream);
+			}
+		}
+
+		// Record after bone transfers
+		if (timing) {
+			cuRecordEvent(s_internalTiming.afterBonesEvent, m_batchStream);
+		}
+
+		// Phase 2: Launch all internal update kernels on the batch stream
+		// Using a single stream ensures all operations are properly ordered and
+		// avoids the thread-affinity issues with per-body streams.
+		{
+			HDT_ZONE_SCOPED_N("BatchedKernelLaunches");
+			for (auto& work : m_workUnits) {
+				if (!work.body || !work.body->m_imp) {
+					continue; // Skip invalid work units
+				}
+				auto& imp = *work.body->m_imp;
+
+				// Validate shape m_imp pointers before use
+				bool hasValidVertexShape = work.vertexShape && work.vertexShape->m_imp;
+				bool hasValidTriangleShape = work.triangleShape && work.triangleShape->m_imp;
+
+				cuInternalUpdate(
+					m_batchStream, imp, imp.m_bones.getD(),
+					hasValidVertexShape ? static_cast<cuColliderData<CudaPerVertexShape>>(*work.vertexShape->m_imp)
+										: s_emptyVertexData,
+					hasValidVertexShape ? work.vertexShape->m_imp->m_tree.m_numNodes : 0,
+					hasValidVertexShape ? work.vertexShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
+					hasValidVertexShape ? work.vertexShape->m_imp->m_tree.getCurrentWriteBuffer() : nullptr,
+					hasValidTriangleShape
+						? static_cast<cuColliderData<CudaPerTriangleShape>>(*work.triangleShape->m_imp)
+						: s_emptyTriangleData,
+					hasValidTriangleShape ? work.triangleShape->m_imp->m_tree.m_numNodes : 0,
+					hasValidTriangleShape ? work.triangleShape->m_imp->m_tree.m_nodeData.getD() : nullptr,
+					hasValidTriangleShape ? work.triangleShape->m_imp->m_tree.getCurrentWriteBuffer() : nullptr)
+					.check(__FUNCTION__);
+			}
+		}
+
+		// Record after kernel launches
+		if (timing) {
+			cuRecordEvent(s_internalTiming.afterKernelsEvent, m_batchStream);
+			s_internalTiming.pending = true;
+		}
+
+		// NOTE: No sync here - caller will sync when needed via CudaInterface::synchronize()
+	}
+
+	void BatchedInternalUpdateManager::queueLeafDownloads()
+	{
+		// No-op: Zero-copy makes explicit D2H copies unnecessary.
+		// GPU writes via getZ() go directly to pinned host memory that get() reads.
+		// Keeping this function for API compatibility but it does nothing.
+	}
+
+	void BatchedInternalUpdateManager::swapAllBuffers()
+	{
+		HDT_ZONE_SCOPED_N("SwapAllBuffers");
+		for (auto& work : m_workUnits) {
+			if (work.vertexShape && work.vertexShape->m_imp) {
+				work.vertexShape->swapBuffers();
+			}
+			if (work.triangleShape && work.triangleShape->m_imp) {
+				work.triangleShape->swapBuffers();
+			}
+		}
+	}
+
+	bool BatchedInternalUpdateManager::hasFirstFrame() const
+	{
+		for (const auto& work : m_workUnits) {
+			if (work.vertexShape && work.vertexShape->m_imp && work.vertexShape->isFirstFrame()) {
+				return true;
+			}
+			if (work.triangleShape && work.triangleShape->m_imp && work.triangleShape->isFirstFrame()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void BatchedInternalUpdateManager::clearAllFirstFrames()
+	{
+		for (auto& work : m_workUnits) {
+			if (work.vertexShape && work.vertexShape->m_imp) {
+				work.vertexShape->clearFirstFrame();
+			}
+			if (work.triangleShape && work.triangleShape->m_imp) {
+				work.triangleShape->clearFirstFrame();
+			}
+		}
+	}
+
+	//==========================================================================
+	// CUDAINTERFACE BATCHED INTERNAL UPDATE API WRAPPERS
+	//==========================================================================
+
+	void CudaInterface::beginInternalUpdateBatch()
+	{
+		m_batchedInternalUpdates.beginBatch();
+	}
+
+	void CudaInterface::addInternalUpdate(std::shared_ptr<CudaBody> body,
+										  std::shared_ptr<CudaPerVertexShape> vertexShape,
+										  std::shared_ptr<CudaPerTriangleShape> triangleShape)
+	{
+		m_batchedInternalUpdates.addBody(body, vertexShape, triangleShape);
+	}
+
+	void CudaInterface::launchInternalUpdateBatch()
+	{
+		m_batchedInternalUpdates.launchBatch();
+	}
+
+	void CudaInterface::queueLeafDownloads()
+	{
+		m_batchedInternalUpdates.queueLeafDownloads();
+	}
+
+	void CudaInterface::swapAllBuffers()
+	{
+		m_batchedInternalUpdates.swapAllBuffers();
+	}
+
+	bool CudaInterface::hasFirstFrame() const
+	{
+		return m_batchedInternalUpdates.hasFirstFrame();
+	}
+
+	void CudaInterface::clearAllFirstFrames()
+	{
+		m_batchedInternalUpdates.clearAllFirstFrames();
+	}
+
+	void* CudaInterface::getBatchStream() const
+	{
+		return m_batchedInternalUpdates.getBatchStream();
 	}
 } // namespace hdt
 #endif

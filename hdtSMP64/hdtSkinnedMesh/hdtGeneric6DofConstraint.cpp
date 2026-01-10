@@ -3,9 +3,10 @@
 namespace hdt
 {
 	Generic6DofConstraint::Generic6DofConstraint(SkinnedMeshBone* a, SkinnedMeshBone* b, const btTransform& frameInA,
-	                                             const btTransform& frameInB)
-		: BoneScaleConstraint(a, b, static_cast<btTypedConstraint*>(this))
-		  , btGeneric6DofSpring2Constraint(a->m_rig, b->m_rig, btTransform::getIdentity(), btTransform::getIdentity(), RO_XYZ)
+												 const btTransform& frameInB)
+		: BoneScaleConstraint(a, b, static_cast<btTypedConstraint*>(this)),
+		  btGeneric6DofSpring2Constraint(a->m_rig, b->m_rig, btTransform::getIdentity(), btTransform::getIdentity(),
+										 RO_XYZ)
 	{
 		auto fa = a->m_rigToLocal * frameInA;
 		auto fb = b->m_rigToLocal * frameInB;
@@ -14,11 +15,11 @@ namespace hdt
 		for (int i = 0; i < 6; ++i)
 			enableSpring(i, true);
 
-		//m_linearLimits.m_stopERP.setValue(0.1f, 0.1f, 0.1f);
+		// m_linearLimits.m_stopERP.setValue(0.1f, 0.1f, 0.1f);
 
-		//m_oldLinearDiff.setZero();
-		//m_oldAngularDiff.setZero();
-		//m_linearBounce.setZero();
+		// m_oldLinearDiff.setZero();
+		// m_oldAngularDiff.setZero();
+		// m_linearBounce.setZero();
 	}
 
 	void Generic6DofConstraint::scaleConstraint()
@@ -45,8 +46,7 @@ namespace hdt
 		m_linearLimits.m_springStiffness *= factor3;
 		m_linearLimits.m_upperLimit *= factor;
 		m_linearLimits.m_lowerLimit *= factor;
-		for (int i = 0; i < 3; ++i)
-		{
+		for (int i = 0; i < 3; ++i) {
 			m_angularLimits[i].m_springStiffness *= factor5;
 		}
 
@@ -55,7 +55,7 @@ namespace hdt
 	}
 
 	//
-	//void Generic6DofConstraint::internalUpdateSprings(btConstraintInfo2* info)
+	// void Generic6DofConstraint::internalUpdateSprings(btConstraintInfo2* info)
 	//{
 	//	// it is assumed that calculateTransforms() have been called before this call
 	//	int i;
@@ -114,7 +114,7 @@ namespace hdt
 	//	m_oldAngularDiff = m_calculatedAxisAngleDiff;
 	//}
 
-	//void Generic6DofConstraint::getInfo2(btConstraintInfo2* info)
+	// void Generic6DofConstraint::getInfo2(btConstraintInfo2* info)
 	//{
 	//	internalUpdateSprings(info);
 
@@ -139,7 +139,9 @@ namespace hdt
 	//	}
 	//}
 
-	//int Generic6DofConstraint::setLinearLimits(btConstraintInfo2* info, int row, const btTransform& transA, const btTransform& transB, const btVector3& linVelA, const btVector3& linVelB, const btVector3& angVelA, const btVector3& angVelB)
+	// int Generic6DofConstraint::setLinearLimits(btConstraintInfo2* info, int row, const btTransform& transA, const
+	// btTransform& transB, const btVector3& linVelA, const btVector3& linVelB, const btVector3& angVelA, const
+	// btVector3& angVelB)
 	//{
 	//	//	int row = 0;
 	//	//solve linear limits
@@ -174,14 +176,16 @@ namespace hdt
 	//				{
 	//					rotAllowed = 0;
 	//				}
-	//				row += get_limit_motor_info2(&limot, transA, transB, linVelA, linVelB, angVelA, angVelB, info, row, axis, 0, rotAllowed);
+	//				row += get_limit_motor_info2(&limot, transA, transB, linVelA, linVelB, angVelA, angVelB, info, row,
+	// axis, 0, rotAllowed);
 	//			}
 	//			else
 	//			{
-	//				row += get_limit_motor_info2(&limot, transA, transB, linVelA, linVelB, angVelA, angVelB, info, row, axis, 0);
+	//				row += get_limit_motor_info2(&limot, transA, transB, linVelA, linVelB, angVelA, angVelB, info, row,
+	// axis, 0);
 	//			}
 	//		}
 	//	}
 	//	return row;
-	//}
-}
+	// }
+} // namespace hdt

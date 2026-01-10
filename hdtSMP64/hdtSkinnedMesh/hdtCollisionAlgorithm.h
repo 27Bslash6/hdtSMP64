@@ -27,10 +27,7 @@ namespace hdt
 	bool checkSphereTriangle(const btVector3& s, float r, const CheckTriangle& tri, CollisionResult& res);
 
 #ifndef CUDA
-	static inline btVector3 BaryCoord(const btVector3& a,
-		const btVector3& b,
-		const btVector3& c,
-		const btVector3& p)
+	static inline btVector3 BaryCoord(const btVector3& a, const btVector3& b, const btVector3& c, const btVector3& p)
 	{
 		auto xmm3 = a - p;
 		auto xmm4 = b - p;
@@ -49,4 +46,4 @@ namespace hdt
 		return _mm_div_ps(xmm0, xmm1);
 	}
 #endif
-}
+} // namespace hdt

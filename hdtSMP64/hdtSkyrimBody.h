@@ -1,8 +1,8 @@
 #pragma once
 
 #include "hdtConvertNi.h"
-#include "hdtSkyrimBone.h"
 #include "hdtSkinnedMesh/hdtSkinnedMeshBody.h"
+#include "hdtSkyrimBone.h"
 
 namespace hdt
 {
@@ -31,4 +31,4 @@ namespace hdt
 		bool canCollideWith(const SkinnedMeshBody* body) const override;
 		void internalUpdate() override;
 	};
-}
+} // namespace hdt

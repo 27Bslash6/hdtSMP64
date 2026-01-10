@@ -7,36 +7,44 @@ namespace hdt
 	class SkinnedMeshWorld : protected btDiscreteDynamicsWorldMt
 	{
 	public:
-
 		SkinnedMeshWorld();
 		~SkinnedMeshWorld();
 
 		virtual void addSkinnedMeshSystem(SkinnedMeshSystem* system);
 		virtual void removeSkinnedMeshSystem(SkinnedMeshSystem* system);
 
+		// Force re-registration of all collision objects to rebuild broadphase
+		// Call during reset to ensure no stale collision state
+		void reregisterAllBodies();
+
 		int stepSimulation(btScalar remainingTimeStep, int maxSubSteps = 1,
-		                   btScalar fixedTimeStep = btScalar(1.) / btScalar(60.)) override;
+						   btScalar fixedTimeStep = btScalar(1.) / btScalar(60.)) override;
 
 		// Global frame counter for dirty flag optimization
 		static uint32_t getCurrentFrame() { return s_currentFrame; }
-		static void incrementFrame() { ++s_currentFrame; }
+		static void incrementFrame();  // Defined in .cpp to update both counters
 
 		btVector3& getWind() { return m_windSpeed; }
 		const btVector3& getWind() const { return m_windSpeed; }
 
 	protected:
-
 		void resetTransformsToOriginal()
 		{
-			for (int i = 0; i < m_systems.size(); ++i) m_systems[i]->resetTransformsToOriginal();
+			for (int i = 0; i < m_systems.size(); ++i)
+				m_systems[i]->resetTransformsToOriginal();
 		}
 
 		void readTransform(float timeStep)
 		{
-			for (int i = 0; i < m_systems.size(); ++i) m_systems[i]->readTransform(timeStep);
+			for (int i = 0; i < m_systems.size(); ++i)
+				m_systems[i]->readTransform(timeStep);
 		}
 
-		void writeTransform() { for (int i = 0; i < m_systems.size(); ++i) m_systems[i]->writeTransform(); }
+		void writeTransform()
+		{
+			for (int i = 0; i < m_systems.size(); ++i)
+				m_systems[i]->writeTransform();
+		}
 
 		void applyGravity() override;
 		void applyWind();
@@ -52,11 +60,10 @@ namespace hdt
 		btVector3 m_windSpeed; // world windspeed
 
 	private:
-
 		std::vector<SkinnedMeshBody*> _bodies;
 		std::vector<SkinnedMeshShape*> _shapes;
 		btConstraintSolverPoolMt* m_solverPool;
 		GroupConstraintSolver m_constraintSolver;
 		static uint32_t s_currentFrame;
 	};
-}
+} // namespace hdt

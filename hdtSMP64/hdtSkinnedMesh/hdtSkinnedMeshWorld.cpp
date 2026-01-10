@@ -2,6 +2,7 @@
 
 #include "hdtBoneScaleConstraint.h"
 #include "hdtDispatcher.h"
+#include "hdtEnkiTSScheduler.h"
 #include "hdtSimulationIslandManager.h"
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtSkyrimPhysicsWorld.h"
@@ -11,20 +12,28 @@
 #include "../hdtTracy.h"
 
 #include <exception>
-#include <ppl.h>
 #include <random>
 
 namespace hdt
 {
 	// Static frame counter for dirty flag optimization
 	uint32_t SkinnedMeshWorld::s_currentFrame = 0;
+
+	void SkinnedMeshWorld::incrementFrame()
+	{
+		++s_currentFrame;
+		// Keep logging namespace in sync for log prefix
+		hdt::logging::currentFrameNumber.store(s_currentFrame, std::memory_order_relaxed);
+	}
+
 	SkinnedMeshWorld::SkinnedMeshWorld()
 		: btDiscreteDynamicsWorldMt(nullptr, nullptr, m_solverPool, &m_constraintSolver, nullptr)
 	{
-		btSetTaskScheduler(btGetPPLTaskScheduler());
+		// Use enkiTS for Bullet's task scheduler - replaces PPL to avoid thread pool over-subscription
+		btSetTaskScheduler(btGetEnkiTSTaskScheduler());
 
 		// Enable nested parallelism for Mt solver - allows btParallelFor inside convertJoints
-		// even when outer threading is running. PPL handles nested parallelism well.
+		// even when outer threading is running. enkiTS handles nested parallelism well.
 		btSequentialImpulseConstraintSolverMt::s_allowNestedParallelForLoops = true;
 
 		m_windSpeed = _mm_setzero_ps();
@@ -67,8 +76,13 @@ namespace hdt
 
 		m_systems.push_back(system);
 
-		for (int i = 0; i < system->m_meshes.size(); ++i)
-			addCollisionObject(system->m_meshes[i], 1, 1);
+		// Add collision objects for all meshes
+		// No pointer refresh needed - offsets are computed on-the-fly
+		for (int i = 0; i < system->m_meshes.size(); ++i) {
+			SkinnedMeshBody* mesh = system->m_meshes[i];
+			addCollisionObject(mesh, 1, 1);
+		}
+
 		for (int i = 0; i < system->m_bones.size(); ++i) {
 			system->m_bones[i]->m_rig.setActivationState(DISABLE_DEACTIVATION);
 			addRigidBody(&system->m_bones[i]->m_rig, 0, 0);
@@ -108,6 +122,53 @@ namespace hdt
 		m_systems.pop_back();
 
 		system->m_world = nullptr;
+	}
+
+	void SkinnedMeshWorld::reregisterAllBodies()
+	{
+		// Log at VERY START to see how many systems we have
+		_VMESSAGE("reregisterAllBodies: ENTERING with %zu systems", m_systems.size());
+
+		// Remove all bodies from broadphase, then re-add them
+		// This forces a complete rebuild of collision state
+		for (auto& system : m_systems) {
+			// Remove meshes and bones from collision world
+			for (int i = 0; i < system->m_meshes.size(); ++i) {
+				SkinnedMeshBody* mesh = system->m_meshes[i];
+				if (mesh->getBroadphaseHandle()) {
+					getBroadphase()->destroyProxy(mesh->getBroadphaseHandle(), m_dispatcher1);
+					mesh->setBroadphaseHandle(nullptr);
+				}
+			}
+			for (int i = 0; i < system->m_bones.size(); ++i) {
+				btRigidBody* rig = &system->m_bones[i]->m_rig;
+				if (rig->getBroadphaseHandle()) {
+					getBroadphase()->destroyProxy(rig->getBroadphaseHandle(), m_dispatcher1);
+					rig->setBroadphaseHandle(nullptr);
+				}
+			}
+		}
+
+		// Re-add all bodies to broadphase with fresh proxies
+		// No pointer refresh needed - offsets are computed on-the-fly
+		for (auto& system : m_systems) {
+			for (int i = 0; i < system->m_meshes.size(); ++i) {
+				SkinnedMeshBody* mesh = system->m_meshes[i];
+				btVector3 minAabb, maxAabb;
+				mesh->getCollisionShape()->getAabb(mesh->getWorldTransform(), minAabb, maxAabb);
+				btBroadphaseProxy* proxy = getBroadphase()->createProxy(
+					minAabb, maxAabb, mesh->getCollisionShape()->getShapeType(), mesh, 1, 1, m_dispatcher1);
+				mesh->setBroadphaseHandle(proxy);
+			}
+			for (int i = 0; i < system->m_bones.size(); ++i) {
+				btRigidBody* rig = &system->m_bones[i]->m_rig;
+				btVector3 minAabb, maxAabb;
+				rig->getCollisionShape()->getAabb(rig->getWorldTransform(), minAabb, maxAabb);
+				btBroadphaseProxy* proxy = getBroadphase()->createProxy(
+					minAabb, maxAabb, rig->getCollisionShape()->getShapeType(), rig, 0, 0, m_dispatcher1);
+				rig->setBroadphaseHandle(proxy);
+			}
+		}
 	}
 
 	int SkinnedMeshWorld::stepSimulation(btScalar remainingTimeStep, int maxSubSteps, btScalar fixedTimeStep)
@@ -305,8 +366,8 @@ namespace hdt
 		{
 			HDT_ZONE_SCOPED_N("ParallelFrameStart");
 
-			// Run all three operations in parallel
-			concurrency::parallel_invoke(
+			// Run all three operations in parallel using enkiTS
+			hdt_parallel_invoke(
 				// Task 1: GPU sync and apply collision results
 				[this]() {
 					HDT_ZONE_SCOPED_N("GpuSyncTask");
@@ -325,7 +386,7 @@ namespace hdt
 						m_systems[i]->internalUpdate();
 				});
 
-			// All tasks complete here due to parallel_invoke semantics
+			// All tasks complete here due to hdt_parallel_invoke semantics
 		}
 
 		// Continue with sequential physics steps (predict motion already done above)

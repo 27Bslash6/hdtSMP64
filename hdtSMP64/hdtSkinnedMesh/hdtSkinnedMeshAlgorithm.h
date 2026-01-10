@@ -1,7 +1,8 @@
 #pragma once
 
-#include "hdtSkinnedMeshShape.h"
 #include "hdtDispatcher.h"
+#include "hdtSkinnedMeshShape.h"
+
 #include <cstring>
 #ifdef CUDA
 #include "hdtCudaInterface.h"
@@ -20,27 +21,24 @@ namespace hdt
 		SkinnedMeshAlgorithm(const btCollisionAlgorithmConstructionInfo& ci);
 
 		void processCollision(const btCollisionObjectWrapper* body0Wrap, const btCollisionObjectWrapper* body1Wrap,
-		                      const btDispatcherInfo& dispatchInfo, btManifoldResult* resultOut) override
-		{
-		}
+							  const btDispatcherInfo& dispatchInfo, btManifoldResult* resultOut) override
+		{}
 
 		btScalar calculateTimeOfImpact(btCollisionObject* body0, btCollisionObject* body1,
-		                               const btDispatcherInfo& dispatchInfo, btManifoldResult* resultOut) override
+									   const btDispatcherInfo& dispatchInfo, btManifoldResult* resultOut) override
 		{
 			return 1;
 		} // TOI cost too much
-		void getAllContactManifolds(btManifoldArray& manifoldArray) override
-		{
-		}
+		void getAllContactManifolds(btManifoldArray& manifoldArray) override {}
 
 		struct CreateFunc : public btCollisionAlgorithmCreateFunc
 		{
 			btCollisionAlgorithm* CreateCollisionAlgorithm(btCollisionAlgorithmConstructionInfo& ci,
-			                                               const btCollisionObjectWrapper* body0Wrap,
-			                                               const btCollisionObjectWrapper* body1Wrap) override
+														   const btCollisionObjectWrapper* body0Wrap,
+														   const btCollisionObjectWrapper* body1Wrap) override
 			{
 				void* mem = ci.m_dispatcher1->allocateCollisionAlgorithm(sizeof(SkinnedMeshAlgorithm));
-				return new(mem) SkinnedMeshAlgorithm(ci);
+				return new (mem) SkinnedMeshAlgorithm(ci);
 			}
 		};
 
@@ -49,16 +47,14 @@ namespace hdt
 		static const int MaxCollisionCount = 256;
 
 #ifdef CUDA
-		static std::function<void()> queueCollision(
-			SkinnedMeshBody* body0Wrap,
-			SkinnedMeshBody* body1Wrap,
-			CollisionDispatcher* dispatcher);
+		static std::function<void()> queueCollision(SkinnedMeshBody* body0Wrap, SkinnedMeshBody* body1Wrap,
+													CollisionDispatcher* dispatcher);
 #endif
 
 		static void processCollision(SkinnedMeshBody* body0Wrap, SkinnedMeshBody* body1Wrap,
-		                             CollisionDispatcher* dispatcher);
-	protected:
+									 CollisionDispatcher* dispatcher);
 
+	protected:
 		struct CollisionMerge
 		{
 			btVector3 normal;
@@ -100,8 +96,7 @@ namespace hdt
 			{
 				mergeStride = y;
 				mergeSize = x * y;
-				if (mergeSize > capacity)
-				{
+				if (mergeSize > capacity) {
 					delete[] buffer;
 					buffer = new CollisionMerge[mergeSize];
 					capacity = mergeSize;
@@ -109,12 +104,16 @@ namespace hdt
 			}
 
 			// Clear buffer contents without deallocating
-			void clear()
-			{
-				std::memset(buffer, 0, mergeSize * sizeof(CollisionMerge));
-			}
+			void clear() { std::memset(buffer, 0, mergeSize * sizeof(CollisionMerge)); }
 
-			void release() { if (buffer) { delete[] buffer; buffer = nullptr; capacity = 0; } }
+			void release()
+			{
+				if (buffer) {
+					delete[] buffer;
+					buffer = nullptr;
+					capacity = 0;
+				}
+			}
 
 			CollisionMerge* get(int x, int y) { return &buffer[x * mergeStride + y]; }
 
@@ -130,7 +129,7 @@ namespace hdt
 #endif
 		};
 
-		template <class T0, class T1>
+		template<class T0, class T1>
 		static void processCollision(T0* shape0, T1* shape1, MergeBuffer& merge, CollisionResult* collision);
 	};
-}
+} // namespace hdt

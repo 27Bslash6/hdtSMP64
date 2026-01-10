@@ -1,4 +1,5 @@
 #include "hdtCollider.h"
+
 #include <algorithm>
 
 namespace hdt
@@ -8,17 +9,16 @@ namespace hdt
 	void ColliderTree::insertCollider(const std::vector<U32>& keys, const Collider& c)
 	{
 		ColliderTree* p = this;
-		for (int i = 0; i < keys.size() && i < 4; ++i)
-		{
+		for (int i = 0; i < keys.size() && i < 4; ++i) {
 			auto key = keys[i];
 			auto f = std::find_if(p->children.begin(), p->children.end(),
-			                      [=](const ColliderTree& n) { return n.key == key; });
-			if (f == p->children.end())
-			{
+								  [=](const ColliderTree& n) { return n.key == key; });
+			if (f == p->children.end()) {
 				p->children.push_back(ColliderTree(key));
 				p = &p->children.back();
 			}
-			else p = &*f;
+			else
+				p = &*f;
 		}
 		p->colliders.push_back(c);
 	}
@@ -31,8 +31,7 @@ namespace hdt
 		if (!aabbAll.collideWith(r->aabbAll))
 			return;
 
-		if (numCollider && aabbMe.collideWith(r->aabbAll))
-		{
+		if (numCollider && aabbMe.collideWith(r->aabbAll)) {
 			if (aabbMe.collideWith(r->aabbMe))
 				ret.push_back(std::make_pair(this, r));
 
@@ -53,8 +52,7 @@ namespace hdt
 		if (isKinematic && r->isKinematic)
 			return;
 
-		if (numCollider)
-		{
+		if (numCollider) {
 			if (!aabbMe.collideWith(r->aabbAll))
 				return;
 
@@ -75,41 +73,34 @@ namespace hdt
 
 		colliders.erase(std::remove_if(colliders.begin(), colliders.end(), func), colliders.end());
 		children.erase(std::remove_if(children.begin(), children.end(),
-		                              [](const ColliderTree& n)-> bool { return n.empty(); }), children.end());
+									  [](const ColliderTree& n) -> bool { return n.empty(); }),
+					   children.end());
 	}
 
 	void ColliderTree::updateKinematic(const std::function<float(const Collider*)>& func)
 	{
 		U32 k = true;
-		for (auto& i : colliders)
-		{
+		for (auto& i : colliders) {
 			i.flexible = func(&i);
 			k &= i.flexible < FLT_EPSILON;
 		}
 
-		for (auto& i : children)
-		{
+		for (auto& i : children) {
 			i.updateKinematic(func);
 			k &= i.isKinematic;
 		}
 
-		std::sort(colliders.begin(), colliders.end(), [](const Collider& a, const Collider& b)
-		{
-			return a.flexible > b.flexible;
-		});
-		std::sort(children.begin(), children.end(), [](const ColliderTree& a, const ColliderTree& b)
-		{
-			return a.isKinematic < b.isKinematic;
-		});
+		std::sort(colliders.begin(), colliders.end(),
+				  [](const Collider& a, const Collider& b) { return a.flexible > b.flexible; });
+		std::sort(children.begin(), children.end(),
+				  [](const ColliderTree& a, const ColliderTree& b) { return a.isKinematic < b.isKinematic; });
 
 		isKinematic = k;
 
-		if (k)
-		{
+		if (k) {
 			dynChild = dynCollider = 0;
 		}
-		else
-		{
+		else {
 			for (dynChild = 0; dynChild < children.size(); ++dynChild)
 				if (children[dynChild].isKinematic)
 					break;
@@ -120,27 +111,26 @@ namespace hdt
 		}
 	}
 
-	void ColliderTree::updateAabb()
+	void ColliderTree::updateAabb(Aabb* aabbBase)
 	{
-		if (numCollider)
-		{
+		if (numCollider) {
+			// Compute actual aabb pointer from base + offset (no stored pointer!)
+			Aabb* myAabb = aabbBase + colliderOffset;
 			// Use AVX2 batch merge for efficiency
-			aabbMe = *this->aabb;
+			aabbMe = *myAabb;
 			if (numCollider > 1)
-				aabbMe.mergeMany(this->aabb + 1, numCollider - 1);
+				aabbMe.mergeMany(myAabb + 1, numCollider - 1);
 		}
 #ifdef CUDA
-		else
-		{
+		else {
 			aabbMe.invalidate();
 		}
 #endif
 
 		aabbAll = aabbMe;
-		for (auto& i : children)
-		{
+		for (auto& i : children) {
 			// FIXME PROFILING Lots of time is used here, because this is called a lot.
-			i.updateAabb();
+			i.updateAabb(aabbBase);
 
 			aabbAll.merge(i.aabbAll);
 		}
@@ -160,19 +150,17 @@ namespace hdt
 		for (auto& i : children)
 			i.optimize();
 
-		children.erase(
-			std::remove_if(children.begin(), children.end(), [](const ColliderTree& n) { return n.empty(); }),
-			children.end());
+		children.erase(std::remove_if(children.begin(), children.end(),
+									  [](const ColliderTree& n) { return n.empty(); }),
+					   children.end());
 
-		while (children.size() == 1 && children[0].colliders.empty())
-		{
+		while (children.size() == 1 && children[0].colliders.empty()) {
 			vectorA16<ColliderTree> temp;
 			temp.swap(children.front().children);
 			children.swap(temp);
 		}
 
-		if (children.size() == 1 && colliders.empty())
-		{
+		if (children.size() == 1 && colliders.empty()) {
 			colliders = children[0].colliders;
 
 			vectorA16<ColliderTree> temp;
@@ -189,8 +177,7 @@ namespace hdt
 		if (!aabbAll.collideWith(r->aabbAll))
 			return false;
 
-		if (numCollider && aabbMe.collideWith(r->aabbAll))
-		{
+		if (numCollider && aabbMe.collideWith(r->aabbAll)) {
 			if (aabbMe.collideWith(r->aabbMe))
 				return true;
 
@@ -214,8 +201,7 @@ namespace hdt
 		if (isKinematic && r->isKinematic)
 			return false;
 
-		if (numCollider)
-		{
+		if (numCollider) {
 			if (!aabbMe.collideWith(r->aabbAll))
 				return false;
 
@@ -235,9 +221,10 @@ namespace hdt
 	void ColliderTree::exportColliders(vectorA16<Collider>& exportTo)
 	{
 		numCollider = colliders.size();
-		cbuf = (Collider*)exportTo.size();
-		for (auto& i : colliders)
-		{
+		// Store offset directly - NO POINTER STORAGE
+		// This offset is relative to the shape's m_colliders vector
+		colliderOffset = exportTo.size();
+		for (auto& i : colliders) {
 			exportTo.push_back(i);
 		}
 
@@ -245,22 +232,13 @@ namespace hdt
 			i.exportColliders(exportTo);
 	}
 
-	void ColliderTree::remapColliders(Collider* start, Aabb* startAabb)
+	void ColliderTree::finalizeOffsets()
 	{
+		// Clear local colliders (they've been exported to shape's m_colliders)
+		// colliderOffset is already set by exportColliders
 		colliders.swap(vectorA16<Collider>());
-		auto offset = (size_t)cbuf;
-		cbuf = start + offset;
-		aabb = startAabb + offset;
 
 		for (auto& i : children)
-			i.remapColliders(start, startAabb);
+			i.finalizeOffsets();
 	}
-#ifdef CUDA
-	void ColliderTree::relocateAabb(Aabb* newAabb)
-	{
-		for (auto& i : children)
-			i.relocateAabb(newAabb + (i.aabb - aabb));
-		aabb = newAabb;
-	}
-#endif
-}
+} // namespace hdt

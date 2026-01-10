@@ -22,6 +22,7 @@ subject to the following restrictions:
 #include "BulletCollision/NarrowPhaseCollision/btPersistentManifold.h"
 
 #include "LinearMath/btIDebugDraw.h"
+#include "../../hdtTracy.h"  // Tracy instrumentation for hdtSMP64
 #include "LinearMath/btCpuFeatureUtility.h"
 
 //#include "btJacobianEntry.h"
@@ -1172,16 +1173,19 @@ void btSequentialImpulseConstraintSolver::convertJoint(btSolverConstraint* curre
 	if (overrideNumSolverIterations > m_maxOverrideNumSolverIterations)
 		m_maxOverrideNumSolverIterations = overrideNumSolverIterations;
 
-	for (int j = 0; j < info1.m_numConstraintRows; j++)
 	{
-		memset(&currentConstraintRow[j], 0, sizeof(btSolverConstraint));
-		currentConstraintRow[j].m_lowerLimit = -SIMD_INFINITY;
-		currentConstraintRow[j].m_upperLimit = SIMD_INFINITY;
-		currentConstraintRow[j].m_appliedImpulse = 0.f;
-		currentConstraintRow[j].m_appliedPushImpulse = 0.f;
-		currentConstraintRow[j].m_solverBodyIdA = solverBodyIdA;
-		currentConstraintRow[j].m_solverBodyIdB = solverBodyIdB;
-		currentConstraintRow[j].m_overrideNumSolverIterations = overrideNumSolverIterations;
+		HDT_ZONE_SCOPED_N("InitConstraintRows");
+		for (int j = 0; j < info1.m_numConstraintRows; j++)
+		{
+			memset(&currentConstraintRow[j], 0, sizeof(btSolverConstraint));
+			currentConstraintRow[j].m_lowerLimit = -SIMD_INFINITY;
+			currentConstraintRow[j].m_upperLimit = SIMD_INFINITY;
+			currentConstraintRow[j].m_appliedImpulse = 0.f;
+			currentConstraintRow[j].m_appliedPushImpulse = 0.f;
+			currentConstraintRow[j].m_solverBodyIdA = solverBodyIdA;
+			currentConstraintRow[j].m_solverBodyIdB = solverBodyIdB;
+			currentConstraintRow[j].m_overrideNumSolverIterations = overrideNumSolverIterations;
+		}
 	}
 
 	// these vectors are already cleared in initSolverBody, no need to redundantly clear again
@@ -1219,68 +1223,74 @@ void btSequentialImpulseConstraintSolver::convertJoint(btSolverConstraint* curre
 	info2.m_lowerLimit = &currentConstraintRow->m_lowerLimit;
 	info2.m_upperLimit = &currentConstraintRow->m_upperLimit;
 	info2.m_numIterations = infoGlobal.m_numIterations;
-	constraint->getInfo2(&info2);
+	{
+		HDT_ZONE_SCOPED_N("GetInfo2");
+		constraint->getInfo2(&info2);
+	}
 
 	///finalize the constraint setup
-	for (int j = 0; j < info1.m_numConstraintRows; j++)
 	{
-		btSolverConstraint& solverConstraint = currentConstraintRow[j];
-
-		if (solverConstraint.m_upperLimit >= constraint->getBreakingImpulseThreshold())
+		HDT_ZONE_SCOPED_N("FinalizeRows");
+		for (int j = 0; j < info1.m_numConstraintRows; j++)
 		{
-			solverConstraint.m_upperLimit = constraint->getBreakingImpulseThreshold();
-		}
+			btSolverConstraint& solverConstraint = currentConstraintRow[j];
 
-		if (solverConstraint.m_lowerLimit <= -constraint->getBreakingImpulseThreshold())
-		{
-			solverConstraint.m_lowerLimit = -constraint->getBreakingImpulseThreshold();
-		}
+			if (solverConstraint.m_upperLimit >= constraint->getBreakingImpulseThreshold())
+			{
+				solverConstraint.m_upperLimit = constraint->getBreakingImpulseThreshold();
+			}
 
-		solverConstraint.m_originalContactPoint = constraint;
+			if (solverConstraint.m_lowerLimit <= -constraint->getBreakingImpulseThreshold())
+			{
+				solverConstraint.m_lowerLimit = -constraint->getBreakingImpulseThreshold();
+			}
 
-		{
-			const btVector3& ftorqueAxis1 = solverConstraint.m_relpos1CrossNormal;
-			solverConstraint.m_angularComponentA = constraint->getRigidBodyA().getInvInertiaTensorWorld() * ftorqueAxis1 * constraint->getRigidBodyA().getAngularFactor();
-		}
-		{
-			const btVector3& ftorqueAxis2 = solverConstraint.m_relpos2CrossNormal;
-			solverConstraint.m_angularComponentB = constraint->getRigidBodyB().getInvInertiaTensorWorld() * ftorqueAxis2 * constraint->getRigidBodyB().getAngularFactor();
-		}
+			solverConstraint.m_originalContactPoint = constraint;
 
-		{
-			btVector3 iMJlA = solverConstraint.m_contactNormal1 * rbA.getInvMass();
-			btVector3 iMJaA = rbA.getInvInertiaTensorWorld() * solverConstraint.m_relpos1CrossNormal;
-			btVector3 iMJlB = solverConstraint.m_contactNormal2 * rbB.getInvMass();  //sign of normal?
-			btVector3 iMJaB = rbB.getInvInertiaTensorWorld() * solverConstraint.m_relpos2CrossNormal;
+			{
+				const btVector3& ftorqueAxis1 = solverConstraint.m_relpos1CrossNormal;
+				solverConstraint.m_angularComponentA = constraint->getRigidBodyA().getInvInertiaTensorWorld() * ftorqueAxis1 * constraint->getRigidBodyA().getAngularFactor();
+			}
+			{
+				const btVector3& ftorqueAxis2 = solverConstraint.m_relpos2CrossNormal;
+				solverConstraint.m_angularComponentB = constraint->getRigidBodyB().getInvInertiaTensorWorld() * ftorqueAxis2 * constraint->getRigidBodyB().getAngularFactor();
+			}
 
-			btScalar sum = iMJlA.dot(solverConstraint.m_contactNormal1);
-			sum += iMJaA.dot(solverConstraint.m_relpos1CrossNormal);
-			sum += iMJlB.dot(solverConstraint.m_contactNormal2);
-			sum += iMJaB.dot(solverConstraint.m_relpos2CrossNormal);
-			btScalar sorRelaxation = 1.f;  //todo: get from globalInfo?
-			solverConstraint.m_jacDiagABInv = sum != 0.f ? sorRelaxation / sum : 0.f;
-		}
+			{
+				btVector3 iMJlA = solverConstraint.m_contactNormal1 * rbA.getInvMass();
+				btVector3 iMJaA = rbA.getInvInertiaTensorWorld() * solverConstraint.m_relpos1CrossNormal;
+				btVector3 iMJlB = solverConstraint.m_contactNormal2 * rbB.getInvMass();  //sign of normal?
+				btVector3 iMJaB = rbB.getInvInertiaTensorWorld() * solverConstraint.m_relpos2CrossNormal;
 
-		{
-			btScalar rel_vel;
-			btVector3 externalForceImpulseA = bodyAPtr->m_originalBody ? bodyAPtr->m_externalForceImpulse : btVector3(0, 0, 0);
-			btVector3 externalTorqueImpulseA = bodyAPtr->m_originalBody ? bodyAPtr->m_externalTorqueImpulse : btVector3(0, 0, 0);
+				btScalar sum = iMJlA.dot(solverConstraint.m_contactNormal1);
+				sum += iMJaA.dot(solverConstraint.m_relpos1CrossNormal);
+				sum += iMJlB.dot(solverConstraint.m_contactNormal2);
+				sum += iMJaB.dot(solverConstraint.m_relpos2CrossNormal);
+				btScalar sorRelaxation = 1.f;  //todo: get from globalInfo?
+				solverConstraint.m_jacDiagABInv = sum != 0.f ? sorRelaxation / sum : 0.f;
+			}
 
-			btVector3 externalForceImpulseB = bodyBPtr->m_originalBody ? bodyBPtr->m_externalForceImpulse : btVector3(0, 0, 0);
-			btVector3 externalTorqueImpulseB = bodyBPtr->m_originalBody ? bodyBPtr->m_externalTorqueImpulse : btVector3(0, 0, 0);
+			{
+				btScalar rel_vel;
+				btVector3 externalForceImpulseA = bodyAPtr->m_originalBody ? bodyAPtr->m_externalForceImpulse : btVector3(0, 0, 0);
+				btVector3 externalTorqueImpulseA = bodyAPtr->m_originalBody ? bodyAPtr->m_externalTorqueImpulse : btVector3(0, 0, 0);
 
-			btScalar vel1Dotn = solverConstraint.m_contactNormal1.dot(rbA.getLinearVelocity() + externalForceImpulseA) + solverConstraint.m_relpos1CrossNormal.dot(rbA.getAngularVelocity() + externalTorqueImpulseA);
+				btVector3 externalForceImpulseB = bodyBPtr->m_originalBody ? bodyBPtr->m_externalForceImpulse : btVector3(0, 0, 0);
+				btVector3 externalTorqueImpulseB = bodyBPtr->m_originalBody ? bodyBPtr->m_externalTorqueImpulse : btVector3(0, 0, 0);
 
-			btScalar vel2Dotn = solverConstraint.m_contactNormal2.dot(rbB.getLinearVelocity() + externalForceImpulseB) + solverConstraint.m_relpos2CrossNormal.dot(rbB.getAngularVelocity() + externalTorqueImpulseB);
+				btScalar vel1Dotn = solverConstraint.m_contactNormal1.dot(rbA.getLinearVelocity() + externalForceImpulseA) + solverConstraint.m_relpos1CrossNormal.dot(rbA.getAngularVelocity() + externalTorqueImpulseA);
 
-			rel_vel = vel1Dotn + vel2Dotn;
-			btScalar restitution = 0.f;
-			btScalar positionalError = solverConstraint.m_rhs;  //already filled in by getConstraintInfo2
-			btScalar velocityError = restitution - rel_vel * info2.m_damping;
-			btScalar penetrationImpulse = positionalError * solverConstraint.m_jacDiagABInv;
-			btScalar velocityImpulse = velocityError * solverConstraint.m_jacDiagABInv;
-			solverConstraint.m_rhs = penetrationImpulse + velocityImpulse;
-			solverConstraint.m_appliedImpulse = 0.f;
+				btScalar vel2Dotn = solverConstraint.m_contactNormal2.dot(rbB.getLinearVelocity() + externalForceImpulseB) + solverConstraint.m_relpos2CrossNormal.dot(rbB.getAngularVelocity() + externalTorqueImpulseB);
+
+				rel_vel = vel1Dotn + vel2Dotn;
+				btScalar restitution = 0.f;
+				btScalar positionalError = solverConstraint.m_rhs;  //already filled in by getConstraintInfo2
+				btScalar velocityError = restitution - rel_vel * info2.m_damping;
+				btScalar penetrationImpulse = positionalError * solverConstraint.m_jacDiagABInv;
+				btScalar velocityImpulse = velocityError * solverConstraint.m_jacDiagABInv;
+				solverConstraint.m_rhs = penetrationImpulse + velocityImpulse;
+				solverConstraint.m_appliedImpulse = 0.f;
+			}
 		}
 	}
 }
@@ -1288,64 +1298,78 @@ void btSequentialImpulseConstraintSolver::convertJoint(btSolverConstraint* curre
 void btSequentialImpulseConstraintSolver::convertJoints(btTypedConstraint** constraints, int numConstraints, const btContactSolverInfo& infoGlobal)
 {
 	BT_PROFILE("convertJoints");
-	for (int j = 0; j < numConstraints; j++)
+
 	{
-		btTypedConstraint* constraint = constraints[j];
-		constraint->buildJacobian();
-		constraint->internalSetAppliedImpulse(0.0f);
+		HDT_ZONE_SCOPED_N("BuildJacobians");
+		HDT_ZONE_VALUE(static_cast<int64_t>(numConstraints));
+		for (int j = 0; j < numConstraints; j++)
+		{
+			btTypedConstraint* constraint = constraints[j];
+			constraint->buildJacobian();
+			constraint->internalSetAppliedImpulse(0.0f);
+		}
 	}
 
 	int totalNumRows = 0;
 
-	m_tmpConstraintSizesPool.resizeNoInitialize(numConstraints);
-	//calculate the total number of contraint rows
-	for (int i = 0; i < numConstraints; i++)
 	{
-		btTypedConstraint::btConstraintInfo1& info1 = m_tmpConstraintSizesPool[i];
-		btJointFeedback* fb = constraints[i]->getJointFeedback();
-		if (fb)
+		HDT_ZONE_SCOPED_N("GetConstraintInfo");
+		HDT_ZONE_VALUE(static_cast<int64_t>(numConstraints));
+		m_tmpConstraintSizesPool.resizeNoInitialize(numConstraints);
+		//calculate the total number of contraint rows
+		for (int i = 0; i < numConstraints; i++)
 		{
-			fb->m_appliedForceBodyA.setZero();
-			fb->m_appliedTorqueBodyA.setZero();
-			fb->m_appliedForceBodyB.setZero();
-			fb->m_appliedTorqueBodyB.setZero();
-		}
+			btTypedConstraint::btConstraintInfo1& info1 = m_tmpConstraintSizesPool[i];
+			btJointFeedback* fb = constraints[i]->getJointFeedback();
+			if (fb)
+			{
+				fb->m_appliedForceBodyA.setZero();
+				fb->m_appliedTorqueBodyA.setZero();
+				fb->m_appliedForceBodyB.setZero();
+				fb->m_appliedTorqueBodyB.setZero();
+			}
 
-		if (constraints[i]->isEnabled())
-		{
-			constraints[i]->getInfo1(&info1);
+			if (constraints[i]->isEnabled())
+			{
+				constraints[i]->getInfo1(&info1);
+			}
+			else
+			{
+				info1.m_numConstraintRows = 0;
+				info1.nub = 0;
+			}
+			totalNumRows += info1.m_numConstraintRows;
 		}
-		else
-		{
-			info1.m_numConstraintRows = 0;
-			info1.nub = 0;
-		}
-		totalNumRows += info1.m_numConstraintRows;
 	}
+
 	m_tmpSolverNonContactConstraintPool.resizeNoInitialize(totalNumRows);
 
 	///setup the btSolverConstraints
 	int currentRow = 0;
 
-	for (int i = 0; i < numConstraints; i++)
 	{
-		const btTypedConstraint::btConstraintInfo1& info1 = m_tmpConstraintSizesPool[i];
-
-		if (info1.m_numConstraintRows)
+		HDT_ZONE_SCOPED_N("SetupConstraintRows");
+		HDT_ZONE_VALUE(static_cast<int64_t>(totalNumRows));
+		for (int i = 0; i < numConstraints; i++)
 		{
-			btAssert(currentRow < totalNumRows);
+			const btTypedConstraint::btConstraintInfo1& info1 = m_tmpConstraintSizesPool[i];
 
-			btSolverConstraint* currentConstraintRow = &m_tmpSolverNonContactConstraintPool[currentRow];
-			btTypedConstraint* constraint = constraints[i];
-			btRigidBody& rbA = constraint->getRigidBodyA();
-			btRigidBody& rbB = constraint->getRigidBodyB();
+			if (info1.m_numConstraintRows)
+			{
+				btAssert(currentRow < totalNumRows);
 
-			int solverBodyIdA = getOrInitSolverBody(rbA, infoGlobal.m_timeStep);
-			int solverBodyIdB = getOrInitSolverBody(rbB, infoGlobal.m_timeStep);
+				btSolverConstraint* currentConstraintRow = &m_tmpSolverNonContactConstraintPool[currentRow];
+				btTypedConstraint* constraint = constraints[i];
+				btRigidBody& rbA = constraint->getRigidBodyA();
+				btRigidBody& rbB = constraint->getRigidBodyB();
 
-			convertJoint(currentConstraintRow, constraint, info1, solverBodyIdA, solverBodyIdB, infoGlobal);
+				int solverBodyIdA = getOrInitSolverBody(rbA, infoGlobal.m_timeStep);
+				int solverBodyIdB = getOrInitSolverBody(rbB, infoGlobal.m_timeStep);
+
+				convertJoint(currentConstraintRow, constraint, info1, solverBodyIdA, solverBodyIdB, infoGlobal);
+			}
+			currentRow += info1.m_numConstraintRows;
 		}
-		currentRow += info1.m_numConstraintRows;
 	}
 }
 
@@ -1398,6 +1422,10 @@ btScalar btSequentialImpulseConstraintSolver::solveGroupCacheFriendlySetup(btCol
 {
 	m_fixedBodyId = -1;
 	BT_PROFILE("solveGroupCacheFriendlySetup");
+	HDT_ZONE_SCOPED_N("SolverSetup");
+	HDT_ZONE_VALUE(static_cast<int64_t>(numBodies));
+	HDT_ZONE_VALUE(static_cast<int64_t>(numManifolds));
+	HDT_ZONE_VALUE(static_cast<int64_t>(numConstraints));
 	(void)debugDrawer;
 
 	// if solver mode has changed,
@@ -1478,39 +1506,55 @@ btScalar btSequentialImpulseConstraintSolver::solveGroupCacheFriendlySetup(btCol
 #endif  //BT_ADDITIONAL_DEBUG
 
 	//convert all bodies
-	convertBodies(bodies, numBodies, infoGlobal);
+	{
+		HDT_ZONE_SCOPED_N("ConvertBodies");
+		HDT_ZONE_VALUE(static_cast<int64_t>(numBodies));
+		convertBodies(bodies, numBodies, infoGlobal);
+	}
 
-	convertJoints(constraints, numConstraints, infoGlobal);
+	{
+		HDT_ZONE_SCOPED_N("ConvertJoints");
+		HDT_ZONE_VALUE(static_cast<int64_t>(numConstraints));
+		convertJoints(constraints, numConstraints, infoGlobal);
+	}
 
-	convertContacts(manifoldPtr, numManifolds, infoGlobal);
+	{
+		HDT_ZONE_SCOPED_N("ConvertContacts");
+		HDT_ZONE_VALUE(static_cast<int64_t>(numManifolds));
+		convertContacts(manifoldPtr, numManifolds, infoGlobal);
+	}
 
 	//	btContactSolverInfo info = infoGlobal;
 
-	int numNonContactPool = m_tmpSolverNonContactConstraintPool.size();
-	int numConstraintPool = m_tmpSolverContactConstraintPool.size();
-	int numFrictionPool = m_tmpSolverContactFrictionConstraintPool.size();
-
-	///@todo: use stack allocator for such temporarily memory, same for solver bodies/constraints
-	m_orderNonContactConstraintPool.resizeNoInitialize(numNonContactPool);
-	if ((infoGlobal.m_solverMode & SOLVER_USE_2_FRICTION_DIRECTIONS))
-		m_orderTmpConstraintPool.resizeNoInitialize(numConstraintPool * 2);
-	else
-		m_orderTmpConstraintPool.resizeNoInitialize(numConstraintPool);
-
-	m_orderFrictionConstraintPool.resizeNoInitialize(numFrictionPool);
 	{
-		int i;
-		for (i = 0; i < numNonContactPool; i++)
+		HDT_ZONE_SCOPED_N("SetupOrderArrays");
+		int numNonContactPool = m_tmpSolverNonContactConstraintPool.size();
+		int numConstraintPool = m_tmpSolverContactConstraintPool.size();
+		int numFrictionPool = m_tmpSolverContactFrictionConstraintPool.size();
+		HDT_ZONE_VALUE(static_cast<int64_t>(numNonContactPool + numConstraintPool + numFrictionPool));
+
+		///@todo: use stack allocator for such temporarily memory, same for solver bodies/constraints
+		m_orderNonContactConstraintPool.resizeNoInitialize(numNonContactPool);
+		if ((infoGlobal.m_solverMode & SOLVER_USE_2_FRICTION_DIRECTIONS))
+			m_orderTmpConstraintPool.resizeNoInitialize(numConstraintPool * 2);
+		else
+			m_orderTmpConstraintPool.resizeNoInitialize(numConstraintPool);
+
+		m_orderFrictionConstraintPool.resizeNoInitialize(numFrictionPool);
 		{
-			m_orderNonContactConstraintPool[i] = i;
-		}
-		for (i = 0; i < numConstraintPool; i++)
-		{
-			m_orderTmpConstraintPool[i] = i;
-		}
-		for (i = 0; i < numFrictionPool; i++)
-		{
-			m_orderFrictionConstraintPool[i] = i;
+			int i;
+			for (i = 0; i < numNonContactPool; i++)
+			{
+				m_orderNonContactConstraintPool[i] = i;
+			}
+			for (i = 0; i < numConstraintPool; i++)
+			{
+				m_orderTmpConstraintPool[i] = i;
+			}
+			for (i = 0; i < numFrictionPool; i++)
+			{
+				m_orderFrictionConstraintPool[i] = i;
+			}
 		}
 	}
 
@@ -1528,6 +1572,7 @@ btScalar btSequentialImpulseConstraintSolver::solveSingleIteration(int iteration
 
 	if (infoGlobal.m_solverMode & SOLVER_RANDMIZE_ORDER)
 	{
+		HDT_ZONE_SCOPED_N("ShuffleOrder");
 		if (1)  // uncomment this for a bit less random ((iteration & 7) == 0)
 		{
 			for (int j = 0; j < numNonContactPool; ++j)
@@ -1561,27 +1606,34 @@ btScalar btSequentialImpulseConstraintSolver::solveSingleIteration(int iteration
 	}
 
 	///solve all joint constraints
-	for (int j = 0; j < m_tmpSolverNonContactConstraintPool.size(); j++)
 	{
-		btSolverConstraint& constraint = m_tmpSolverNonContactConstraintPool[m_orderNonContactConstraintPool[j]];
-		if (iteration < constraint.m_overrideNumSolverIterations)
+		HDT_ZONE_SCOPED_N("SolveJoints");
+		HDT_ZONE_VALUE(static_cast<int64_t>(numNonContactPool));
+		for (int j = 0; j < m_tmpSolverNonContactConstraintPool.size(); j++)
 		{
-			btScalar residual = resolveSingleConstraintRowGeneric(m_tmpSolverBodyPool[constraint.m_solverBodyIdA], m_tmpSolverBodyPool[constraint.m_solverBodyIdB], constraint);
-			leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+			btSolverConstraint& constraint = m_tmpSolverNonContactConstraintPool[m_orderNonContactConstraintPool[j]];
+			if (iteration < constraint.m_overrideNumSolverIterations)
+			{
+				btScalar residual = resolveSingleConstraintRowGeneric(m_tmpSolverBodyPool[constraint.m_solverBodyIdA], m_tmpSolverBodyPool[constraint.m_solverBodyIdB], constraint);
+				leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+			}
 		}
 	}
 
 	if (iteration < infoGlobal.m_numIterations)
 	{
-		for (int j = 0; j < numConstraints; j++)
 		{
-			if (constraints[j]->isEnabled())
+			HDT_ZONE_SCOPED_N("SolveObsolete");
+			for (int j = 0; j < numConstraints; j++)
 			{
-				int bodyAid = getOrInitSolverBody(constraints[j]->getRigidBodyA(), infoGlobal.m_timeStep);
-				int bodyBid = getOrInitSolverBody(constraints[j]->getRigidBodyB(), infoGlobal.m_timeStep);
-				btSolverBody& bodyA = m_tmpSolverBodyPool[bodyAid];
-				btSolverBody& bodyB = m_tmpSolverBodyPool[bodyBid];
-				constraints[j]->solveConstraintObsolete(bodyA, bodyB, infoGlobal.m_timeStep);
+				if (constraints[j]->isEnabled())
+				{
+					int bodyAid = getOrInitSolverBody(constraints[j]->getRigidBodyA(), infoGlobal.m_timeStep);
+					int bodyBid = getOrInitSolverBody(constraints[j]->getRigidBodyB(), infoGlobal.m_timeStep);
+					btSolverBody& bodyA = m_tmpSolverBodyPool[bodyAid];
+					btSolverBody& bodyB = m_tmpSolverBodyPool[bodyBid];
+					constraints[j]->solveConstraintObsolete(bodyA, bodyB, infoGlobal.m_timeStep);
+				}
 			}
 		}
 
@@ -1640,48 +1692,58 @@ btScalar btSequentialImpulseConstraintSolver::solveSingleIteration(int iteration
 			int numPoolConstraints = m_tmpSolverContactConstraintPool.size();
 			int j;
 
-			for (j = 0; j < numPoolConstraints; j++)
 			{
-				const btSolverConstraint& solveManifold = m_tmpSolverContactConstraintPool[m_orderTmpConstraintPool[j]];
-				btScalar residual = resolveSingleConstraintRowLowerLimit(m_tmpSolverBodyPool[solveManifold.m_solverBodyIdA], m_tmpSolverBodyPool[solveManifold.m_solverBodyIdB], solveManifold);
-				leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+				HDT_ZONE_SCOPED_N("SolveContacts");
+				HDT_ZONE_VALUE(static_cast<int64_t>(numPoolConstraints));
+				for (j = 0; j < numPoolConstraints; j++)
+				{
+					const btSolverConstraint& solveManifold = m_tmpSolverContactConstraintPool[m_orderTmpConstraintPool[j]];
+					btScalar residual = resolveSingleConstraintRowLowerLimit(m_tmpSolverBodyPool[solveManifold.m_solverBodyIdA], m_tmpSolverBodyPool[solveManifold.m_solverBodyIdB], solveManifold);
+					leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+				}
 			}
 
 			///solve all friction constraints
-
-			int numFrictionPoolConstraints = m_tmpSolverContactFrictionConstraintPool.size();
-			for (j = 0; j < numFrictionPoolConstraints; j++)
 			{
-				btSolverConstraint& solveManifold = m_tmpSolverContactFrictionConstraintPool[m_orderFrictionConstraintPool[j]];
-				btScalar totalImpulse = m_tmpSolverContactConstraintPool[solveManifold.m_frictionIndex].m_appliedImpulse;
-
-				if (totalImpulse > btScalar(0))
+				HDT_ZONE_SCOPED_N("SolveFriction");
+				int numFrictionPoolConstraints = m_tmpSolverContactFrictionConstraintPool.size();
+				HDT_ZONE_VALUE(static_cast<int64_t>(numFrictionPoolConstraints));
+				for (j = 0; j < numFrictionPoolConstraints; j++)
 				{
-					solveManifold.m_lowerLimit = -(solveManifold.m_friction * totalImpulse);
-					solveManifold.m_upperLimit = solveManifold.m_friction * totalImpulse;
+					btSolverConstraint& solveManifold = m_tmpSolverContactFrictionConstraintPool[m_orderFrictionConstraintPool[j]];
+					btScalar totalImpulse = m_tmpSolverContactConstraintPool[solveManifold.m_frictionIndex].m_appliedImpulse;
 
-					btScalar residual = resolveSingleConstraintRowGeneric(m_tmpSolverBodyPool[solveManifold.m_solverBodyIdA], m_tmpSolverBodyPool[solveManifold.m_solverBodyIdB], solveManifold);
-					leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+					if (totalImpulse > btScalar(0))
+					{
+						solveManifold.m_lowerLimit = -(solveManifold.m_friction * totalImpulse);
+						solveManifold.m_upperLimit = solveManifold.m_friction * totalImpulse;
+
+						btScalar residual = resolveSingleConstraintRowGeneric(m_tmpSolverBodyPool[solveManifold.m_solverBodyIdA], m_tmpSolverBodyPool[solveManifold.m_solverBodyIdB], solveManifold);
+						leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+					}
 				}
 			}
 		}
 
-		int numRollingFrictionPoolConstraints = m_tmpSolverContactRollingFrictionConstraintPool.size();
-		for (int j = 0; j < numRollingFrictionPoolConstraints; j++)
 		{
-			btSolverConstraint& rollingFrictionConstraint = m_tmpSolverContactRollingFrictionConstraintPool[j];
-			btScalar totalImpulse = m_tmpSolverContactConstraintPool[rollingFrictionConstraint.m_frictionIndex].m_appliedImpulse;
-			if (totalImpulse > btScalar(0))
+			HDT_ZONE_SCOPED_N("SolveRollingFriction");
+			int numRollingFrictionPoolConstraints = m_tmpSolverContactRollingFrictionConstraintPool.size();
+			for (int j = 0; j < numRollingFrictionPoolConstraints; j++)
 			{
-				btScalar rollingFrictionMagnitude = rollingFrictionConstraint.m_friction * totalImpulse;
-				if (rollingFrictionMagnitude > rollingFrictionConstraint.m_friction)
-					rollingFrictionMagnitude = rollingFrictionConstraint.m_friction;
+				btSolverConstraint& rollingFrictionConstraint = m_tmpSolverContactRollingFrictionConstraintPool[j];
+				btScalar totalImpulse = m_tmpSolverContactConstraintPool[rollingFrictionConstraint.m_frictionIndex].m_appliedImpulse;
+				if (totalImpulse > btScalar(0))
+				{
+					btScalar rollingFrictionMagnitude = rollingFrictionConstraint.m_friction * totalImpulse;
+					if (rollingFrictionMagnitude > rollingFrictionConstraint.m_friction)
+						rollingFrictionMagnitude = rollingFrictionConstraint.m_friction;
 
-				rollingFrictionConstraint.m_lowerLimit = -rollingFrictionMagnitude;
-				rollingFrictionConstraint.m_upperLimit = rollingFrictionMagnitude;
+					rollingFrictionConstraint.m_lowerLimit = -rollingFrictionMagnitude;
+					rollingFrictionConstraint.m_upperLimit = rollingFrictionMagnitude;
 
-				btScalar residual = resolveSingleConstraintRowGeneric(m_tmpSolverBodyPool[rollingFrictionConstraint.m_solverBodyIdA], m_tmpSolverBodyPool[rollingFrictionConstraint.m_solverBodyIdB], rollingFrictionConstraint);
-				leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+					btScalar residual = resolveSingleConstraintRowGeneric(m_tmpSolverBodyPool[rollingFrictionConstraint.m_solverBodyIdA], m_tmpSolverBodyPool[rollingFrictionConstraint.m_solverBodyIdB], rollingFrictionConstraint);
+					leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+				}
 			}
 		}
 	}
@@ -1691,6 +1753,7 @@ btScalar btSequentialImpulseConstraintSolver::solveSingleIteration(int iteration
 void btSequentialImpulseConstraintSolver::solveGroupCacheFriendlySplitImpulseIterations(btCollisionObject** bodies, int numBodies, btPersistentManifold** manifoldPtr, int numManifolds, btTypedConstraint** constraints, int numConstraints, const btContactSolverInfo& infoGlobal, btIDebugDraw* debugDrawer)
 {
 	BT_PROFILE("solveGroupCacheFriendlySplitImpulseIterations");
+	HDT_ZONE_SCOPED_N("SplitImpulse");
 	int iteration;
 	if (infoGlobal.m_splitImpulse)
 	{
@@ -1724,12 +1787,14 @@ void btSequentialImpulseConstraintSolver::solveGroupCacheFriendlySplitImpulseIte
 btScalar btSequentialImpulseConstraintSolver::solveGroupCacheFriendlyIterations(btCollisionObject** bodies, int numBodies, btPersistentManifold** manifoldPtr, int numManifolds, btTypedConstraint** constraints, int numConstraints, const btContactSolverInfo& infoGlobal, btIDebugDraw* debugDrawer)
 {
 	BT_PROFILE("solveGroupCacheFriendlyIterations");
+	HDT_ZONE_SCOPED_N("SolverIterations");
 
 	{
 		///this is a special step to resolve penetrations (just for contacts)
 		solveGroupCacheFriendlySplitImpulseIterations(bodies, numBodies, manifoldPtr, numManifolds, constraints, numConstraints, infoGlobal, debugDrawer);
 
 		int maxIterations = m_maxOverrideNumSolverIterations > infoGlobal.m_numIterations ? m_maxOverrideNumSolverIterations : infoGlobal.m_numIterations;
+		HDT_ZONE_VALUE(static_cast<int64_t>(maxIterations));
 
 		for (int iteration = 0; iteration < maxIterations; iteration++)
 			//for ( int iteration = maxIterations-1  ; iteration >= 0;iteration--)
@@ -1830,14 +1895,22 @@ void btSequentialImpulseConstraintSolver::writeBackBodies(int iBegin, int iEnd, 
 btScalar btSequentialImpulseConstraintSolver::solveGroupCacheFriendlyFinish(btCollisionObject** bodies, int numBodies, const btContactSolverInfo& infoGlobal)
 {
 	BT_PROFILE("solveGroupCacheFriendlyFinish");
+	HDT_ZONE_SCOPED_N("SolverFinish");
 
 	if (infoGlobal.m_solverMode & SOLVER_USE_WARMSTARTING)
 	{
+		HDT_ZONE_SCOPED_N("WriteBackContacts");
 		writeBackContacts(0, m_tmpSolverContactConstraintPool.size(), infoGlobal);
 	}
 
-	writeBackJoints(0, m_tmpSolverNonContactConstraintPool.size(), infoGlobal);
-	writeBackBodies(0, m_tmpSolverBodyPool.size(), infoGlobal);
+	{
+		HDT_ZONE_SCOPED_N("WriteBackJoints");
+		writeBackJoints(0, m_tmpSolverNonContactConstraintPool.size(), infoGlobal);
+	}
+	{
+		HDT_ZONE_SCOPED_N("WriteBackBodies");
+		writeBackBodies(0, m_tmpSolverBodyPool.size(), infoGlobal);
+	}
 
 	m_tmpSolverContactConstraintPool.resizeNoInitialize(0);
 	m_tmpSolverNonContactConstraintPool.resizeNoInitialize(0);

@@ -66,8 +66,14 @@ namespace hdt
 		}
 
 		// Build date and time
-		constexpr const char* GetBuildDate() { return __DATE__; }
-		constexpr const char* GetBuildTime() { return __TIME__; }
+		constexpr const char* GetBuildDate()
+		{
+			return __DATE__;
+		}
+		constexpr const char* GetBuildTime()
+		{
+			return __TIME__;
+		}
 
 		// Compiler info
 		constexpr const char* GetCompilerInfo()
@@ -96,5 +102,5 @@ namespace hdt
 			return "Release";
 #endif
 		}
-	}
-}
+	} // namespace BuildInfo
+} // namespace hdt

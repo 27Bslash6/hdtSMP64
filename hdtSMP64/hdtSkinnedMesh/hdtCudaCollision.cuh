@@ -44,7 +44,7 @@ namespace hdt
 		{
 			if (!m_ok)
 			{
-				_MESSAGE("%s: %s", context, m_message.c_str());
+				_ERROR("[CUDA] %s: %s", context, m_message.c_str());
 			}
 			return m_ok;
 		}

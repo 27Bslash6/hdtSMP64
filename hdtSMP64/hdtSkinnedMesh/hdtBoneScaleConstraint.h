@@ -20,4 +20,4 @@ namespace hdt
 		SkinnedMeshBone* m_boneB;
 		btTypedConstraint* m_constraint;
 	};
-}
+} // namespace hdt

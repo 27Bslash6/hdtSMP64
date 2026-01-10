@@ -2,6 +2,7 @@
 
 #include "hdtLog.h"
 #include "hdtSkinnedMesh/hdtConstraintGroup.h"
+#include "hdtSkinnedMesh/hdtDispatcher.h"
 #include "hdtTracy.h"
 #ifdef CUDA
 #include "hdtSkinnedMesh/hdtCudaInterface.h"
@@ -11,8 +12,6 @@
 #include "Offsets.h"
 #include "PluginInterfaceImpl.h"
 #include "skse64/GameMenus.h"
-
-#include <ppl.h>
 
 // Local wrapper for MenuManager::IsGamePaused()
 // Official SKSE 2.2.6 doesn't expose this - numPauseGame is private at offset 0x160
@@ -129,8 +128,10 @@ namespace hdt
 	void SkyrimPhysicsWorld::doUpdate2ndStep(float interval, const float tick, const float remainingTimeStep)
 	{
 		HDT_ZONE_SCOPED_N("hdtSMP::doUpdate2ndStep");
-		if (m_suspended || m_isStasis)
+		if (m_suspended || m_isStasis) {
+			_VMESSAGE("doUpdate2ndStep: early return (suspended=%d, stasis=%d)", m_suspended.load(), m_isStasis.load());
 			return;
+		}
 
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 
@@ -328,6 +329,19 @@ namespace hdt
 		HDT_ZONE_SCOPED_N("ResetSystems");
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 
+		// Clear collision state FIRST to prevent stale references from crashing collision processing
+		// This must happen before any physics step runs after a load/reset
+		static_cast<CollisionDispatcher*>(m_dispatcher1)->clearCollisionState();
+
+		// Also reset the broadphase pair cache - this is where the actual stale body pointers live
+		// The dispatcher's m_pairs is separate from the broadphase's overlapping pair cache
+		getBroadphase()->resetPool(m_dispatcher1);
+
+		// Force re-registration of all bodies to ensure fresh broadphase proxies
+		// This prevents any stale collision state from surviving the reset
+		reregisterAllBodies();
+		_VMESSAGE("resetSystems: cleared collision state and re-registered all bodies");
+
 		// Log performance config on reset
 		_MESSAGE("=== SMP Physics Reset ===");
 #ifdef CUDA
@@ -357,10 +371,32 @@ namespace hdt
 	{
 		auto mm = MenuManager::GetSingleton();
 
-		if ((e.gamePaused || IsMenuManagerGamePaused(mm)) && !m_suspended)
+		// Pause/resume handling FIRST - suspend() may be called here.
+		// At this point m_frameSyncComplete is still true (from previous FrameSyncEvent),
+		// so if suspend() is called from here (same thread), it won't deadlock waiting for itself.
+		if ((e.gamePaused || IsMenuManagerGamePaused(mm)) && !m_suspended) {
+			_VMESSAGE("FrameEvent: game paused, calling suspend()");
 			suspend();
-		else if (!(e.gamePaused || IsMenuManagerGamePaused(mm)) && m_suspended)
+		}
+		else if (!(e.gamePaused || IsMenuManagerGamePaused(mm)) && m_suspended) {
+			_VMESSAGE("FrameEvent: game unpaused while suspended, calling resume()");
 			resume();
+			// Skip physics update in the same frame as resume() to let systems stabilize
+			// Otherwise doUpdate() dispatches collision work while resetSystems() just ran
+			_VMESSAGE("FrameEvent: skipping doUpdate() after resume, returning early");
+			return;
+		}
+
+		// Early exit if suspended (e.g., by FreezeHandler for Main Menu/Loading)
+		// This prevents frame sync machinery from running when physics is disabled
+		if (m_suspended) {
+			return;
+		}
+
+		// NOW mark frame as in-progress - we're about to do physics work.
+		// If console thread calls suspend() after this point, it will wait for FrameSyncEvent.
+		m_frameSyncComplete.store(false, std::memory_order_release);
+		_VMESSAGE("FrameEvent: set frameSyncComplete=false, about to do physics work");
 
 		// Capture metrics flag ONCE to prevent race condition
 		const bool captureMetrics = m_doMetrics;
@@ -391,6 +427,11 @@ namespace hdt
 
 	void SkyrimPhysicsWorld::onEvent(const FrameSyncEvent& e)
 	{
+		// Early exit if suspended - no tasks were started, nothing to sync
+		if (m_suspended) {
+			return;
+		}
+
 		if (m_doMetrics) {
 			LARGE_INTEGER ticks;
 			QueryPerformanceCounter(&ticks);
@@ -413,10 +454,19 @@ namespace hdt
 		}
 		else
 			m_tasks.wait();
+
+		// Mark frame as complete for suspend() synchronization
+		m_frameSyncComplete.store(true, std::memory_order_release);
+		// Notify any waiting suspend() call (console thread)
+		m_frameSyncCV.notify_all();
+		_VMESSAGE("FrameSyncEvent: set frameSyncComplete=true, frame complete");
 	}
 
 	void SkyrimPhysicsWorld::onEvent(const ShutdownEvent& e)
 	{
+		// Wait for any running async physics tasks before shutdown
+		// This prevents use-after-free when destroying systems
+		m_tasks.wait();
 		while (m_systems.size()) {
 			SkinnedMeshWorld::removeSkinnedMeshSystem(m_systems.back());
 		}

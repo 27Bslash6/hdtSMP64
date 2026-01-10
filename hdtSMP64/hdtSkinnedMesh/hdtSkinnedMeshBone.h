@@ -1,7 +1,8 @@
 #pragma once
 
+#include "hdtAABB.h"
 #include "hdtBulletHelper.h"
-#include"hdtAABB.h"
+
 #include <memory>
 
 namespace hdt
@@ -18,7 +19,8 @@ namespace hdt
 		float m_marginMultipler;
 		float m_boudingSphereMultipler = 1.0f;
 		float m_gravityFactor = 1.0f;
-		float m_windFactor = 1.0f; // wind factor for each skinnedmeshbody; currently not changed, this may have been intended to be m_windEffect e.g., (wind-effect in xml)
+		float m_windFactor = 1.0f; // wind factor for each skinnedmeshbody; currently not changed, this may have been
+								   // intended to be m_windEffect e.g., (wind-effect in xml)
 
 		btRigidBody m_rig;
 		btTransform m_localToRig;
@@ -38,4 +40,4 @@ namespace hdt
 
 		bool canCollideWith(SkinnedMeshBone* rhs);
 	};
-}
+} // namespace hdt

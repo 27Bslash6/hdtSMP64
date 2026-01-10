@@ -47,6 +47,9 @@
     <ClInclude Include="hdtSkinnedMesh\hdtDispatcher.h">
       <Filter>hdtSkinnedMesh</Filter>
     </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtEnkiTSScheduler.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
     <ClInclude Include="hdtSkinnedMesh\hdtGeneric6DofConstraint.h">
       <Filter>hdtSkinnedMesh</Filter>
     </ClInclude>
@@ -886,6 +889,9 @@
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtDispatcher.cpp">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="hdtSkinnedMesh\enkiTS_TaskScheduler.cpp">
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtGeneric6DofConstraint.cpp">

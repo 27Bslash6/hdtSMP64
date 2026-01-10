@@ -1,8 +1,7 @@
 #pragma once
-#include "skse64/PluginAPI.h"
-
 #include "EventDispatcherImpl.h"
 #include "PluginAPI.h"
+#include "skse64/PluginAPI.h"
 
 namespace hdt
 {
@@ -31,13 +30,13 @@ namespace hdt
 		void init(const SKSEInterface* skse);
 
 	private:
-		VersionInfo m_versionInfo{ INTERFACE_VERSION, BULLET_VERSION };
+		VersionInfo m_versionInfo{INTERFACE_VERSION, BULLET_VERSION};
 		EventDispatcherImpl<PreStepEvent> m_preStepDispatcher;
 		EventDispatcherImpl<PostStepEvent> m_postStepDispatcher;
 
-		PluginHandle m_sksePluginHandle;
-		SKSEMessagingInterface* m_skseMessagingInterface;
+		PluginHandle m_sksePluginHandle = 0;
+		SKSEMessagingInterface* m_skseMessagingInterface = nullptr;
 	};
 
 	extern PluginInterfaceImpl g_pluginInterface;
-}
+} // namespace hdt

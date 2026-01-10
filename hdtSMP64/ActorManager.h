@@ -1,34 +1,30 @@
 #pragma once
 
-#include "skse64/PapyrusActor.h"
-#include "../hdtSSEUtils/NetImmerseUtils.h"
-#include "../hdtSSEUtils/FrameworkUtils.h"
-
 #include "hdtSkyrimSystem.h"
 
-#include "IEventListener.h"
+#include "../hdtSSEUtils/FrameworkUtils.h"
+#include "../hdtSSEUtils/NetImmerseUtils.h"
+#include "DynamicHDT.h"
 #include "HookEvents.h"
+#include "IEventListener.h"
 #include "Offsets.h"
+#include "skse64/PapyrusActor.h"
 
 #include <mutex>
 #include <optional>
 
-#include "DynamicHDT.h"
-
 namespace hdt
 {
-	class ActorManager
-		: public IEventListener<ArmorAttachEvent>
-		, public IEventListener<ArmorDetachEvent>
-		, public IEventListener<SkinSingleHeadGeometryEvent>
-		, public IEventListener<SkinAllHeadGeometryEvent>
-		, public IEventListener<FrameEvent>
-		, public IEventListener<ShutdownEvent>
+	class ActorManager : public IEventListener<ArmorAttachEvent>,
+						 public IEventListener<ArmorDetachEvent>,
+						 public IEventListener<SkinSingleHeadGeometryEvent>,
+						 public IEventListener<SkinAllHeadGeometryEvent>,
+						 public IEventListener<FrameEvent>,
+						 public IEventListener<ShutdownEvent>
 	{
 		using IDType = UInt32;
 
 	public:
-
 		enum class ItemState
 		{
 			e_NoPhysics,
@@ -101,8 +97,8 @@ namespace hdt
 			Ref<IString> prefix;
 			Ref<NiAVObject> armorWorn;
 			std::unordered_map<IDStr, IDStr> renameMap;
-			// @brief This bool is set to true when the first name for the NiAVObject armor is attributed by the Skyrim executable,
-			// and set back to false the name map is fixed (see fixArmorNameMaps()),
+			// @brief This bool is set to true when the first name for the NiAVObject armor is attributed by the Skyrim
+			// executable, and set back to false the name map is fixed (see fixArmorNameMaps()),
 			bool mustFixNameMap = false;
 			// @brief The string is the first name attributed by the Skyrim executable, to be able to detect the change.
 			std::string armorCurrentMeshName = "";
@@ -131,7 +127,8 @@ namespace hdt
 			// can be directly used for our needs later; the distance is provided squared for performance reasons.
 			// @param sourcePosition the position of the camera
 			// @param sourceOrientation the orientation of the camera
-			void calculateDistanceAndOrientationDifferenceFromSource(NiPoint3 sourcePosition, NiPoint3 sourceOrientation);
+			void calculateDistanceAndOrientationDifferenceFromSource(NiPoint3 sourcePosition,
+																	 NiPoint3 sourceOrientation);
 
 			bool isPlayerCharacter() const;
 			bool isInPlayerView();
@@ -156,7 +153,7 @@ namespace hdt
 			void processGeometry(BSFaceGenNiNode* head, BSGeometry* geometry);
 
 			static void doSkeletonMerge(NiNode* dst, NiNode* src, IString* prefix,
-				std::unordered_map<IDStr, IDStr>& map);
+										std::unordered_map<IDStr, IDStr>& map);
 			static void doSkeletonClean(NiNode* dst, IString* prefix);
 			static NiNode* cloneNodeTree(NiNode* src, IString* prefix, std::unordered_map<IDStr, IDStr>& map);
 			static void renameTree(NiNode* root, IString* prefix, std::unordered_map<IDStr, IDStr>& map);
@@ -199,27 +196,30 @@ namespace hdt
 		fix: take into account the unexpected armors names changes done by the Skyrim executable.
 
 		We add smp physics to armors on the ArmorAttachEvent.
-		But when a smp reset happens, we can't go through the ArmorAttachEvent processing: no event is sent by the skyrim executable.
-		So for each known skeleton, and each of its known armors meshes, we reapply the related xml file.
+		But when a smp reset happens, we can't go through the ArmorAttachEvent processing: no event is sent by the
+		skyrim executable. So for each known skeleton, and each of its known armors meshes, we reapply the related xml
+		file.
 
 		Each Armor has in .physicsFile the applied xml file, the names of the meshes of the armor in the xml file / nif,
 		and for each mesh name the name(s) of the NiAVObject attached through the ArmorAttachEvent hook processing.
 
-		So by looking for the recorded NiAVObject names in the related skyrim models, we can find back the NiAVObject and reapply the related xml file to it.
+		So by looking for the recorded NiAVObject names in the related skyrim models, we can find back the NiAVObject
+		and reapply the related xml file to it.
 
-		But! The skyrim executable changes later the name of the NiAVObject passed as attachedNode through the ArmorAttachEvent hook.
-		So, when trying to find the recorded name in the existing objects, we don't find it anymore.
+		But! The skyrim executable changes later the name of the NiAVObject passed as attachedNode through the
+		ArmorAttachEvent hook. So, when trying to find the recorded name in the existing objects, we don't find it
+		anymore.
 
 		This bug happens for armors, but not for headparts, which names aren't changed by Skyrim on the fly.
 		https://github.com/DaymareOn/hdtSMP64/issues/84
-		This bug has happened since the original HDT-SMP, for all versions of Skyrim (well, I haven't checked on the VR version).
+		This bug has happened since the original HDT-SMP, for all versions of Skyrim (well, I haven't checked on the VR
+		version).
 
-		The implemented solution is to 1) when attaching an armor, record that the fix will need to be applied on this armor,
-		2) save the original name,
-		3) to be able to detect on following events when that the name has changed (ArmorAttachEvent, ItemUnequipEvent, FrameEvent, OpenMenuEvent)
-		   (checking that the fix needs to be applied is quick, and introducing the fix in all events allows to have it fixed asap),
-		4) and then add in.physicsfile the new name;
-		5) finally remove the information that a fix must be applied for this armor.
+		The implemented solution is to 1) when attaching an armor, record that the fix will need to be applied on this
+		armor, 2) save the original name, 3) to be able to detect on following events when that the name has changed
+		(ArmorAttachEvent, ItemUnequipEvent, FrameEvent, OpenMenuEvent) (checking that the fix needs to be applied is
+		quick, and introducing the fix in all events allows to have it fixed asap), 4) and then add in.physicsfile the
+		new name; 5) finally remove the information that a fix must be applied for this armor.
 		*/
 		void fixArmorNameMaps();
 
@@ -235,16 +235,17 @@ namespace hdt
 		void onEvent(const SkinAllHeadGeometryEvent&) override;
 
 		bool skeletonNeedsParts(NiNode* skeleton);
-		std::vector<Skeleton>& getSkeletons();//Altered by Dynamic HDT
+		std::vector<Skeleton>& getSkeletons(); // Altered by Dynamic HDT
 
 		bool m_skinNPCFaceParts = true;
 		bool m_disableSMPHairWhenWigEquipped = false;
-		bool m_autoAdjustMaxSkeletons = true; // Whether to dynamically change the maxActive skeletons to maintain min_fps
-		int m_maxActiveSkeletons = 20; // The maximum active skeletons; hard limit
-		int m_framesToNextIncrease = 0; // Cooldown frames before next skeleton increase allowed
-		float m_minCullingDistance = 500; // The distance from the camera under which we never cull the skeletons.
-		bool m_windowHadFocus = true; // Track window focus to avoid auto-scaling during alt-tab
-		float m_smoothedMargin = 0.0f; // EMA-smoothed margin for auto-adjustment stability
+		bool m_autoAdjustMaxSkeletons = true; // Whether to dynamically change the maxActive skeletons to maintain
+											  // min_fps
+		int m_maxActiveSkeletons = 20;		  // The maximum active skeletons; hard limit
+		int m_framesToNextIncrease = 0;		  // Cooldown frames before next skeleton increase allowed
+		float m_minCullingDistance = 500;	  // The distance from the camera under which we never cull the skeletons.
+		bool m_windowHadFocus = true;		  // Track window focus to avoid auto-scaling during alt-tab
+		float m_smoothedMargin = 0.0f;		  // EMA-smoothed margin for auto-adjustment stability
 
 		// @brief Depending on this setting, we avoid to calculate the physics of the PC when it is in 1st person view.
 		bool m_disable1stPersonViewPhysics = false;
@@ -255,4 +256,4 @@ namespace hdt
 
 		void setSkeletonsActive(const bool updateMetrics = false);
 	};
-}
+} // namespace hdt

@@ -1,9 +1,9 @@
 #pragma once
 
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
 
 class NiNode;
 
@@ -14,7 +14,7 @@ namespace hdt
 	public:
 		using RemapEntry = std::pair<int, std::string>;
 		using NameSet = std::unordered_set<std::string>;
-		using NameMap = std::unordered_map<std::string, NameSet >;
+		using NameMap = std::unordered_map<std::string, NameSet>;
 		using PhysicsFile = std::pair<std::string, NameMap>;
 
 		struct Remap
@@ -38,4 +38,4 @@ namespace hdt
 		NameMap getNameMap(NiNode* armor);
 		NameMap defaultNameMap(NiNode* armor);
 	};
-}
+} // namespace hdt

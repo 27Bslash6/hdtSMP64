@@ -8,7 +8,6 @@ namespace hdt
 	class SkyrimBone : public SkinnedMeshBone
 	{
 	public:
-
 		SkyrimBone(IDStr name, NiNode* node, NiNode* skeleton, btRigidBody::btRigidBodyConstructionInfo& ci);
 
 		void resetTransformToOriginal() override;
@@ -22,4 +21,4 @@ namespace hdt
 	private:
 		int m_forceUpdateType;
 	};
-}
+} // namespace hdt

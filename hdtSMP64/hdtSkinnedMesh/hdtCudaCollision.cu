@@ -1100,8 +1100,9 @@ namespace hdt
     void cuRecordEvent(void* ptr, void* stream)
     {
         cudaEvent_t* e = reinterpret_cast<cudaEvent_t*>(ptr);
-        cudaStream_t* s = reinterpret_cast<cudaStream_t*>(stream);
-        cudaEventRecord(*e, *s);
+        // Handle nullptr for default stream (0)
+        cudaStream_t s = stream ? *reinterpret_cast<cudaStream_t*>(stream) : 0;
+        cudaEventRecord(*e, s);
     }
 
     void cuWaitEvent(void* ptr)

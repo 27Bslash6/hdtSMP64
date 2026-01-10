@@ -1,19 +1,24 @@
 #pragma once
 #include "DynamicHDT.h"
+
 #include <fstream>
 #include <hdtSerialization.h>
 
 extern bool g_hasPapyrusExtension;
 
-namespace hdt {
-	namespace Override {
+namespace hdt
+{
+	namespace Override
+	{
 
-		//The formID of the armoraddon in ArmorAttachEvent cannot be acquired, which makes it impossible to check override by the formID upon attaching armoraddon.
-		class OverrideManager:public Serializer<void>{
+		// The formID of the armoraddon in ArmorAttachEvent cannot be acquired, which makes it impossible to check
+		// override by the formID upon attaching armoraddon.
+		class OverrideManager : public Serializer<void>
+		{
 		public:
-			~OverrideManager() {};
+			~OverrideManager(){};
 
-			//Override virtual methods inherited from Serializer
+			// Override virtual methods inherited from Serializer
 			UInt32 FormatVersion() override { return 1; };
 
 			UInt32 StorageName() override { return 'APFW'; };
@@ -21,7 +26,7 @@ namespace hdt {
 			std::stringstream Serialize() override;
 
 			void Deserialize(std::stringstream&) override;
-			//Inherit End
+			// Inherit End
 
 			static OverrideManager* GetSingleton();
 
@@ -35,5 +40,5 @@ namespace hdt {
 			OverrideManager() = default;
 			std::unordered_map<UInt32, std::unordered_map<std::string, std::string>> m_ActorPhysicsFileSwapList;
 		};
-	}
-}
+	} // namespace Override
+} // namespace hdt

@@ -1,6 +1,10 @@
 #include "hdtSkinnedMeshAlgorithm.h"
+
 #include "hdtCollider.h"
+#include "hdtEnkiTSScheduler.h"
+
 #include "../hdtTracy.h"
+
 #include <memory>
 #include <vector>
 
@@ -12,8 +16,7 @@ namespace hdt
 {
 	SkinnedMeshAlgorithm::SkinnedMeshAlgorithm(const btCollisionAlgorithmConstructionInfo& ci)
 		: btCollisionAlgorithm(ci)
-	{
-	}
+	{}
 
 	// static const CollisionResult zero;
 
@@ -32,16 +35,13 @@ namespace hdt
 
 	// CollisionCheckBase1 provides data members and the basic constructor for the target types. Note that we
 	// always collide a vertex shape against something else, so only the second type is templated.
-	template <typename T>
+	template<typename T>
 	struct CollisionCheckBase1
 	{
 		typedef typename PerVertexShape::ShapeProp SP0;
 		typedef typename T::ShapeProp SP1;
 
-		CollisionCheckBase1(PerVertexShape* a, T* b, CollisionResult* r)
-#ifdef CUDA
-			: shapeA(a), shapeB(b)
-#endif
+		CollisionCheckBase1(PerVertexShape* a, T* b, CollisionResult* r) : shapeA(a), shapeB(b)
 		{
 #ifdef CUDA
 			v0 = a->m_owner->m_vpos.get();
@@ -56,12 +56,31 @@ namespace hdt
 			sp1 = &b->m_shapeProp;
 			results = r;
 			numResults = 0;
+			// Store base pointers for computing actual addresses from offsets
+			colliderBaseA = a->getColliderBase();
+			colliderBaseB = b->getColliderBase();
+			aabbBaseA = a->getAabbBase();
+			aabbBaseB = b->getAabbBase();
+
+			// DIAGNOSTIC: Log base pointers for tracing
+			static thread_local int logCount = 0;
+			if (logCount++ < 5) {
+				_VMESSAGE("CollisionCheckBase1: shapeA=%p ownerA=%s colliderBaseA=%p [%p,%p) size=%zu", a,
+						  (a->m_owner && a->m_owner->m_name()) ? a->m_owner->m_name()->cstr() : "null", colliderBaseA,
+						  colliderBaseA, colliderBaseA + a->m_colliders.size(), a->m_colliders.size());
+				_VMESSAGE("CollisionCheckBase1: shapeB=%p ownerB=%s colliderBaseB=%p [%p,%p) size=%zu", b,
+						  (b->m_owner && b->m_owner->m_name()) ? b->m_owner->m_name()->cstr() : "null", colliderBaseB,
+						  colliderBaseB, colliderBaseB + b->m_colliders.size(), b->m_colliders.size());
+			}
 		}
 
-#ifdef CUDA
 		PerVertexShape* shapeA;
 		T* shapeB;
-#endif
+		// Base pointers for computing actual addresses from tree node offsets
+		Collider* colliderBaseA;
+		Collider* colliderBaseB;
+		Aabb* aabbBaseA;
+		Aabb* aabbBaseB;
 
 		VertexPos* v0;
 		VertexPos* v1;
@@ -77,22 +96,35 @@ namespace hdt
 	// CollisionCheckBase2 provides the method to add results, swapping the colliders if necessary. This
 	// means we can support triangle-sphere collisions by reversing the input shapes and setting SwapResults
 	// to true, instead of having two almost identical versions of the same lower-level algorithm.
-	template <typename T, bool SwapResults>
+	template<typename T, bool SwapResults>
 	struct CollisionCheckBase2;
 
-	template <typename T>
+	template<typename T>
 	struct CollisionCheckBase2<T, false> : public CollisionCheckBase1<T>
 	{
-		template <typename... Ts>
-		CollisionCheckBase2(Ts&&... ts)
-			: CollisionCheckBase1(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionCheckBase2(Ts&&... ts) : CollisionCheckBase1(std::forward<Ts>(ts)...)
 		{}
 
 		bool addResult(const CollisionResult& res)
 		{
-			int p = numResults.fetch_add(1);
-			if (p < SkinnedMeshAlgorithm::MaxCollisionCount)
+			// DIAGNOSTIC: Validate pointers BEFORE storing
 			{
+				bool validA = res.colliderA >= colliderBaseA &&
+							  res.colliderA < colliderBaseA + shapeA->m_colliders.size();
+				bool validB = res.colliderB >= colliderBaseB &&
+							  res.colliderB < colliderBaseB + shapeB->m_colliders.size();
+				if (!validA || !validB) {
+					static thread_local int errCount = 0;
+					if (errCount++ < 3) {
+						_ERROR("addResult[NoSwap]: INVALID ptr! A=%p valid=[%p,%p) ok=%d  B=%p valid=[%p,%p) ok=%d",
+							   res.colliderA, colliderBaseA, colliderBaseA + shapeA->m_colliders.size(), validA,
+							   res.colliderB, colliderBaseB, colliderBaseB + shapeB->m_colliders.size(), validB);
+					}
+				}
+			}
+			int p = numResults.fetch_add(1);
+			if (p < SkinnedMeshAlgorithm::MaxCollisionCount) {
 				results[p] = res;
 				return true;
 			}
@@ -100,19 +132,35 @@ namespace hdt
 		}
 	};
 
-	template <typename T>
+	template<typename T>
 	struct CollisionCheckBase2<T, true> : public CollisionCheckBase1<T>
 	{
-		template <typename... Ts>
-		CollisionCheckBase2(Ts&&... ts)
-			: CollisionCheckBase1(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionCheckBase2(Ts&&... ts) : CollisionCheckBase1(std::forward<Ts>(ts)...)
 		{}
 
 		bool addResult(const CollisionResult& res)
 		{
-			int p = numResults.fetch_add(1);
-			if (p < SkinnedMeshAlgorithm::MaxCollisionCount)
+			// DIAGNOSTIC: Validate pointers BEFORE storing (note: we swap A<->B)
+			// res.colliderA is from shapeA, res.colliderB is from shapeB
+			// After swap: stored colliderA = res.colliderB (from shapeB)
+			//             stored colliderB = res.colliderA (from shapeA)
 			{
+				bool validA = res.colliderA >= colliderBaseA &&
+							  res.colliderA < colliderBaseA + shapeA->m_colliders.size();
+				bool validB = res.colliderB >= colliderBaseB &&
+							  res.colliderB < colliderBaseB + shapeB->m_colliders.size();
+				if (!validA || !validB) {
+					static thread_local int errCount = 0;
+					if (errCount++ < 3) {
+						_ERROR("addResult[Swap]: INVALID ptr! resA=%p valid=[%p,%p) ok=%d  resB=%p valid=[%p,%p) ok=%d",
+							   res.colliderA, colliderBaseA, colliderBaseA + shapeA->m_colliders.size(), validA,
+							   res.colliderB, colliderBaseB, colliderBaseB + shapeB->m_colliders.size(), validB);
+					}
+				}
+			}
+			int p = numResults.fetch_add(1);
+			if (p < SkinnedMeshAlgorithm::MaxCollisionCount) {
 				results[p].posA = res.posB;
 				results[p].posB = res.posA;
 				results[p].colliderA = res.colliderB;
@@ -128,15 +176,14 @@ namespace hdt
 	// CollisionChecker provides the checkCollide method, which handles a single pair of colliders. This does
 	// the accurate collision check for the CPU algorithms. GPU algorithms will provide their own methods for
 	// this, and should derive directly from CollisionCheckBase2.
-	template <typename T, bool SwapResults>
+	template<typename T, bool SwapResults>
 	struct CollisionChecker;
 
-	template <bool SwapResults>
+	template<bool SwapResults>
 	struct CollisionChecker<PerVertexShape, SwapResults> : public CollisionCheckBase2<PerVertexShape, SwapResults>
 	{
-		template <typename... Ts>
-		CollisionChecker(Ts&&... ts)
-			: CollisionCheckBase2(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionChecker(Ts&&... ts) : CollisionCheckBase2(std::forward<Ts>(ts)...)
 		{}
 		bool checkCollide(Collider* a, Collider* b, CollisionResult& res)
 		{
@@ -155,7 +202,8 @@ namespace hdt
 #if true
 	namespace
 	{
-		inline __m128 cross_product(__m128 const& vec0, __m128 const& vec1) {
+		inline __m128 cross_product(__m128 const& vec0, __m128 const& vec1)
+		{
 			__m128 tmp0 = _mm_shuffle_ps(vec0, vec0, _MM_SHUFFLE(3, 0, 2, 1));
 			__m128 tmp1 = _mm_shuffle_ps(vec1, vec1, _MM_SHUFFLE(3, 1, 0, 2));
 			__m128 tmp2 = _mm_mul_ps(tmp0, vec1);
@@ -163,14 +211,13 @@ namespace hdt
 			__m128 tmp4 = _mm_shuffle_ps(tmp2, tmp2, _MM_SHUFFLE(3, 0, 2, 1));
 			return _mm_sub_ps(tmp3, tmp4);
 		}
-	}
+	} // namespace
 
-	template <bool SwapResults>
+	template<bool SwapResults>
 	struct CollisionChecker<PerTriangleShape, SwapResults> : public CollisionCheckBase2<PerTriangleShape, SwapResults>
 	{
-		template <typename... Ts>
-		CollisionChecker(Ts&&... ts)
-			: CollisionCheckBase2(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionChecker(Ts&&... ts) : CollisionCheckBase2(std::forward<Ts>(ts)...)
 		{}
 
 		bool checkCollide(Collider* a, Collider* b, CollisionResult& res)
@@ -183,8 +230,7 @@ namespace hdt
 			auto margin = (p0.marginMultiplier() + p1.marginMultiplier() + p2.marginMultiplier()) / 3;
 			auto penetration = sp1->penetration * margin;
 			margin *= sp1->margin;
-			if (penetration > -FLT_EPSILON && penetration < FLT_EPSILON)
-			{
+			if (penetration > -FLT_EPSILON && penetration < FLT_EPSILON) {
 				penetration = 0;
 			}
 
@@ -194,13 +240,11 @@ namespace hdt
 			auto ac = (p2.pos() - p0.pos()).get128();
 			auto raw_normal = cross_product(ab, ac);
 			auto len = _mm_sqrt_ps(_mm_dp_ps(raw_normal, raw_normal, 0x77));
-			if (_mm_cvtss_f32(len) < FLT_EPSILON)
-			{
+			if (_mm_cvtss_f32(len) < FLT_EPSILON) {
 				return false;
 			}
 			auto normal = _mm_div_ps(raw_normal, len);
-			if (penetration < 0)
-			{
+			if (penetration < 0) {
 				normal = _mm_sub_ps(_mm_set1_ps(0.0), normal);
 				penetration = -penetration;
 			}
@@ -221,17 +265,14 @@ namespace hdt
 			bool isInsideContactPlane;
 			if (penetration >= FLT_EPSILON)
 				isInsideContactPlane = distanceFromPlane < radiusWithMargin && distanceFromPlane >= -penetration;
-			else
-			{
-				if (distanceFromPlane < 0)
-				{
+			else {
+				if (distanceFromPlane < 0) {
 					distanceFromPlane = -distanceFromPlane;
 					normal = _mm_sub_ps(_mm_set1_ps(0.0), normal);
 				}
 				isInsideContactPlane = distanceFromPlane < radiusWithMargin;
 			}
-			if (!isInsideContactPlane)
-			{
+			if (!isInsideContactPlane) {
 				return false;
 			}
 
@@ -270,12 +311,11 @@ namespace hdt
 			aa = _mm_cmpgt_ps(aa, len);
 #endif
 			auto pointInTriangle = _mm_test_all_zeros(_mm_set_epi32(0, -1, -1, -1), _mm_castps_si128(aa));
-			//auto pointInTriangle = _mm_testz_ps(_mm_set_ps(0, -1, -1, -1), aa);
+			// auto pointInTriangle = _mm_testz_ps(_mm_set_ps(0, -1, -1, -1), aa);
 
 			res.colliderA = a;
 			res.colliderB = b;
-			if (pointInTriangle)
-			{
+			if (pointInTriangle) {
 				res.normOnB.set128(normal);
 				res.posA = s.pos() - res.normOnB * r;
 #ifdef CUDA
@@ -290,12 +330,11 @@ namespace hdt
 		}
 	};
 #else
-	template <bool SwapResults>
+	template<bool SwapResults>
 	struct CollisionChecker<PerTriangleShape, SwapResults> : public CollisionCheckBase2<PerTriangleShape, SwapResults>
 	{
-		template <typename... Ts>
-		CollisionChecker(Ts&&... ts)
-			: CollisionCheckBase2(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionChecker(Ts&&... ts) : CollisionCheckBase2(std::forward<Ts>(ts)...)
 		{}
 
 		bool checkCollide(Collider* a, Collider* b, CollisionResult& res)
@@ -310,7 +349,8 @@ namespace hdt
 			margin *= sp1->margin;
 
 			CheckTriangle tri(p0.pos(), p1.pos(), p2.pos(), margin, penetration);
-			if (!tri.valid) return false;
+			if (!tri.valid)
+				return false;
 			auto ret = checkSphereTriangle(s.pos(), r, tri, res);
 			res.colliderA = a;
 			res.colliderB = b;
@@ -321,35 +361,49 @@ namespace hdt
 
 	// CollisionCheckDispatcher provides a dispatch method to process two lists of colliders. It is needed for
 	// the new (GPU-oriented) algorithm, but we provide a CPU-only version as well.
-	template <typename T, bool SwapResults, CollisionCheckAlgorithmType Algorithm>
+	template<typename T, bool SwapResults, CollisionCheckAlgorithmType Algorithm>
 	struct CollisionCheckDispatcher : public CollisionChecker<T, SwapResults>
 	{
-		template <typename... Ts>
-		CollisionCheckDispatcher(Ts&&... ts)
-			: CollisionChecker(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionCheckDispatcher(Ts&&... ts) : CollisionChecker(std::forward<Ts>(ts)...)
 		{}
 
-		void dispatch(ColliderTree* a, ColliderTree* b, const std::vector<Aabb*>& listA, const std::vector<Aabb*>& listB)
+		void dispatch(ColliderTree* a, ColliderTree* b, const std::vector<Aabb*>& listA,
+					  const std::vector<Aabb*>& listB)
 		{
 			CollisionResult result;
 			CollisionResult temp;
 			bool hasResult = false;
 
-			auto abeg = a->aabb;
-			auto bbeg = b->aabb;
+			// Compute pointers from base + offset (no stored pointers)
+			auto abeg = aabbBaseA + a->colliderOffset;
+			auto bbeg = aabbBaseB + b->colliderOffset;
+			auto acbuf = colliderBaseA + a->colliderOffset;
+			auto bcbuf = colliderBaseB + b->colliderOffset;
 
-			if (listA.size() && listB.size())
-			{
-				for (auto i : listA)
-				{
-					for (auto j : listB)
-					{
+			// DIAGNOSTIC: Validate offsets are sane
+			size_t maxOffsetA = shapeA->m_colliders.size();
+			size_t maxOffsetB = shapeB->m_colliders.size();
+			if (a->colliderOffset + a->numCollider > maxOffsetA) {
+				_ERROR("dispatch: BAD offsetA! tree=%p offset=%zu numCollider=%u maxOffset=%zu shapeA=%p ownerA=%s", a,
+					   a->colliderOffset, a->numCollider, maxOffsetA, shapeA,
+					   (shapeA->m_owner && shapeA->m_owner->m_name()) ? shapeA->m_owner->m_name()->cstr() : "null");
+				return;
+			}
+			if (b->colliderOffset + b->numCollider > maxOffsetB) {
+				_ERROR("dispatch: BAD offsetB! tree=%p offset=%zu numCollider=%u maxOffset=%zu shapeB=%p ownerB=%s", b,
+					   b->colliderOffset, b->numCollider, maxOffsetB, shapeB,
+					   (shapeB->m_owner && shapeB->m_owner->m_name()) ? shapeB->m_owner->m_name()->cstr() : "null");
+				return;
+			}
+
+			if (listA.size() && listB.size()) {
+				for (auto i : listA) {
+					for (auto j : listB) {
 						if (!i->collideWith(*j))
 							continue;
-						if (checkCollide(&a->cbuf[i - abeg], &b->cbuf[j - bbeg], temp))
-						{
-							if (!hasResult || result.depth > temp.depth)
-							{
+						if (checkCollide(&acbuf[i - abeg], &bcbuf[j - bbeg], temp)) {
+							if (!hasResult || result.depth > temp.depth) {
 								hasResult = true;
 								result = temp;
 							}
@@ -358,8 +412,7 @@ namespace hdt
 				}
 			}
 
-			if (hasResult)
-			{
+			if (hasResult) {
 				addResult(result);
 			}
 		}
@@ -369,19 +422,18 @@ namespace hdt
 #ifndef CUDA
 	// Dispatcher specialization for sphere-triangle collisions on CUDA. Sphere-sphere collisions will
 	// continue to use the CPU dispatcher. Doesn't actually do anything yet (and will fail to compile).
-	template <bool SwapResults>
+	template<bool SwapResults>
 	struct CollisionCheckDispatcher<PerTriangleShape, SwapResults, e_CUDA>
 		: public CollisionCheckBase2<PerTriangleShape, SwapResults>
 	{};
 #endif
 
 	// Finally, CollisionCheckAlgorithm does the full check between collider trees.
-	template <typename T, bool SwapResults = false, CollisionCheckAlgorithmType Algorithm = e_CPURefactored>
+	template<typename T, bool SwapResults = false, CollisionCheckAlgorithmType Algorithm = e_CPURefactored>
 	struct CollisionCheckAlgorithm : public CollisionCheckDispatcher<T, SwapResults, Algorithm>
 	{
-		template <typename... Ts>
-		CollisionCheckAlgorithm(Ts&&... ts)
-			: CollisionCheckDispatcher(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionCheckAlgorithm(Ts&&... ts) : CollisionCheckDispatcher(std::forward<Ts>(ts)...)
 		{}
 
 		int operator()()
@@ -394,18 +446,35 @@ namespace hdt
 				HDT_ZONE_SCOPED_N("TreeTraversal");
 				c0->checkCollisionL(c1, pairs);
 			}
-			if (pairs.empty()) return 0;
+			if (pairs.empty())
+				return 0;
 			HDT_PLOT("CollisionPairs", static_cast<int64_t>(pairs.size()));
 
-			decltype(auto) func = [this](const std::pair<ColliderTree*, ColliderTree*>& pair)
-			{
+			decltype(auto) func = [this](const std::pair<ColliderTree*, ColliderTree*>& pair) {
 				if (numResults >= SkinnedMeshAlgorithm::MaxCollisionCount)
 					return;
 
 				auto a = pair.first, b = pair.second;
 
-				auto abeg = a->aabb;
-				auto bbeg = b->aabb;
+				// DIAGNOSTIC: Validate tree nodes belong to correct shapes
+				size_t maxOffsetA = shapeA->m_colliders.size();
+				size_t maxOffsetB = shapeB->m_colliders.size();
+				if (a->colliderOffset + a->numCollider > maxOffsetA) {
+					_ERROR("func: BAD offsetA! tree=%p offset=%zu num=%u max=%zu shapeA=%p ownerA=%s", a,
+						   a->colliderOffset, a->numCollider, maxOffsetA, shapeA,
+						   (shapeA->m_owner && shapeA->m_owner->m_name()) ? shapeA->m_owner->m_name()->cstr() : "null");
+					return;
+				}
+				if (b->colliderOffset + b->numCollider > maxOffsetB) {
+					_ERROR("func: BAD offsetB! tree=%p offset=%zu num=%u max=%zu shapeB=%p ownerB=%s", b,
+						   b->colliderOffset, b->numCollider, maxOffsetB, shapeB,
+						   (shapeB->m_owner && shapeB->m_owner->m_name()) ? shapeB->m_owner->m_name()->cstr() : "null");
+					return;
+				}
+
+				// Compute AABB pointers from base + offset (no stored pointers)
+				auto abeg = aabbBaseA + a->colliderOffset;
+				auto bbeg = aabbBaseB + b->colliderOffset;
 				auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
 				auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
 				auto aend = abeg + asize;
@@ -420,17 +489,16 @@ namespace hdt
 				listA.reserve(asize);
 				listB.reserve(bsize);
 
-				// Colliders in A that intersect full bounding box of B. Compute a new bounding box for just those - this
-				// can be MUCH smaller than the original bounding box for A (consider the case where we have two spheres
-				// colliding, offset by an equal amount in all three axes).
-				// Use batched SIMD collision detection (AVX-512: 4 at a time, AVX2: 2 at a time)
+				// Colliders in A that intersect full bounding box of B. Compute a new bounding box for just those -
+				// this can be MUCH smaller than the original bounding box for A (consider the case where we have two
+				// spheres colliding, offset by an equal amount in all three axes). Use batched SIMD collision detection
+				// (AVX-512: 4 at a time, AVX2: 2 at a time)
 				Aabb::collideWithMany(aabbB, abeg, asize, std::back_inserter(listA));
 				for (Aabb* aabb : listA)
 					aabbA.merge(*aabb);
 
 				// Colliders in B that intersect the new bounding box for A. Compute a new bounding box for those too.
-				if (listA.size())
-				{
+				if (listA.size()) {
 					aabbB.invalidate();
 					Aabb::collideWithMany(aabbA, bbeg, bsize, std::back_inserter(listB));
 					for (Aabb* aabb : listB)
@@ -438,9 +506,10 @@ namespace hdt
 				}
 
 				// Remove any colliders from A that don't intersect the new bounding box for B
-				if (listB.size())
-				{
-					listA.erase(std::remove_if(listA.begin(), listA.end(), [&](Aabb* aabb) { return !aabb->collideWith(aabbB); }), listA.end());
+				if (listB.size()) {
+					listA.erase(std::remove_if(listA.begin(), listA.end(),
+											   [&](Aabb* aabb) { return !aabb->collideWith(aabbB); }),
+								listA.end());
 				}
 
 				// Now go through both lists and do the real collision (if needed).
@@ -450,16 +519,15 @@ namespace hdt
 				listB.clear();
 			};
 
-			if (pairs.size() >= std::thread::hardware_concurrency())
-			{
+			if (pairs.size() >= std::thread::hardware_concurrency()) {
 				HDT_ZONE_SCOPED_N("ParallelCollide");
 				// FIXME PROFILING This is the line where we spend the most time in the whole mod.
-				concurrency::parallel_for_each(pairs.begin(), pairs.end(), func);
+				hdt_parallel_for_each(pairs.begin(), pairs.end(), func);
 			}
-			else
-			{
+			else {
 				HDT_ZONE_SCOPED_N("SequentialCollide");
-				for (auto& i : pairs) func(i);
+				for (auto& i : pairs)
+					func(i);
 			}
 
 			return numResults;
@@ -467,12 +535,11 @@ namespace hdt
 	};
 
 	// Old algorithm - lower memory use, possibly faster (for CPU), but not at all suited to GPU processing
-	template <typename T, bool SwapResults>
+	template<typename T, bool SwapResults>
 	struct CollisionCheckAlgorithm<T, SwapResults, e_CPU> : public CollisionChecker<T, SwapResults>
 	{
-		template <typename... Ts>
-		CollisionCheckAlgorithm(Ts&&... ts)
-			: CollisionChecker(std::forward<Ts>(ts)...)
+		template<typename... Ts>
+		CollisionCheckAlgorithm(Ts&&... ts) : CollisionChecker(std::forward<Ts>(ts)...)
 		{}
 
 		int operator()()
@@ -480,10 +547,10 @@ namespace hdt
 			std::vector<std::pair<ColliderTree*, ColliderTree*>> pairs;
 			pairs.reserve(c0->colliders.size() + c1->colliders.size());
 			c0->checkCollisionL(c1, pairs);
-			if (pairs.empty()) return 0;
+			if (pairs.empty())
+				return 0;
 
-			decltype(auto) func = [this](const std::pair<ColliderTree*, ColliderTree*>& pair)
-			{
+			decltype(auto) func = [this](const std::pair<ColliderTree*, ColliderTree*>& pair) {
 				if (numResults >= SkinnedMeshAlgorithm::MaxCollisionCount)
 					return;
 
@@ -491,8 +558,11 @@ namespace hdt
 
 				auto aabbA = a->aabbMe;
 				auto aabbB = b->aabbMe;
-				auto abeg = a->aabb;
-				auto bbeg = b->aabb;
+				// Compute pointers from base + offset (no stored pointers)
+				auto abeg = aabbBaseA + a->colliderOffset;
+				auto bbeg = aabbBaseB + b->colliderOffset;
+				auto acbuf = colliderBaseA + a->colliderOffset;
+				auto bcbuf = colliderBaseB + b->colliderOffset;
 				auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
 				auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
 				auto aend = abeg + asize;
@@ -503,25 +573,20 @@ namespace hdt
 				bool hasResult = false;
 
 				thread_local std::vector<Aabb*> list;
-				if (asize > bsize)
-				{
+				if (asize > bsize) {
 					list.reserve(std::max<size_t>(bsize, list.capacity()));
 					// AVX2 batch collision filtering - process 2 AABBs at a time
 					Aabb::collideWithMany(aabbA, bbeg, bsize, std::back_inserter(list));
 
-					for (auto i = abeg; i < aend; ++i)
-					{
+					for (auto i = abeg; i < aend; ++i) {
 						if (!i->collideWith(aabbB))
 							continue;
 
-						for (auto j : list)
-						{
+						for (auto j : list) {
 							if (!i->collideWith(*j))
 								continue;
-							if (checkCollide(&a->cbuf[i - abeg], &b->cbuf[j - bbeg], temp))
-							{
-								if (!hasResult || result.depth > temp.depth)
-								{
+							if (checkCollide(&acbuf[i - abeg], &bcbuf[j - bbeg], temp)) {
+								if (!hasResult || result.depth > temp.depth) {
 									hasResult = true;
 									result = temp;
 								}
@@ -529,25 +594,20 @@ namespace hdt
 						}
 					}
 				}
-				else
-				{
+				else {
 					list.reserve(std::max<size_t>(asize, list.capacity()));
 					// AVX2 batch collision filtering - process 2 AABBs at a time
 					Aabb::collideWithMany(aabbB, abeg, asize, std::back_inserter(list));
 
-					for (auto j = bbeg; j < bend; ++j)
-					{
+					for (auto j = bbeg; j < bend; ++j) {
 						if (!j->collideWith(aabbA))
 							continue;
 
-						for (auto i : list)
-						{
+						for (auto i : list) {
 							if (!i->collideWith(*j))
 								continue;
-							if (checkCollide(&a->cbuf[i - abeg], &b->cbuf[j - bbeg], temp))
-							{
-								if (!hasResult || result.depth > temp.depth)
-								{
+							if (checkCollide(&acbuf[i - abeg], &bcbuf[j - bbeg], temp)) {
+								if (!hasResult || result.depth > temp.depth) {
 									hasResult = true;
 									result = temp;
 								}
@@ -557,21 +617,22 @@ namespace hdt
 				}
 				list.clear();
 
-				if (hasResult)
-				{
+				if (hasResult) {
 					addResult(result);
 				}
 			};
 
 			if (pairs.size() >= std::thread::hardware_concurrency())
-				concurrency::parallel_for_each(pairs.begin(), pairs.end(), func);
-			else for (auto& i : pairs) func(i);
+				hdt_parallel_for_each(pairs.begin(), pairs.end(), func);
+			else
+				for (auto& i : pairs)
+					func(i);
 
 			return numResults;
 		}
 	};
 
-	template <class T1>
+	template<class T1>
 	int checkCollide(PerVertexShape* a, T1* b, CollisionResult* results)
 	{
 		return CollisionCheckAlgorithm<T1>(a, b, results)();
@@ -583,39 +644,79 @@ namespace hdt
 	}
 
 	void SkinnedMeshAlgorithm::MergeBuffer::doMerge(SkinnedMeshShape* a, SkinnedMeshShape* b,
-		CollisionResult* collision, int count)
+													CollisionResult* collision, int count)
 	{
 		HDT_ZONE_SCOPED_N("MergeCollisions");
-		for (int i = 0; i < count; ++i)
-		{
+		// Validate inputs - null checks help diagnose crashes during load
+		if (!a || !b || !collision) {
+			_WARNING("doMerge: null input (a=%p, b=%p, collision=%p, count=%d)", a, b, collision, count);
+			return;
+		}
+		if (!a->m_owner || !b->m_owner) {
+			_WARNING("doMerge: null owner (a->m_owner=%p, b->m_owner=%p)", a ? a->m_owner : nullptr,
+					 b ? b->m_owner : nullptr);
+			return;
+		}
+
+		// Get valid collider ranges for pointer validation (outside loop - they don't change)
+		const Collider* aCollidersBegin = a->m_colliders.data();
+		const Collider* aCollidersEnd = aCollidersBegin + a->m_colliders.size();
+		const Collider* bCollidersBegin = b->m_colliders.data();
+		const Collider* bCollidersEnd = bCollidersBegin + b->m_colliders.size();
+
+		for (int i = 0; i < count; ++i) {
 			auto& res = collision[i];
 #ifdef CUDA
-			if (res.depth >= -FLT_EPSILON) continue;
+			if (res.depth >= -FLT_EPSILON)
+				continue;
 #else
-			if (res.depth >= -FLT_EPSILON) break;
+			if (res.depth >= -FLT_EPSILON)
+				break;
 #endif
+
+			// Validate collider pointers are within expected ranges
+			if (res.colliderA < aCollidersBegin || res.colliderA >= aCollidersEnd) {
+				ptrdiff_t offsetA =
+					reinterpret_cast<const char*>(res.colliderA) - reinterpret_cast<const char*>(aCollidersBegin);
+				_ERROR("doMerge: colliderA %p out of range [%p, %p) offset=%lld bytes - stale pointer! shapeA=%p "
+					   "ownerA=%s",
+					   res.colliderA, aCollidersBegin, aCollidersEnd, (long long)offsetA, a,
+					   (a->m_owner && a->m_owner->m_name()) ? a->m_owner->m_name()->cstr() : "null");
+				continue; // Skip this result instead of crashing
+			}
+			if (res.colliderB < bCollidersBegin || res.colliderB >= bCollidersEnd) {
+				ptrdiff_t offsetB =
+					reinterpret_cast<const char*>(res.colliderB) - reinterpret_cast<const char*>(bCollidersBegin);
+				_ERROR("doMerge: colliderB %p out of range [%p, %p) offset=%lld bytes - stale pointer! shapeB=%p "
+					   "ownerB=%s",
+					   res.colliderB, bCollidersBegin, bCollidersEnd, (long long)offsetB, b,
+					   (b->m_owner && b->m_owner->m_name()) ? b->m_owner->m_name()->cstr() : "null");
+				continue; // Skip this result instead of crashing
+			}
 
 			auto flexible = std::max(res.colliderA->flexible, res.colliderB->flexible);
 #ifdef CUDA
-			if (flexible < FLT_EPSILON) continue;
+			if (flexible < FLT_EPSILON)
+				continue;
 #else
-			if (flexible < FLT_EPSILON) return;
+			if (flexible < FLT_EPSILON)
+				return;
 #endif
 
-			for (int ib = 0; ib < a->getBonePerCollider(); ++ib)
-			{
+			for (int ib = 0; ib < a->getBonePerCollider(); ++ib) {
 				auto w0 = a->getColliderBoneWeight(res.colliderA, ib);
 				int boneIdx0 = a->getColliderBoneIndex(res.colliderA, ib);
-				if (w0 <= a->m_owner->m_skinnedBones[boneIdx0].weightThreshold) continue;
+				if (w0 <= a->m_owner->m_skinnedBones[boneIdx0].weightThreshold)
+					continue;
 
-				for (int jb = 0; jb < b->getBonePerCollider(); ++jb)
-				{
+				for (int jb = 0; jb < b->getBonePerCollider(); ++jb) {
 					auto w1 = b->getColliderBoneWeight(res.colliderB, jb);
 					int boneIdx1 = b->getColliderBoneIndex(res.colliderB, jb);
-					if (w1 <= b->m_owner->m_skinnedBones[boneIdx1].weightThreshold) continue;
+					if (w1 <= b->m_owner->m_skinnedBones[boneIdx1].weightThreshold)
+						continue;
 
-					if (a->m_owner->m_skinnedBones[boneIdx0].isKinematic && b->m_owner->m_skinnedBones[boneIdx1].
-						isKinematic)
+					if (a->m_owner->m_skinnedBones[boneIdx0].isKinematic &&
+						b->m_owner->m_skinnedBones[boneIdx1].isKinematic)
 						continue;
 
 					float w = flexible * res.depth;
@@ -631,22 +732,25 @@ namespace hdt
 	}
 
 	void SkinnedMeshAlgorithm::MergeBuffer::apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1,
-		CollisionDispatcher* dispatcher)
+												  CollisionDispatcher* dispatcher)
 	{
 		HDT_ZONE_SCOPED_N("ApplyManifolds");
-		for (int i = 0; i < body0->m_skinnedBones.size(); ++i)
-		{
-			if (!body1->canCollideWith(body0->m_skinnedBones[i].ptr)) continue;
-			for (int j = 0; j < body1->m_skinnedBones.size(); ++j)
-			{
-				if (!body0->canCollideWith(body1->m_skinnedBones[j].ptr)) continue;
-				if (get(i, j)->weight < FLT_EPSILON) continue;
+		for (int i = 0; i < body0->m_skinnedBones.size(); ++i) {
+			if (!body1->canCollideWith(body0->m_skinnedBones[i].ptr))
+				continue;
+			for (int j = 0; j < body1->m_skinnedBones.size(); ++j) {
+				if (!body0->canCollideWith(body1->m_skinnedBones[j].ptr))
+					continue;
+				if (get(i, j)->weight < FLT_EPSILON)
+					continue;
 
-				if (body0->m_skinnedBones[i].isKinematic && body1->m_skinnedBones[j].isKinematic) continue;
+				if (body0->m_skinnedBones[i].isKinematic && body1->m_skinnedBones[j].isKinematic)
+					continue;
 
 				auto rb0 = body0->m_skinnedBones[i].ptr;
 				auto rb1 = body1->m_skinnedBones[j].ptr;
-				if (rb0 == rb1) continue;
+				if (rb0 == rb1)
+					continue;
 
 				auto c = get(i, j);
 				float invWeight = 1.0f / c->weight;
@@ -657,11 +761,13 @@ namespace hdt
 				auto localA = rb0->m_rig.getWorldTransform().invXform(worldA);
 				auto localB = rb1->m_rig.getWorldTransform().invXform(worldB);
 				auto normal = c->normal * invWeight;
-				if (normal.fuzzyZero()) continue;
+				if (normal.fuzzyZero())
+					continue;
 				auto depth = -normal.length();
 				normal = -normal.normalized();
 
-				if (depth >= -FLT_EPSILON) continue;
+				if (depth >= -FLT_EPSILON)
+					continue;
 
 				btManifoldPoint newPt(localA, localB, normal, depth);
 				newPt.m_positionWorldOnA = worldA;
@@ -674,7 +780,7 @@ namespace hdt
 		}
 	}
 
-	template <class T0, class T1>
+	template<class T0, class T1>
 	void SkinnedMeshAlgorithm::processCollision(T0* shape0, T1* shape1, MergeBuffer& merge, CollisionResult* collision)
 	{
 		int count = std::min(checkCollide(shape0, shape1, collision), MaxCollisionCount);
@@ -684,10 +790,7 @@ namespace hdt
 
 #ifdef CUDA
 	template<bool Swap, typename T>
-	void launchCollision(
-		PerVertexShape* shape0,
-		T* shape1,
-		std::shared_ptr<CudaMergeBuffer> cudaMerge)
+	void launchCollision(PerVertexShape* shape0, T* shape1, std::shared_ptr<CudaMergeBuffer> cudaMerge)
 	{
 		ColliderTree* c0 = &shape0->m_tree;
 		ColliderTree* c1 = &shape1->m_tree;
@@ -695,33 +798,25 @@ namespace hdt
 		std::vector<std::pair<ColliderTree*, ColliderTree*>> pairs;
 		pairs.reserve(c0->colliders.size() + c1->colliders.size());
 		c0->checkCollisionL(c1, pairs);
-		if (pairs.empty()) return;
+		if (pairs.empty())
+			return;
 		int npairs = pairs.size();
 
-		CudaCollisionPair<T::CudaType> collisionPair(
-			shape0->m_cudaObject.get(),
-			shape1->m_cudaObject.get(),
-			npairs);
+		CudaCollisionPair<T::CudaType> collisionPair(shape0->m_cudaObject.get(), shape1->m_cudaObject.get(), npairs);
 
 		// Set up data for each pair of collision trees
 		{
 			HDT_ZONE_SCOPED_N("AddCollisionPairs");
-			for (int i = 0; i < npairs; ++i)
-			{
+			for (int i = 0; i < npairs; ++i) {
 				auto a = pairs[i].first;
 				auto b = pairs[i].second;
 				auto asize = b->isKinematic ? a->dynCollider : a->numCollider;
 				auto bsize = a->isKinematic ? b->dynCollider : b->numCollider;
 
-				if (asize > 0 && bsize > 0)
-				{
-					collisionPair.addPair(
-						pairs[i].first->cbuf - shape0->m_colliders.data(),
-						pairs[i].second->cbuf - shape1->m_colliders.data(),
-						asize,
-						bsize,
-						a->aabbMe,
-						b->aabbMe);
+				if (asize > 0 && bsize > 0) {
+					// Use colliderOffset directly (no pointer subtraction needed)
+					collisionPair.addPair(pairs[i].first->colliderOffset, pairs[i].second->colliderOffset, asize, bsize,
+										  a->aabbMe, b->aabbMe);
 				}
 			}
 		}
@@ -733,10 +828,8 @@ namespace hdt
 		}
 	}
 
-	std::function<void()> SkinnedMeshAlgorithm::queueCollision(
-		SkinnedMeshBody* body0,
-		SkinnedMeshBody* body1,
-		CollisionDispatcher* dispatcher)
+	std::function<void()> SkinnedMeshAlgorithm::queueCollision(SkinnedMeshBody* body0, SkinnedMeshBody* body1,
+															   CollisionDispatcher* dispatcher)
 	{
 		HDT_ZONE_SCOPED_N("queueCollision");
 
@@ -748,17 +841,21 @@ namespace hdt
 
 		{
 			HDT_ZONE_SCOPED_N("LaunchKernels");
-			if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
-			{
-				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
-				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+			if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape()) {
+				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(),
+									  cudaMerge);
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(),
+									   cudaMerge);
 			}
 			else if (body0->m_shape->asPerTriangleShape())
-				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(), cudaMerge);
+				launchCollision<true>(body1->m_shape->asPerVertexShape(), body0->m_shape->asPerTriangleShape(),
+									  cudaMerge);
 			else if (body1->m_shape->asPerTriangleShape())
-				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), cudaMerge);
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(),
+									   cudaMerge);
 			else
-				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), cudaMerge);
+				launchCollision<false>(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(),
+									   cudaMerge);
 		}
 
 		{
@@ -769,20 +866,40 @@ namespace hdt
 		std::weak_ptr<CudaBody> weak0 = body0->m_cudaObject;
 		std::weak_ptr<CudaBody> weak1 = body1->m_cudaObject;
 
-		return [=]()
-		{
-			if (weak0.lock() && weak1.lock())
-			{
-				cudaMerge->apply(body0, body1, dispatcher);
+		return [=]() {
+			// Lock weak_ptrs ONCE and pass the locked shared_ptrs to apply()
+			// This avoids TOCTOU race where body->m_cudaObject could change between lock and use
+			auto cuda0 = weak0.lock();
+			auto cuda1 = weak1.lock();
+			if (cuda0 && cuda1) {
+				cudaMerge->apply(body0, body1, cuda0, cuda1, dispatcher);
 			}
 		};
 	}
 #endif
 
 	void SkinnedMeshAlgorithm::processCollision(SkinnedMeshBody* body0, SkinnedMeshBody* body1,
-		CollisionDispatcher* dispatcher)
+												CollisionDispatcher* dispatcher)
 	{
 		HDT_ZONE_SCOPED_N("ProcessCollision");
+
+		// Validate bodies and shapes before processing
+		if (!body0 || !body1) {
+			_ERROR("processCollision: null body (body0=%p, body1=%p)", body0, body1);
+			return;
+		}
+		SkinnedMeshShape* shape0 = body0->m_shape;
+		SkinnedMeshShape* shape1 = body1->m_shape;
+		if (!shape0 || !shape1) {
+			_ERROR("processCollision: null shape (shape0=%p, shape1=%p)", shape0, shape1);
+			return;
+		}
+		// Check if colliders vector is valid (non-zero size indicates properly built shape)
+		if (shape0->m_colliders.empty() || shape1->m_colliders.empty()) {
+			_ERROR("processCollision: empty colliders (shape0=%zu, shape1=%zu)", shape0->m_colliders.size(),
+				   shape1->m_colliders.size());
+			return;
+		}
 
 		// Thread-local buffers to avoid per-call allocations (86K+ calls per frame)
 		thread_local MergeBuffer merge;
@@ -792,20 +909,20 @@ namespace hdt
 		merge.clear();
 
 		CollisionResult* collision = collisionBuffer.data();
-		if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape())
-		{
+		if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape()) {
 			processCollision(body0->m_shape->asPerTriangleShape(), body1->m_shape->asPerVertexShape(), merge,
-				collision);
+							 collision);
 			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), merge,
-				collision);
+							 collision);
 		}
 		else if (body0->m_shape->asPerTriangleShape())
 			processCollision(body0->m_shape->asPerTriangleShape(), body1->m_shape->asPerVertexShape(), merge,
-				collision);
+							 collision);
 		else if (body1->m_shape->asPerTriangleShape())
 			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerTriangleShape(), merge,
-				collision);
-		else processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), merge, collision);
+							 collision);
+		else
+			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), merge, collision);
 
 		merge.apply(body0, body1, dispatcher);
 		// No release needed - thread_local persists and reuses memory
@@ -816,4 +933,4 @@ namespace hdt
 		static CreateFunc s_gimpact_cf;
 		dispatcher->registerCollisionCreateFunc(CUSTOM_CONCAVE_SHAPE_TYPE, CUSTOM_CONCAVE_SHAPE_TYPE, &s_gimpact_cf);
 	}
-}
+} // namespace hdt

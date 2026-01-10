@@ -22,7 +22,8 @@ subject to the following restrictions:
 
 #endif  // #if BT_USE_OPENMP && BT_THREADSAFE
 
-#if BT_USE_PPL && BT_THREADSAFE
+// PPL disabled - using enkiTS instead (avoids thread pool over-subscription)
+#if 0 // BT_USE_PPL && BT_THREADSAFE
 
 // use Microsoft Parallel Patterns Library (installed with Visual Studio 2010 and later)
 #include <ppl.h>  // if you get a compile error here, check whether your version of Visual Studio includes PPL
@@ -646,7 +647,8 @@ public:
 };
 #endif  // #if BT_USE_TBB && BT_THREADSAFE
 
-#if BT_USE_PPL && BT_THREADSAFE
+// PPL disabled - using enkiTS instead (avoids thread pool over-subscription)
+#if 0 // BT_USE_PPL && BT_THREADSAFE
 ///
 /// btTaskSchedulerPPL -- wrapper around Microsoft Parallel Patterns Lib task scheduler
 ///
@@ -751,6 +753,139 @@ public:
 };
 #endif  // #if BT_USE_PPL && BT_THREADSAFE
 
+#if BT_THREADSAFE
+// enkiTS task scheduler - replaces PPL with lower overhead work-stealing scheduler
+#include "../hdtSkinnedMesh/hdtEnkiTSScheduler.h"
+
+class btTaskSchedulerEnkiTS : public btITaskScheduler
+{
+	int m_numThreads;
+
+public:
+	btTaskSchedulerEnkiTS()
+		: btITaskScheduler("enkiTS")
+	{
+		m_numThreads = static_cast<int>(hdt::EnkiTSScheduler::get().getNumThreads());
+	}
+
+	virtual int getMaxNumThreads() const BT_OVERRIDE
+	{
+		return static_cast<int>(enki::GetNumHardwareThreads());
+	}
+
+	virtual int getNumThreads() const BT_OVERRIDE { return m_numThreads; }
+
+	virtual void setNumThreads(int numThreads) BT_OVERRIDE
+	{
+		// enkiTS doesn't support dynamic thread count changes after init
+		// The scheduler is already initialized with optimal thread count
+		m_numThreads = (std::min)(static_cast<int>(BT_MAX_THREAD_COUNT),
+								  (std::max)(1, numThreads));
+		m_savedThreadCounter = 0;
+		if (m_isActive)
+		{
+			btResetThreadIndexCounter();
+		}
+	}
+
+	// enkiTS task for btIParallelForBody
+	struct ForTask : public enki::ITaskSet
+	{
+		const btIParallelForBody* mBody;
+		int mGrainSize;
+		int mBegin;
+		int mEnd;
+
+		ForTask(const btIParallelForBody* body, int begin, int end, int grainSize)
+			: enki::ITaskSet(static_cast<uint32_t>((end - begin + grainSize - 1) / grainSize))
+			, mBody(body)
+			, mGrainSize(grainSize)
+			, mBegin(begin)
+			, mEnd(end)
+		{
+			m_MinRange = 1;
+		}
+
+		void ExecuteRange(enki::TaskSetPartition range, uint32_t /*threadnum*/) override
+		{
+			for (uint32_t chunk = range.start; chunk < range.end; ++chunk)
+			{
+				int iStart = mBegin + static_cast<int>(chunk) * mGrainSize;
+				int iEnd = (std::min)(iStart + mGrainSize, mEnd);
+				BT_PROFILE("enkiTS_forJob");
+				mBody->forLoop(iStart, iEnd);
+			}
+		}
+	};
+
+	virtual void parallelFor(int iBegin, int iEnd, int grainSize, const btIParallelForBody& body) BT_OVERRIDE
+	{
+		BT_PROFILE("parallelFor_enkiTS");
+		if (iBegin >= iEnd)
+			return;
+
+		ForTask task(&body, iBegin, iEnd, grainSize);
+		btPushThreadsAreRunning();
+		hdt::EnkiTSScheduler::get().scheduler().AddTaskSetToPipe(&task);
+		hdt::EnkiTSScheduler::get().scheduler().WaitforTask(&task);
+		btPopThreadsAreRunning();
+	}
+
+	// enkiTS task for btIParallelSumBody with thread-local accumulation
+	struct SumTask : public enki::ITaskSet
+	{
+		const btIParallelSumBody* mBody;
+		int mGrainSize;
+		int mBegin;
+		int mEnd;
+		std::atomic<double> mSum{0.0}; // Use atomic for thread-safe accumulation
+
+		SumTask(const btIParallelSumBody* body, int begin, int end, int grainSize)
+			: enki::ITaskSet(static_cast<uint32_t>((end - begin + grainSize - 1) / grainSize))
+			, mBody(body)
+			, mGrainSize(grainSize)
+			, mBegin(begin)
+			, mEnd(end)
+		{
+			m_MinRange = 1;
+		}
+
+		void ExecuteRange(enki::TaskSetPartition range, uint32_t /*threadnum*/) override
+		{
+			btScalar localSum = 0;
+			for (uint32_t chunk = range.start; chunk < range.end; ++chunk)
+			{
+				int iStart = mBegin + static_cast<int>(chunk) * mGrainSize;
+				int iEnd = (std::min)(iStart + mGrainSize, mEnd);
+				BT_PROFILE("enkiTS_sumJob");
+				localSum += mBody->sumLoop(iStart, iEnd);
+			}
+			// Atomic add to global sum
+			double expected = mSum.load(std::memory_order_relaxed);
+			while (!mSum.compare_exchange_weak(expected, expected + localSum,
+											   std::memory_order_release,
+											   std::memory_order_relaxed))
+			{
+			}
+		}
+	};
+
+	virtual btScalar parallelSum(int iBegin, int iEnd, int grainSize, const btIParallelSumBody& body) BT_OVERRIDE
+	{
+		BT_PROFILE("parallelSum_enkiTS");
+		if (iBegin >= iEnd)
+			return btScalar(0);
+
+		SumTask task(&body, iBegin, iEnd, grainSize);
+		btPushThreadsAreRunning();
+		hdt::EnkiTSScheduler::get().scheduler().AddTaskSetToPipe(&task);
+		hdt::EnkiTSScheduler::get().scheduler().WaitforTask(&task);
+		btPopThreadsAreRunning();
+		return static_cast<btScalar>(task.mSum.load(std::memory_order_acquire));
+	}
+};
+#endif // #if BT_THREADSAFE
+
 // create a non-threaded task scheduler (always available)
 btITaskScheduler* btGetSequentialTaskScheduler()
 {
@@ -785,6 +920,17 @@ btITaskScheduler* btGetPPLTaskScheduler()
 {
 #if BT_USE_PPL && BT_THREADSAFE
 	static btTaskSchedulerPPL sTaskScheduler;
+	return &sTaskScheduler;
+#else
+	return NULL;
+#endif
+}
+
+// create an enkiTS task scheduler (always available in threadsafe builds)
+btITaskScheduler* btGetEnkiTSTaskScheduler()
+{
+#if BT_THREADSAFE
+	static btTaskSchedulerEnkiTS sTaskScheduler;
 	return &sTaskScheduler;
 #else
 	return NULL;
