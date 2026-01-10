@@ -53,7 +53,7 @@ namespace hdt
 
 			if (evn && evn->opening &&
 				(!strcmp(evn->menuName.data, "Loading Menu") || !strcmp(evn->menuName.data, "RaceSex Menu") ||
-				!strcmp(evn->menuName.data, "Main Menu")))
+				 !strcmp(evn->menuName.data, "Main Menu")))
 			{
 				_VMESSAGE("FreezeHandler: %s opening, calling suspend(true)", evn->menuName.data);
 				SkyrimPhysicsWorld::get()->suspend(true);

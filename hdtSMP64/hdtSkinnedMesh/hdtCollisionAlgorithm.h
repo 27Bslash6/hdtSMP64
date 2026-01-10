@@ -9,8 +9,8 @@ namespace hdt
 		btVector3 posA;
 		btVector3 posB;
 		btVector3 normOnB;
-		Collider* colliderA;
-		Collider* colliderB;
+		size_t colliderIndexA; // Index into shape's m_colliders (not pointer - avoids stale pointer bugs)
+		size_t colliderIndexB; // Index into shape's m_colliders (not pointer - avoids stale pointer bugs)
 		float depth;
 	};
 

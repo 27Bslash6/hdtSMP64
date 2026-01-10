@@ -108,18 +108,16 @@ namespace hdt
 
 		bool addResult(const CollisionResult& res)
 		{
-			// DIAGNOSTIC: Validate pointers BEFORE storing
+			// DIAGNOSTIC: Validate indices BEFORE storing
 			{
-				bool validA = res.colliderA >= colliderBaseA &&
-							  res.colliderA < colliderBaseA + shapeA->m_colliders.size();
-				bool validB = res.colliderB >= colliderBaseB &&
-							  res.colliderB < colliderBaseB + shapeB->m_colliders.size();
+				bool validA = res.colliderIndexA < shapeA->m_colliders.size();
+				bool validB = res.colliderIndexB < shapeB->m_colliders.size();
 				if (!validA || !validB) {
 					static thread_local int errCount = 0;
 					if (errCount++ < 3) {
-						_ERROR("addResult[NoSwap]: INVALID ptr! A=%p valid=[%p,%p) ok=%d  B=%p valid=[%p,%p) ok=%d",
-							   res.colliderA, colliderBaseA, colliderBaseA + shapeA->m_colliders.size(), validA,
-							   res.colliderB, colliderBaseB, colliderBaseB + shapeB->m_colliders.size(), validB);
+						_ERROR("addResult[NoSwap]: INVALID index! indexA=%zu max=%zu ok=%d  indexB=%zu max=%zu ok=%d",
+							   res.colliderIndexA, shapeA->m_colliders.size(), validA, res.colliderIndexB,
+							   shapeB->m_colliders.size(), validB);
 					}
 				}
 			}
@@ -141,21 +139,19 @@ namespace hdt
 
 		bool addResult(const CollisionResult& res)
 		{
-			// DIAGNOSTIC: Validate pointers BEFORE storing (note: we swap A<->B)
-			// res.colliderA is from shapeA, res.colliderB is from shapeB
-			// After swap: stored colliderA = res.colliderB (from shapeB)
-			//             stored colliderB = res.colliderA (from shapeA)
+			// DIAGNOSTIC: Validate indices BEFORE storing (note: we swap A<->B)
+			// res.colliderIndexA is from shapeA, res.colliderIndexB is from shapeB
+			// After swap: stored colliderIndexA = res.colliderIndexB (from shapeB)
+			//             stored colliderIndexB = res.colliderIndexA (from shapeA)
 			{
-				bool validA = res.colliderA >= colliderBaseA &&
-							  res.colliderA < colliderBaseA + shapeA->m_colliders.size();
-				bool validB = res.colliderB >= colliderBaseB &&
-							  res.colliderB < colliderBaseB + shapeB->m_colliders.size();
+				bool validA = res.colliderIndexA < shapeA->m_colliders.size();
+				bool validB = res.colliderIndexB < shapeB->m_colliders.size();
 				if (!validA || !validB) {
 					static thread_local int errCount = 0;
 					if (errCount++ < 3) {
-						_ERROR("addResult[Swap]: INVALID ptr! resA=%p valid=[%p,%p) ok=%d  resB=%p valid=[%p,%p) ok=%d",
-							   res.colliderA, colliderBaseA, colliderBaseA + shapeA->m_colliders.size(), validA,
-							   res.colliderB, colliderBaseB, colliderBaseB + shapeB->m_colliders.size(), validB);
+						_ERROR("addResult[Swap]: INVALID index! indexA=%zu max=%zu ok=%d  indexB=%zu max=%zu ok=%d",
+							   res.colliderIndexA, shapeA->m_colliders.size(), validA, res.colliderIndexB,
+							   shapeB->m_colliders.size(), validB);
 					}
 				}
 			}
@@ -163,8 +159,8 @@ namespace hdt
 			if (p < SkinnedMeshAlgorithm::MaxCollisionCount) {
 				results[p].posA = res.posB;
 				results[p].posB = res.posA;
-				results[p].colliderA = res.colliderB;
-				results[p].colliderB = res.colliderA;
+				results[p].colliderIndexA = res.colliderIndexB;
+				results[p].colliderIndexB = res.colliderIndexA;
 				results[p].normOnB = -res.normOnB;
 				results[p].depth = res.depth;
 				return true;
@@ -193,8 +189,9 @@ namespace hdt
 			auto r1 = s1.marginMultiplier() * sp1->margin;
 
 			auto ret = checkSphereSphere(s0.pos(), s1.pos(), r0, r1, res);
-			res.colliderA = a;
-			res.colliderB = b;
+			// Store indices instead of pointers to avoid stale pointer bugs
+			res.colliderIndexA = a - colliderBaseA;
+			res.colliderIndexB = b - colliderBaseB;
 			return ret;
 		}
 	};
@@ -313,8 +310,9 @@ namespace hdt
 			auto pointInTriangle = _mm_test_all_zeros(_mm_set_epi32(0, -1, -1, -1), _mm_castps_si128(aa));
 			// auto pointInTriangle = _mm_testz_ps(_mm_set_ps(0, -1, -1, -1), aa);
 
-			res.colliderA = a;
-			res.colliderB = b;
+			// Store indices instead of pointers to avoid stale pointer bugs
+			res.colliderIndexA = a - colliderBaseA;
+			res.colliderIndexB = b - colliderBaseB;
 			if (pointInTriangle) {
 				res.normOnB.set128(normal);
 				res.posA = s.pos() - res.normOnB * r;
@@ -352,8 +350,9 @@ namespace hdt
 			if (!tri.valid)
 				return false;
 			auto ret = checkSphereTriangle(s.pos(), r, tri, res);
-			res.colliderA = a;
-			res.colliderB = b;
+			// Store indices instead of pointers to avoid stale pointer bugs
+			res.colliderIndexA = a - colliderBaseA;
+			res.colliderIndexB = b - colliderBaseB;
 			return ret;
 		}
 	};
@@ -658,11 +657,11 @@ namespace hdt
 			return;
 		}
 
-		// Get valid collider ranges for pointer validation (outside loop - they don't change)
-		const Collider* aCollidersBegin = a->m_colliders.data();
-		const Collider* aCollidersEnd = aCollidersBegin + a->m_colliders.size();
-		const Collider* bCollidersBegin = b->m_colliders.data();
-		const Collider* bCollidersEnd = bCollidersBegin + b->m_colliders.size();
+		// Get valid collider bases and sizes for index validation (outside loop - they don't change)
+		const Collider* aCollidersBase = a->m_colliders.data();
+		const size_t aCollidersSize = a->m_colliders.size();
+		const Collider* bCollidersBase = b->m_colliders.data();
+		const size_t bCollidersSize = b->m_colliders.size();
 
 		for (int i = 0; i < count; ++i) {
 			auto& res = collision[i];
@@ -674,27 +673,25 @@ namespace hdt
 				break;
 #endif
 
-			// Validate collider pointers are within expected ranges
-			if (res.colliderA < aCollidersBegin || res.colliderA >= aCollidersEnd) {
-				ptrdiff_t offsetA =
-					reinterpret_cast<const char*>(res.colliderA) - reinterpret_cast<const char*>(aCollidersBegin);
-				_ERROR("doMerge: colliderA %p out of range [%p, %p) offset=%lld bytes - stale pointer! shapeA=%p "
-					   "ownerA=%s",
-					   res.colliderA, aCollidersBegin, aCollidersEnd, (long long)offsetA, a,
+			// Validate collider indices are within expected ranges
+			if (res.colliderIndexA >= aCollidersSize) {
+				_ERROR("doMerge: colliderIndexA %zu out of range [0, %zu) - invalid index! shapeA=%p ownerA=%s",
+					   res.colliderIndexA, aCollidersSize, a,
 					   (a->m_owner && a->m_owner->m_name()) ? a->m_owner->m_name()->cstr() : "null");
 				continue; // Skip this result instead of crashing
 			}
-			if (res.colliderB < bCollidersBegin || res.colliderB >= bCollidersEnd) {
-				ptrdiff_t offsetB =
-					reinterpret_cast<const char*>(res.colliderB) - reinterpret_cast<const char*>(bCollidersBegin);
-				_ERROR("doMerge: colliderB %p out of range [%p, %p) offset=%lld bytes - stale pointer! shapeB=%p "
-					   "ownerB=%s",
-					   res.colliderB, bCollidersBegin, bCollidersEnd, (long long)offsetB, b,
+			if (res.colliderIndexB >= bCollidersSize) {
+				_ERROR("doMerge: colliderIndexB %zu out of range [0, %zu) - invalid index! shapeB=%p ownerB=%s",
+					   res.colliderIndexB, bCollidersSize, b,
 					   (b->m_owner && b->m_owner->m_name()) ? b->m_owner->m_name()->cstr() : "null");
 				continue; // Skip this result instead of crashing
 			}
 
-			auto flexible = std::max(res.colliderA->flexible, res.colliderB->flexible);
+			// Compute actual pointers from indices - these are always valid after validation
+			const Collider* colliderA = aCollidersBase + res.colliderIndexA;
+			const Collider* colliderB = bCollidersBase + res.colliderIndexB;
+
+			auto flexible = std::max(colliderA->flexible, colliderB->flexible);
 #ifdef CUDA
 			if (flexible < FLT_EPSILON)
 				continue;
@@ -704,14 +701,14 @@ namespace hdt
 #endif
 
 			for (int ib = 0; ib < a->getBonePerCollider(); ++ib) {
-				auto w0 = a->getColliderBoneWeight(res.colliderA, ib);
-				int boneIdx0 = a->getColliderBoneIndex(res.colliderA, ib);
+				auto w0 = a->getColliderBoneWeight(colliderA, ib);
+				int boneIdx0 = a->getColliderBoneIndex(colliderA, ib);
 				if (w0 <= a->m_owner->m_skinnedBones[boneIdx0].weightThreshold)
 					continue;
 
 				for (int jb = 0; jb < b->getBonePerCollider(); ++jb) {
-					auto w1 = b->getColliderBoneWeight(res.colliderB, jb);
-					int boneIdx1 = b->getColliderBoneIndex(res.colliderB, jb);
+					auto w1 = b->getColliderBoneWeight(colliderB, jb);
+					int boneIdx1 = b->getColliderBoneIndex(colliderB, jb);
 					if (w1 <= b->m_owner->m_skinnedBones[boneIdx1].weightThreshold)
 						continue;
 
