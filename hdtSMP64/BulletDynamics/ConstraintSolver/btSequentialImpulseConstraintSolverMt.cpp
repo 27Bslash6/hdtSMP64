@@ -865,12 +865,25 @@ btScalar btSequentialImpulseConstraintSolverMt::solveGroupCacheFriendlySetup(
 
 	m_numFrictionDirections = (infoGlobal.m_solverMode & SOLVER_USE_2_FRICTION_DIRECTIONS) ? 2 : 1;
 	m_useBatching = false;
-	if (numManifolds >= s_minimumContactManifoldsForBatching &&
-		(s_allowNestedParallelForLoops || !btThreadsAreRunning()))
+	// Batching enables btParallelFor inside convertJoints/convertContacts
+	// Requires: enough manifolds AND (nested parallelism allowed OR not already threading)
+	bool hasEnoughManifolds = numManifolds >= s_minimumContactManifoldsForBatching;
+	bool canNest = s_allowNestedParallelForLoops || !btThreadsAreRunning();
+	if (hasEnoughManifolds && canNest)
 	{
 		m_useBatching = true;
 		m_batchedContactConstraints.m_debugDrawer = debugDrawer;
 		m_batchedJointConstraints.m_debugDrawer = debugDrawer;
+	}
+	// DEBUG: Log batching decision (every ~2 seconds at 60fps)
+	static int s_batchingLogCounter = 0;
+	if (++s_batchingLogCounter % 120 == 0) {
+		_MESSAGE("[SOLVER-MT] Batching=%s (manifolds=%d>=%d? %s, nested=%s, threadsRunning=%s)",
+			m_useBatching ? "ON" : "OFF",
+			numManifolds, s_minimumContactManifoldsForBatching,
+			hasEnoughManifolds ? "yes" : "no",
+			s_allowNestedParallelForLoops ? "allowed" : "blocked",
+			btThreadsAreRunning() ? "yes" : "no");
 	}
 	btSequentialImpulseConstraintSolver::solveGroupCacheFriendlySetup(bodies,
 																	  numBodies,

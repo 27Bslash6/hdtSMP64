@@ -23,6 +23,10 @@ namespace hdt
 	{
 		btSetTaskScheduler(btGetPPLTaskScheduler());
 
+		// Enable nested parallelism for Mt solver - allows btParallelFor inside convertJoints
+		// even when outer threading is running. PPL handles nested parallelism well.
+		btSequentialImpulseConstraintSolverMt::s_allowNestedParallelForLoops = true;
+
 		m_windSpeed = _mm_setzero_ps();
 
 		auto collisionConfiguration = new btDefaultCollisionConfiguration;
@@ -332,12 +336,18 @@ namespace hdt
 		dispatchInfo.m_stepCount = 0;
 		dispatchInfo.m_debugDraw = getDebugDrawer();
 
-		createPredictiveContacts(timeStep);
+		{
+			HDT_ZONE_SCOPED_N("CreatePredictiveContacts");
+			createPredictiveContacts(timeStep);
+		}
 
 		// Collision detection (launches new GPU work)
 		performDiscreteCollisionDetection();
 
-		calculateSimulationIslands();
+		{
+			HDT_ZONE_SCOPED_N("CalculateSimulationIslands");
+			calculateSimulationIslands();
+		}
 
 		getSolverInfo().m_timeStep = timeStep;
 
@@ -347,8 +357,14 @@ namespace hdt
 		// Integrate transforms
 		integrateTransforms(timeStep);
 
-		updateActions(timeStep);
-		updateActivationState(timeStep);
+		{
+			HDT_ZONE_SCOPED_N("UpdateActions");
+			updateActions(timeStep);
+		}
+		{
+			HDT_ZONE_SCOPED_N("UpdateActivationState");
+			updateActivationState(timeStep);
+		}
 #else
 		// Non-CUDA path: Sequential execution
 		{
