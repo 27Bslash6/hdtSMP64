@@ -1,6 +1,11 @@
 # Task Graph Architecture for Physics Pipeline
 
-## Status: RESEARCH COMPLETE / IMPLEMENTATION PROPOSED
+## Status: DECISION MADE - enkiTS Full Replacement
+
+> **UPDATE:** Expert panel review concluded that adding a second task scheduler
+> (Taskflow or enkiTS) alongside PPL causes thread over-subscription.
+> The approved solution is **full replacement of PPL with enkiTS**.
+> See [enkits-replacement-plan.md](enkits-replacement-plan.md) for implementation details.
 
 ## Problem Statement
 
@@ -214,11 +219,17 @@ Primary savings from overlapping:
 
 ## Recommendation
 
-**Start with Taskflow** for Phase 1:
-- Header-only = zero build system changes
-- DAG model matches our dependency structure
-- Can coexist with existing PPL usage
-- Easy to visualize and debug task graphs
+**REJECTED: Taskflow** - Expert panel found:
+1. Thread over-subscription when mixed with PPL (2N threads for N cores)
+2. YAGNI - DAG features unused for simple parallel+barrier pattern
+3. Can't coexist with PPL without replacing all PPL usage
+
+**APPROVED: Full enkiTS replacement** - See [enkits-replacement-plan.md](enkits-replacement-plan.md)
+- Replaces ALL PPL usage (18 call sites, 12 files)
+- Single thread pool = no over-subscription
+- Lower overhead (0.5-1μs vs 2-5μs per task)
+- Game-proven (Doom, Doom Eternal, Rage 2, Saints Row)
+- 2-3 days implementation effort
 
 ## Files to Modify
 
