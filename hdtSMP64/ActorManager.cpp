@@ -147,7 +147,7 @@ namespace hdt
 		}
 
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		if (m_shutdown)
+		if (m_shutdown.load(std::memory_order_acquire))
 			return;
 
 		_DMESSAGE("ArmorAttachEvent: skeleton=%p, hasAttached=%d, armorModel=%s", e.skeleton, e.hasAttached,
@@ -185,7 +185,7 @@ namespace hdt
 			return;
 
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		if (m_shutdown)
+		if (m_shutdown.load(std::memory_order_acquire))
 			return;
 
 		fixArmorNameMaps();
@@ -215,7 +215,7 @@ namespace hdt
 	{
 		// The ActorManager members are protected from parallel events by ActorManager.m_lock.
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		if (m_shutdown)
+		if (m_shutdown.load(std::memory_order_acquire))
 			return;
 
 		_DMESSAGE("Processing MenuOpenCloseEvent.");
@@ -281,7 +281,7 @@ namespace hdt
 	// the events.
 	void ActorManager::setSkeletonsActive(const bool updateMetrics)
 	{
-		if (m_shutdown)
+		if (m_shutdown.load(std::memory_order_acquire))
 			return;
 
 		// We get the player character and its cell.
@@ -347,10 +347,10 @@ namespace hdt
 				// check wind obstructions
 				const auto world = SkyrimPhysicsWorld::get();
 				const auto wind = getWindDirection();
-				if (world->m_enableWind && wind && !(btFuzzyZero(hdt::magnitude(*wind)))) {
+				if (world->m_enableWind && !(btFuzzyZero(hdt::magnitude(wind)))) {
 					const auto owner = DYNAMIC_CAST(i.skeletonOwner.get(), TESForm, Actor);
 					if (owner) {
-						auto windray = *wind * -1; // reverse wind raycast to find obstruction
+						auto windray = wind * -1; // reverse wind raycast to find obstruction
 						NiPoint3 hitLocation;
 						// Raycast for object in direction of wind
 						const auto object = Actor_CalculateLOS(owner, &windray, &hitLocation, 6.28);
@@ -361,10 +361,12 @@ namespace hdt
 							// wind is a linear reduction, with a minimum floor since objects may have a minimum
 							// distance windfactor = 0 when dist <= m_distanceForNoWind, = 1 when dist >=
 							// m_distanceForMaxWind, and is linear with dist between these 2 values.
+							// BUG-NEW-007: Guard against division by zero when distances are equal
+							const float denominator = world->m_distanceForMaxWind - world->m_distanceForNoWind;
 							const auto windFactor =
-								std::clamp((dist - world->m_distanceForNoWind) /
-											   (world->m_distanceForMaxWind - world->m_distanceForNoWind),
-										   0.f, 1.f);
+								(denominator > 0.0001f)
+									? std::clamp((dist - world->m_distanceForNoWind) / denominator, 0.f, 1.f)
+									: 0.f; // Default to no wind if config is invalid
 							const auto windDelta = std::abs(windFactor - i.getWindFactor());
 							if (!btFuzzyZero(windDelta)) {
 								// Only log significant changes (>10%) to reduce spam
@@ -499,7 +501,7 @@ namespace hdt
 
 	void ActorManager::onEvent(const ShutdownEvent&)
 	{
-		m_shutdown = true;
+		m_shutdown.store(true, std::memory_order_release);
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 
 		m_skeletons.clear();
@@ -513,7 +515,7 @@ namespace hdt
 			return;
 
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		if (m_shutdown)
+		if (m_shutdown.load(std::memory_order_acquire))
 			return;
 
 		fixArmorNameMaps();
@@ -554,7 +556,7 @@ namespace hdt
 			return;
 
 		std::lock_guard<decltype(m_lock)> l(m_lock);
-		if (m_shutdown)
+		if (m_shutdown.load(std::memory_order_acquire))
 			return;
 
 		fixArmorNameMaps();
@@ -936,7 +938,7 @@ namespace hdt
 				if (headPart.state() != ItemState::e_NoPhysics)
 					hasPhysics = true;
 			});
-		_DMESSAGE("%s isDrawn %d: %d", name(), hasPhysics);
+		_DMESSAGE("%s hasPhysics: %d", name(), hasPhysics);
 
 		return hasPhysics;
 	}

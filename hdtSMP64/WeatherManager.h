@@ -67,6 +67,6 @@ namespace hdt
 	size_t randomGenerator(size_t min, size_t max);
 	void WeatherCheck();
 
-	NiPoint3* getWindDirection();
+	NiPoint3 getWindDirection();
 
 } // namespace hdt

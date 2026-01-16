@@ -10,6 +10,7 @@
 #include "Offsets.h"
 #include "skse64/PapyrusActor.h"
 
+#include <atomic>
 #include <mutex>
 #include <optional>
 
@@ -175,7 +176,7 @@ namespace hdt
 			std::vector<Armor> armors;
 		};
 
-		bool m_shutdown = false;
+		std::atomic<bool> m_shutdown{false};
 		std::recursive_mutex m_lock;
 		std::vector<Skeleton> m_skeletons;
 

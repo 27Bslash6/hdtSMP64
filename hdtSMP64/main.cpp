@@ -30,6 +30,7 @@
 #endif
 
 #include "hdtLog.h"
+#include "hdtSaveNameValidator.h"
 
 #include "BuildInfo.h"
 #include "WeatherManager.h"
@@ -676,7 +677,7 @@ namespace hdt
 		}
 
 		if (_strnicmp(buffer, "QueryOverride", MAX_PATH) == 0) {
-			Console_Print(hdt::Override::OverrideManager::GetSingleton()->queryOverrideData().c_str());
+			Console_Print("%s", hdt::Override::OverrideManager::GetSingleton()->queryOverrideData().c_str());
 			return true;
 		}
 
@@ -894,6 +895,12 @@ namespace hdt
 					auto data = hdt::Override::OverrideManager::GetSingleton()->Serialize();
 					if (!data.str().empty()) {
 						std::string save_name = reinterpret_cast<char*>(msg->data);
+						// SEC-001: Validate save name to prevent path traversal (CWE-22)
+						if (!hdt::security::isValidSaveName(save_name)) {
+							_WARNING("HDT-SMP: Invalid save name rejected (potential path traversal): %s",
+									 save_name.c_str());
+							return;
+						}
 						std::ofstream ofs(OVERRIDE_SAVE_PATH + save_name + ".dhdt", std::ios::out);
 						if (ofs && ofs.is_open())
 							ofs << data.str();
@@ -908,6 +915,13 @@ namespace hdt
 
 					std::string save_name = reinterpret_cast<char*>(msg->data);
 					save_name = save_name.substr(0, save_name.find_last_of("."));
+
+					// SEC-001: Validate save name to prevent path traversal (CWE-22)
+					if (!hdt::security::isValidSaveName(save_name)) {
+						_WARNING("HDT-SMP: Invalid save name rejected (potential path traversal): %s",
+								 save_name.c_str());
+						return;
+					}
 
 					std::ifstream ifs(OVERRIDE_SAVE_PATH + save_name + ".dhdt", std::ios::in);
 					if (ifs && ifs.is_open()) {

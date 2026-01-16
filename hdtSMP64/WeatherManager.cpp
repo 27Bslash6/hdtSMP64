@@ -1,9 +1,13 @@
 #include "WeatherManager.h"
+
+#include <mutex>
+
 using namespace hdt;
 
 
 Sky** g_SkyPtr = nullptr;
-NiPoint3 precipDirection{0.f, 0.f, 0.f};
+static std::mutex g_windMutex;
+static NiPoint3 precipDirection{0.f, 0.f, 0.f};
 std::vector<UInt32> notExteriorWorlds = {0x69857, 0x1EE62, 0x20DCB, 0x1FAE2, 0x34240, 0x50015, 0x2C965,
 										 0x29AB7, 0x4F838, 0x3A9D6, 0x243DE, 0xC97EB, 0xC350D, 0x1CDD3,
 										 0x1CDD9, 0x21EDB, 0x1E49D, 0x2B101, 0x2A9D8, 0x20BFE};
@@ -122,9 +126,9 @@ void hdt::WeatherCheck()
 
 		const auto skyPtr = *g_SkyPtr;
 		if (skyPtr) {
-			// Wind Detection
+			// Wind Detection - compute locally, then update global under lock
 			const float range = (randomGeneratorLowMoreProbable(0, 5, 6, 50, 10) / 10.0f);
-			precipDirection = NiPoint3{0.f, 1.f, 0.f};
+			NiPoint3 localWindDir{0.f, 1.f, 0.f};
 			if (skyPtr->currentWeather) {
 				_DMESSAGE("Wind Speed: %2.2g, Wind Direction: %2.2g, Weather Wind Speed: %2.2g WindDir:%2.2g "
 						  "WindDirRange:%2.2g",
@@ -136,17 +140,21 @@ void hdt::WeatherCheck()
 				// CK.
 				const float theta = (((skyPtr->currentWeather->general.windDirection) * 180.0f) / 256.0f) - 90.f +
 									randomGenerator(-range, range);
-				precipDirection = rotate(precipDirection, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
-				world->setWind(&precipDirection, world->m_windStrength * scaleSkyrim * skyPtr->windSpeed);
+				localWindDir = rotate(localWindDir, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
 			}
 			else {
 				_DMESSAGE("Wind Speed: %2.2g, Wind Direction: %2.2g", skyPtr->windSpeed, skyPtr->windDirection);
 				// use sky wind info
 				const float theta =
 					(((skyPtr->windDirection) * 180.0f) / 256.0f) - 90.f + (randomGenerator(0, 2 * range) - range);
-				precipDirection = rotate(precipDirection, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
-				world->setWind(&precipDirection, world->m_windStrength * scaleSkyrim * skyPtr->windSpeed);
+				localWindDir = rotate(localWindDir, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
 			}
+			// Update global state under lock
+			{
+				std::lock_guard<std::mutex> lock(g_windMutex);
+				precipDirection = localWindDir;
+			}
+			world->setWind(&localWindDir, world->m_windStrength * scaleSkyrim * skyPtr->windSpeed);
 			Sleep(500);
 		}
 		else {
@@ -157,7 +165,8 @@ void hdt::WeatherCheck()
 	}
 }
 
-NiPoint3* hdt::getWindDirection()
+NiPoint3 hdt::getWindDirection()
 {
-	return &precipDirection;
+	std::lock_guard<std::mutex> lock(g_windMutex);
+	return precipDirection;
 }
