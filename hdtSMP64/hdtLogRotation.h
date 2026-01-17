@@ -82,8 +82,16 @@ namespace hdt
 				}
 
 				// Generate rotated filename with timestamp
+				// Timestamp has second precision, so add numeric suffix if collision occurs
 				std::string timestamp = getTimestamp();
 				std::filesystem::path rotatedLog = logsDir / ("hdtSMP64_" + timestamp + ".log");
+
+				// Find unique filename if collision (multiple rotations within same second)
+				int suffix = 1;
+				while (std::filesystem::exists(rotatedLog)) {
+					rotatedLog = logsDir / ("hdtSMP64_" + timestamp + "_" + std::to_string(suffix) + ".log");
+					++suffix;
+				}
 
 				// Move current log to subdirectory
 				std::filesystem::rename(currentLog, rotatedLog);

@@ -782,13 +782,19 @@ namespace hdt
 		std::weak_ptr<CudaBody> weak0 = body0->m_cudaObject;
 		std::weak_ptr<CudaBody> weak1 = body1->m_cudaObject;
 
+		// Capture bodies via Ref<> to extend lifetime and prevent dangling pointers
+		// Ref<> calls retain() on construction and release() on destruction
+		Ref<SkinnedMeshBody> safeBody0 = body0;
+		Ref<SkinnedMeshBody> safeBody1 = body1;
+
 		return [=]() {
 			// Lock weak_ptrs ONCE and pass the locked shared_ptrs to apply()
 			// This avoids TOCTOU race where body->m_cudaObject could change between lock and use
 			auto cuda0 = weak0.lock();
 			auto cuda1 = weak1.lock();
 			if (cuda0 && cuda1) {
-				cudaMerge->apply(body0, body1, cuda0, cuda1, dispatcher);
+				// Ref<T> has implicit conversion to T*, so safeBody0/1 work as raw pointers
+				cudaMerge->apply(safeBody0, safeBody1, cuda0, cuda1, dispatcher);
 			}
 		};
 	}

@@ -86,6 +86,12 @@ namespace hdt::logging
 				startBackgroundThread();
 			}
 
+			// Fallback: if thread failed to start, write synchronously
+			if (!m_threadStarted.load(std::memory_order_acquire)) {
+				writeSynchronized(message, alsoConsole);
+				return;
+			}
+
 			{
 				std::lock_guard<std::mutex> lock(m_queueMutex);
 				m_messageQueue.emplace_back(message, alsoConsole);
@@ -94,11 +100,7 @@ namespace hdt::logging
 		}
 
 		// For fatal errors - write immediately and synchronously
-		void writeImmediate(const std::string& message)
-		{
-			gLog.Message(message.c_str());
-			printf("%s\n", message.c_str());
-		}
+		void writeImmediate(const std::string& message) { writeSynchronized(message, true); }
 
 		void shutdown()
 		{
@@ -112,9 +114,19 @@ namespace hdt::logging
 		}
 
 	private:
-		AsyncLogger() : m_running(false) {}
+		AsyncLogger() : m_running(false), m_threadStarted(false) {}
 
 		~AsyncLogger() { shutdown(); }
+
+		// Synchronized log write - serializes all direct log/printf calls
+		void writeSynchronized(const std::string& message, bool alsoConsole)
+		{
+			std::lock_guard<std::mutex> lock(m_logMutex);
+			gLog.Message(message.c_str());
+			if (alsoConsole) {
+				printf("%s\n", message.c_str());
+			}
+		}
 
 		void startBackgroundThread()
 		{
@@ -122,7 +134,15 @@ namespace hdt::logging
 			if (!m_running.compare_exchange_strong(expected, true))
 				return; // Already started
 
-			m_backgroundThread = std::thread([this]() { backgroundWorker(); });
+			try {
+				m_backgroundThread = std::thread([this]() { backgroundWorker(); });
+				m_threadStarted.store(true, std::memory_order_release);
+			}
+			catch (...) {
+				// Thread construction failed - reset running flag
+				m_running.store(false, std::memory_order_release);
+				// m_threadStarted remains false, enqueue() will use fallback
+			}
 		}
 
 		void backgroundWorker()
@@ -142,12 +162,9 @@ namespace hdt::logging
 					}
 				}
 
-				// Write batch outside lock
+				// Write batch outside queue lock, but with log mutex
 				for (const auto& [msg, alsoConsole] : localBatch) {
-					gLog.Message(msg.c_str());
-					if (alsoConsole) {
-						printf("%s\n", msg.c_str());
-					}
+					writeSynchronized(msg, alsoConsole);
 				}
 				localBatch.clear();
 			}
@@ -157,19 +174,18 @@ namespace hdt::logging
 		{
 			std::lock_guard<std::mutex> lock(m_queueMutex);
 			for (const auto& [msg, alsoConsole] : m_messageQueue) {
-				gLog.Message(msg.c_str());
-				if (alsoConsole) {
-					printf("%s\n", msg.c_str());
-				}
+				writeSynchronized(msg, alsoConsole);
 			}
 			m_messageQueue.clear();
 		}
 
 		std::mutex m_queueMutex;
+		std::mutex m_logMutex; // Serializes all gLog.Message/printf calls
 		std::condition_variable m_queueCV;
 		std::vector<std::pair<std::string, bool>> m_messageQueue;
 		std::thread m_backgroundThread;
 		std::atomic<bool> m_running;
+		std::atomic<bool> m_threadStarted; // True only after thread successfully started
 	};
 
 	// Fast inline check - avoids function call overhead when logging is disabled
