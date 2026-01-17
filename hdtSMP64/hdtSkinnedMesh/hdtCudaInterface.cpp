@@ -1484,7 +1484,7 @@ namespace hdt
 		// Get write buffer for this frame's collision results
 		auto& writeBuffer = m_pendingResults[writeIndex()];
 
-		// Clear write buffer - it was last written 3 frames ago and cleared by applyResults,
+		// Clear write buffer - it was read and cleared last frame by applyResults,
 		// but clear again for safety during bootstrap or edge cases
 		writeBuffer.clear();
 
@@ -1578,9 +1578,9 @@ namespace hdt
 
 	void BatchedCollisionManager::swapResultBuffers()
 	{
-		// Advance frame count - this drives the triple buffer rotation:
-		//   writeIndex = m_frameCount % 3
-		//   readIndex = (m_frameCount + 2) % 3  (1 frame behind)
+		// Advance frame count - this drives the double buffer ping-pong:
+		//   writeIndex = m_frameCount & 1
+		//   readIndex = (m_frameCount + 1) & 1  (1 frame behind)
 		_DMESSAGE("[CUDA-PIPE] swapResultBuffers: frame %d -> %d", m_frameCount, m_frameCount + 1);
 		m_frameCount++;
 	}
@@ -1598,8 +1598,8 @@ namespace hdt
 		// DIAGNOSTIC: Track pending results buffer sizes
 		static int s_applyCounter = 0;
 		if (++s_applyCounter % 120 == 0) { // Every ~2 seconds
-			_MESSAGE("[CUDA-DIAG] Frame %d: pendingResults[0]=%zu, [1]=%zu, [2]=%zu, ridx=%d, widx=%d", m_frameCount,
-					 m_pendingResults[0].size(), m_pendingResults[1].size(), m_pendingResults[2].size(), ridx, widx);
+			_MESSAGE("[CUDA-DIAG] Frame %d: pendingResults[0]=%zu, [1]=%zu, ridx=%d, widx=%d", m_frameCount,
+					 m_pendingResults[0].size(), m_pendingResults[1].size(), ridx, widx);
 		}
 
 		// Need at least 1 frame to have data in read buffer
@@ -1642,8 +1642,8 @@ namespace hdt
 		// Hold mutex while modifying pending results
 		std::lock_guard<std::mutex> lock(m_resultsMutex);
 
-		// Remove from ALL 3 buffers (body might have results in any stage of pipeline)
-		for (int i = 0; i < 3; ++i) {
+		// Remove from both buffers (body might have results in either stage of pipeline)
+		for (int i = 0; i < 2; ++i) {
 			auto& buffer = m_pendingResults[i];
 			auto it = std::remove_if(buffer.begin(), buffer.end(), [body](const PendingCollisionResult& r) {
 				return r.body0 == body || r.body1 == body;

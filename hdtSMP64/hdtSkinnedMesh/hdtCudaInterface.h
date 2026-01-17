@@ -241,11 +241,11 @@ namespace hdt
 		int frameCount() const { return m_frameCount; }
 
 	private:
-		// Buffer index helpers for 1-frame latency with 3 buffers
-		// Frame N: write to buffer N%3, read from buffer (N+2)%3 (which is N-1 in time)
+		// Buffer index helpers for 1-frame latency double buffer (ping-pong)
+		// Frame N: write to buffer N&1, read from buffer (N+1)&1 (previous frame's data)
 		// 1-frame latency requires sync but avoids physics instability from stale data
-		int writeIndex() const { return m_frameCount % 3; }
-		int readIndex() const { return (m_frameCount + 2) % 3; } // 1 frame behind write
+		int writeIndex() const { return m_frameCount & 1; }
+		int readIndex() const { return (m_frameCount + 1) & 1; } // 1 frame behind write
 
 		// Accumulate a VV pair into thread-local batch
 		void accumulateVV(SkinnedMeshBody* body0, SkinnedMeshBody* body1, bool swapped);
@@ -274,19 +274,18 @@ namespace hdt
 		size_t m_lastFramePairCount = 0;
 
 		//======================================================================
-		// 1-FRAME LATENCY TRIPLE BUFFER WITH STORED TRANSFORMS
-		// 3 buffers for clean separation:
-		//   - Buffer (N % 3): being written by GPU this frame
-		//   - Buffer ((N+2) % 3): previous frame's data, read after sync
-		//   - Buffer ((N+1) % 3): 2 frames old, already processed, can be reused
+		// 1-FRAME LATENCY DOUBLE BUFFER WITH STORED TRANSFORMS
+		// 2 buffers for ping-pong operation:
+		//   - Buffer (N & 1): being written by GPU this frame
+		//   - Buffer ((N+1) & 1): previous frame's data, read after sync
 		//
 		// Bone transforms are stored in CudaMergeBuffer at collision time.
 		// When applying results 1 frame later, we use stored transforms
 		// for local coordinate conversion (not current transforms).
 		// Sync at frame start ensures GPU is done before reading.
 		//======================================================================
-		std::vector<PendingCollisionResult> m_pendingResults[3];
-		void* m_completionEvents[3]; // cudaEvent_t (reserved for future optimization)
+		std::vector<PendingCollisionResult> m_pendingResults[2];
+		void* m_completionEvents[2]; // cudaEvent_t (reserved for future optimization)
 		int m_frameCount = 0;		 // Frames since start (for buffer index)
 		bool m_eventsInitialized = false;
 	};

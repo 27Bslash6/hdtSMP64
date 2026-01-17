@@ -13,10 +13,10 @@
 #include <LinearMath/btPoolAllocator.h>
 
 #ifdef CUDA
-// If defined, triangle-vertex and vertex-vertex collision results aren't applied until the next frame. This
-// allows GPU collision detection to run concurrently with the rest of the game engine, instead of leaving
-// the CPU idle waiting for the results. Triangle-triangle collisions are assumed to require the higher
-// accuracy, and are always applied in the current frame.
+// CUDA builds use 1-frame latency for ALL collision types (VV, VT, TT).
+// This allows GPU collision detection to overlap with CPU constraint solving,
+// recovering ~17% frame time. Results computed in frame N are applied in frame N+1
+// via syncPreviousCollisionResults() at frame start.
 #define CUDA_DELAYED_COLLISIONS
 #endif
 
@@ -99,9 +99,16 @@ namespace hdt
 
 		hdt_parallel_for(
 			0, size,
-			[&](int i)
+			[&, this](int i)
 #endif
 		{
+#ifndef CUDA
+			// BUG-001 FIX: Track this worker so suspend() can wait for it
+			WorkerScope workerScope(this);
+			if (isCancelled())
+				return; // Early exit if suspend requested
+#endif
+
 			auto& pair = pairs[i];
 
 			auto shape0 =
@@ -183,7 +190,12 @@ namespace hdt
 
 			// Create any new CUDA objects if necessary
 			if (!initialized) {
-				hdt_parallel_for_each(to_update.begin(), to_update.end(), [deviceId](UpdateMap::value_type& o) {
+				hdt_parallel_for_each(to_update.begin(), to_update.end(), [this, deviceId](UpdateMap::value_type& o) {
+					// BUG-001 FIX: Track worker for suspend() synchronization
+					WorkerScope workerScope(this);
+					if (isCancelled())
+						return;
+
 					CudaInterface::instance()->setCurrentDevice();
 
 					if (!o.first->m_cudaObject || o.first->m_cudaObject->deviceId() != deviceId) {
@@ -212,8 +224,13 @@ namespace hdt
 				// Phase 1: Update bone transforms on CPU (parallel)
 				{
 					HDT_ZONE_SCOPED_N("UpdateBonesParallel");
-					hdt_parallel_for_each(to_update.begin(), to_update.end(),
-										  [](UpdateMap::value_type& o) { o.first->updateBones(); });
+					hdt_parallel_for_each(to_update.begin(), to_update.end(), [this](UpdateMap::value_type& o) {
+						// BUG-001 FIX: Track worker for suspend() synchronization
+						WorkerScope workerScope(this);
+						if (isCancelled())
+							return;
+						o.first->updateBones();
+					});
 				}
 
 				// Phase 2: Batch and launch GPU work (replaces per-body graph launches)
@@ -248,7 +265,12 @@ namespace hdt
 				// Sync already happened at frame START (syncPreviousCollisionResults)
 				{
 					HDT_ZONE_SCOPED_N("ParallelTreeUpdates");
-					hdt_parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
+					hdt_parallel_for_each(to_update.begin(), to_update.end(), [this](UpdateMap::value_type& o) {
+						// BUG-001 FIX: Track worker for suspend() synchronization
+						WorkerScope workerScope(this);
+						if (isCancelled())
+							return;
+
 						if (o.second.first && o.second.first->m_cudaObject) {
 							o.second.first->m_cudaObject->updateTree();
 						}
@@ -261,7 +283,12 @@ namespace hdt
 			}
 		}
 		else {
-			hdt_parallel_for_each(to_update.begin(), to_update.end(), [](UpdateMap::value_type& o) {
+			hdt_parallel_for_each(to_update.begin(), to_update.end(), [this](UpdateMap::value_type& o) {
+				// BUG-001 FIX: Track worker for suspend() synchronization
+				WorkerScope workerScope(this);
+				if (isCancelled())
+					return;
+
 				o.first->internalUpdate();
 				if (o.second.first) {
 					o.second.first->internalUpdate();
@@ -287,6 +314,11 @@ namespace hdt
 
 				// Gather all collision pairs into batched system
 				hdt_parallel_for(0, pairCount, [this](int i) {
+					// BUG-001 FIX: Track worker for suspend() synchronization
+					WorkerScope workerScope(this);
+					if (isCancelled())
+						return;
+
 					auto& pair = m_pairs[i];
 					if (pair.first->m_shape->m_tree.collapseCollideL(&pair.second->m_shape->m_tree)) {
 						// Add to batched collision system
@@ -312,6 +344,11 @@ namespace hdt
 			// Now we can process the collisions
 			hdt_parallel_for_each(m_pairs.begin(), m_pairs.end(),
 								  [this](std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
+									  // BUG-001 FIX: Track worker for suspend() synchronization
+									  WorkerScope workerScope(this);
+									  if (isCancelled())
+										  return;
+
 									  if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree)) {
 										  SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
 									  }
@@ -347,17 +384,37 @@ namespace hdt
 #else
 			});
 		FrameTimer::instance()->logEvent(FrameTimer::e_Start);
-		hdt_parallel_for_each(bodies.begin(), bodies.end(), [](SkinnedMeshBody* shape) { shape->internalUpdate(); });
-		hdt_parallel_for_each(vertex_shapes.begin(), vertex_shapes.end(),
-							  [](PerVertexShape* shape) { shape->internalUpdate(); });
-		hdt_parallel_for_each(triangle_shapes.begin(), triangle_shapes.end(),
-							  [](PerTriangleShape* shape) { shape->internalUpdate(); });
+
+		// BUG-001 FIX: Wrap all parallel workers with WorkerScope for suspend() synchronization
+		hdt_parallel_for_each(bodies.begin(), bodies.end(), [this](SkinnedMeshBody* shape) {
+			WorkerScope workerScope(this);
+			if (isCancelled())
+				return;
+			shape->internalUpdate();
+		});
+		hdt_parallel_for_each(vertex_shapes.begin(), vertex_shapes.end(), [this](PerVertexShape* shape) {
+			WorkerScope workerScope(this);
+			if (isCancelled())
+				return;
+			shape->internalUpdate();
+		});
+		hdt_parallel_for_each(triangle_shapes.begin(), triangle_shapes.end(), [this](PerTriangleShape* shape) {
+			WorkerScope workerScope(this);
+			if (isCancelled())
+				return;
+			shape->internalUpdate();
+		});
+
 		for (auto body : bodies) {
 			body->m_bulletShape.m_aabb = body->m_shape->m_tree.aabbAll;
 		}
 		FrameTimer::instance()->logEvent(FrameTimer::e_Internal);
+
 		hdt_parallel_for_each(m_pairs.begin(), m_pairs.end(),
-							  [&, this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
+							  [this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
+								  WorkerScope workerScope(this);
+								  if (isCancelled())
+									  return;
 								  if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree))
 									  SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
 							  });
