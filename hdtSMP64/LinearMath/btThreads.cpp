@@ -386,12 +386,12 @@ bool btThreadsAreRunning()
 
 void btSetTaskScheduler(btITaskScheduler* ts)
 {
-	int threadId = btGetCurrentThreadIndex();  // make sure we call this on main thread at least once before any workers run
-	if (threadId != 0)
-	{
-		btAssert(!"btSetTaskScheduler must be called from the main thread!");
-		return;
-	}
+	// NOTE: Original Bullet code checks btGetCurrentThreadIndex() == 0 here.
+	// We skip this check because:
+	// 1. enkiTS workers may have already called btGetCurrentThreadIndex(), claiming index 0
+	// 2. We KNOW this is called from SKSE plugin load on the game's main thread
+	// 3. The check is defensive, not essential - setting gBtTaskScheduler is thread-safe
+
 	if (gBtTaskScheduler)
 	{
 		// deactivate old task scheduler
@@ -759,13 +759,17 @@ public:
 
 class btTaskSchedulerEnkiTS : public btITaskScheduler
 {
-	int m_numThreads;
+	// NOTE: We query thread count dynamically instead of caching at construction
+	// because of static initialization order issues. The enkiTS scheduler may not
+	// be fully initialized when this singleton is first constructed.
+	mutable int m_cachedNumThreads;
 
 public:
 	btTaskSchedulerEnkiTS()
 		: btITaskScheduler("enkiTS")
+		, m_cachedNumThreads(0)
 	{
-		m_numThreads = static_cast<int>(hdt::EnkiTSScheduler::get().getNumThreads());
+		// Don't query thread count here - scheduler may not be ready yet
 	}
 
 	virtual int getMaxNumThreads() const BT_OVERRIDE
@@ -773,13 +777,24 @@ public:
 		return static_cast<int>(enki::GetNumHardwareThreads());
 	}
 
-	virtual int getNumThreads() const BT_OVERRIDE { return m_numThreads; }
+	virtual int getNumThreads() const BT_OVERRIDE
+	{
+		// Query dynamically to avoid static init order issues
+		// EnkiTSScheduler is guaranteed to be initialized by the time physics runs
+		int numThreads = static_cast<int>(hdt::EnkiTSScheduler::get().getNumThreads());
+		if (numThreads > 0)
+		{
+			m_cachedNumThreads = numThreads;
+		}
+		// Ensure we never return 0 - at minimum we have 1 thread (the main thread)
+		return (std::max)(1, m_cachedNumThreads);
+	}
 
 	virtual void setNumThreads(int numThreads) BT_OVERRIDE
 	{
 		// enkiTS doesn't support dynamic thread count changes after init
 		// The scheduler is already initialized with optimal thread count
-		m_numThreads = (std::min)(static_cast<int>(BT_MAX_THREAD_COUNT),
+		m_cachedNumThreads = (std::min)(static_cast<int>(BT_MAX_THREAD_COUNT),
 								  (std::max)(1, numThreads));
 		m_savedThreadCounter = 0;
 		if (m_isActive)

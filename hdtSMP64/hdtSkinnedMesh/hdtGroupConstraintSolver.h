@@ -1,140 +1,24 @@
 #pragma once
 
-#include "hdtSkinnedMeshSystem.h"
-
-#include <BulletDynamics/ConstraintSolver/btNNCGConstraintSolver.h>
 #include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h>
-#include <BulletDynamics/Dynamics/btDiscreteDynamicsWorldMt.h>
-#include <BulletDynamics/MLCPSolvers/btMLCPSolver.h>
-
-#include <mutex>
 
 namespace hdt
 {
-	struct SolverBodyMt
-	{
-	public:
-		SolverBodyMt();
-		~SolverBodyMt();
-
-		btSolverBody* m_body;
-
-		void lock() { m_lock.lock(); }
-		void unlock() { m_lock.unlock(); }
-
-		SolverBodyMt(const SolverBodyMt& rhs) : m_body(rhs.m_body) {}
-
-		SolverBodyMt& operator=(const SolverBodyMt& rhs)
-		{
-			m_body = rhs.m_body;
-			return *this;
-		}
-
-	private:
-		SpinLock m_lock;
-	};
-
-	class SolverTask
-	{
-	public:
-		SolverTask(SolverBodyMt* A, SolverBodyMt* B);
-
-		virtual ~SolverTask() {}
-
-		virtual void solve() = 0;
-
-	protected:
-		SolverBodyMt* m_bodyA;
-		SolverBodyMt* m_bodyB;
-		SolverBodyMt* m_lockOrderA;
-		SolverBodyMt* m_lockOrderB;
-	};
-
-	typedef std::shared_ptr<SolverTask> SolverTaskPtr;
-
-	class NonContactSolverTask : public SolverTask
-	{
-	public:
-		NonContactSolverTask(SolverBodyMt* A, SolverBodyMt* B, btSolverConstraint** begin, btSolverConstraint** end,
-							 btSingleConstraintRowSolver s);
-		void solve() override;
-
-	protected:
-		btSolverConstraint** m_begin;
-		btSolverConstraint** m_end;
-		btSingleConstraintRowSolver m_solver;
-	};
-
-	class ObsoleteSolverTask : public SolverTask
-	{
-	public:
-		ObsoleteSolverTask(SolverBodyMt* A, SolverBodyMt* B, btTypedConstraint* c, float t);
-		void solve() override;
-
-	protected:
-		float m_timeStep;
-		btTypedConstraint* m_constraint;
-	};
-
-	class ContactSolverTask : public SolverTask
-	{
-	public:
-		ContactSolverTask(SolverBodyMt* A, SolverBodyMt* B, btSolverConstraint* c, btSolverConstraint* f0,
-						  btSolverConstraint* f1, btSingleConstraintRowSolver sl, btSingleConstraintRowSolver s);
-		void solve() override;
-
-	protected:
-		btSolverConstraint* m_contact;
-		btSolverConstraint* m_friction0;
-		btSolverConstraint* m_friction1;
-
-		btSingleConstraintRowSolver m_solver;
-		btSingleConstraintRowSolver m_solverLowerLimit;
-	};
-
+	// Simplified GroupConstraintSolver - provides AVX-optimized constraint row solvers.
+	// The batched parallel solving is now handled by btSequentialImpulseConstraintSolverMt
+	// via btConstraintSolverPoolMt with s_minimumContactManifoldsForBatching = 8.
+	//
+	// The previous lock-based parallel solver (SolverBodyMt, SolverTask, etc.) was dead code
+	// that was never executed because btConstraintSolverPoolMt dispatches to its internal
+	// solver instances, not to this class's solveSingleIteration override.
 	class GroupConstraintSolver : public btSequentialImpulseConstraintSolverMt
 	{
 		typedef btSequentialImpulseConstraintSolverMt Base;
 
 	public:
-		GroupConstraintSolver::GroupConstraintSolver();
+		GroupConstraintSolver();
 
-		// Early conversion for parallel execution with collision detection.
-		// Call this BEFORE collision to convert bodies and joints.
-		// convertContacts will be called in solveGroupCacheFriendlySetup after collision.
-		void prepareEarlyConversion(btCollisionObject** bodies, int numBodies, btTypedConstraint** constraints,
-									int numConstraints, const btContactSolverInfo& infoGlobal);
-
-		btScalar solveSingleIteration(int iteration, btCollisionObject** bodies, int numBodies,
-									  btPersistentManifold** manifoldPtr, int numManifolds,
-									  btTypedConstraint** constraints, int numConstraints,
-									  const btContactSolverInfo& infoGlobal, btIDebugDraw* debugDrawer) override;
-		btScalar solveGroupCacheFriendlySetup(btCollisionObject** bodies, int numBodies,
-											  btPersistentManifold** manifoldPtr, int numManifolds,
-											  btTypedConstraint** constraints, int numConstraints,
-											  const btContactSolverInfo& infoGlobal,
-											  btIDebugDraw* debugDrawer) override;
-		btScalar solveGroupCacheFriendlyFinish(btCollisionObject** bodies, int numBodies,
-											   const btContactSolverInfo& infoGlobal) override;
-
-	protected:
-		// Overrides to skip if early conversion already done
-		void convertBodies(btCollisionObject** bodies, int numBodies, const btContactSolverInfo& infoGlobal) override;
-		void convertJoints(btTypedConstraint** constraints, int numConstraints,
-						   const btContactSolverInfo& infoGlobal) override;
-
-	public:
 		static btSingleConstraintRowSolver getResolveSingleConstraintRowGenericAVX();
 		static btSingleConstraintRowSolver getResolveSingleConstraintRowLowerLimitAVX();
-
-		std::vector<ConstraintGroup*> m_groups;
-		std::vector<SolverBodyMt> m_bodiesMt;
-		std::vector<btSolverConstraint*> m_nonContactConstraintRowPtrs;
-		std::vector<SolverTaskPtr> m_tasks;
-		std::vector<SolverTaskPtr> m_contactTasks;
-		std::vector<SolverTaskPtr> m_nonContactTasks;
-
-		// Early conversion state - set by prepareEarlyConversion, cleared by solveGroupCacheFriendlyFinish
-		bool m_earlyConversionDone = false;
 	};
 } // namespace hdt

@@ -13,7 +13,9 @@
 #endif
 
 #include "../../external/enkiTS/src/TaskScheduler.h"
+#include "../hdtPrefix.h" // For _MESSAGE logging
 #include "../hdtTracy.h"
+#include "../LinearMath/btThreads.h" // For btGetCurrentThreadIndex
 
 #include <atomic>
 #include <functional>
@@ -57,8 +59,30 @@ namespace hdt
 	private:
 		EnkiTSScheduler() : m_initialized(false) // Initialize first for safety
 		{
+			// CRITICAL: Register main thread index BEFORE enkiTS spawns workers.
+			// btGetCurrentThreadIndex() assigns indices sequentially - first caller gets 0.
+			// If worker threads call it first, main thread won't be index 0, and
+			// btSetTaskScheduler() will silently fail (it requires threadId == 0).
+			(void)btGetCurrentThreadIndex();
+
+			// Check hardware thread detection BEFORE initializing
+			uint32_t hwThreads = enki::GetNumHardwareThreads();
+
 			// Initialize with hardware thread count
 			m_scheduler.Initialize();
+
+			// Verify initialization succeeded
+			uint32_t taskThreads = m_scheduler.GetNumTaskThreads();
+
+			// Log the actual values we got
+			_MESSAGE("[ENKITS-INIT] hwThreads=%u, taskThreads=%u (after Initialize)", hwThreads, taskThreads);
+
+			if (hwThreads == 0 || taskThreads == 0) {
+				_ERROR("[ENKITS-INIT] FATAL: Thread initialization failed! hwThreads=%u taskThreads=%u", hwThreads,
+					   taskThreads);
+				__debugbreak();
+			}
+
 			m_initialized = true;
 		}
 

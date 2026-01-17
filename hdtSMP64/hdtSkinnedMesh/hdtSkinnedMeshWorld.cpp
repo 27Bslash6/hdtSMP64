@@ -11,13 +11,15 @@
 #include "../hdtPrefix.h"
 #include "../hdtTracy.h"
 
+#include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h>
+
 #include <exception>
 #include <random>
 
 namespace hdt
 {
-	// Static frame counter for dirty flag optimization
-	uint32_t SkinnedMeshWorld::s_currentFrame = 0;
+	// Static frame counter for dirty flag optimization (atomic for thread safety)
+	std::atomic<uint32_t> SkinnedMeshWorld::s_currentFrame{0};
 
 	void SkinnedMeshWorld::incrementFrame()
 	{
@@ -26,18 +28,14 @@ namespace hdt
 		// causing objects to incorrectly skip updates. Reset to 1 to avoid this.
 		// Threshold of 0xC0000000 (~3 billion) gives ~1.6 years buffer before overflow at 60fps.
 		constexpr uint32_t RESET_THRESHOLD = 0xC0000000;
-		if (s_currentFrame >= RESET_THRESHOLD) {
-			s_currentFrame = 1;
-		}
-		else {
-			++s_currentFrame;
-		}
+		uint32_t current = s_currentFrame.load(std::memory_order_relaxed);
+		uint32_t next = (current >= RESET_THRESHOLD) ? 1 : current + 1;
+		s_currentFrame.store(next, std::memory_order_relaxed);
 		// Keep logging namespace in sync for log prefix
-		hdt::logging::currentFrameNumber.store(s_currentFrame, std::memory_order_relaxed);
+		hdt::logging::currentFrameNumber.store(next, std::memory_order_relaxed);
 	}
 
-	SkinnedMeshWorld::SkinnedMeshWorld()
-		: btDiscreteDynamicsWorldMt(nullptr, nullptr, m_solverPool, &m_constraintSolver, nullptr)
+	SkinnedMeshWorld::SkinnedMeshWorld() : btDiscreteDynamicsWorldMt(nullptr, nullptr, nullptr, nullptr, nullptr)
 	{
 		// Use enkiTS for Bullet's task scheduler - replaces PPL to avoid thread pool over-subscription
 		btSetTaskScheduler(btGetEnkiTSTaskScheduler());
@@ -45,6 +43,26 @@ namespace hdt
 		// Enable nested parallelism for Mt solver - allows btParallelFor inside convertJoints
 		// even when outer threading is running. enkiTS handles nested parallelism well.
 		btSequentialImpulseConstraintSolverMt::s_allowNestedParallelForLoops = true;
+
+		// Set batching threshold to 8 manifolds (Bullet default is 4).
+		// This threshold determines when graph-colored parallel constraint solving activates.
+		// With 8+ manifolds (typical for 3+ physics NPCs), batches execute in parallel via enkiTS.
+		btSequentialImpulseConstraintSolverMt::s_minimumContactManifoldsForBatching = 8;
+
+		auto* scheduler = btGetTaskScheduler();
+		int numThreads = scheduler ? scheduler->getNumThreads() : 0;
+		int maxThreads = scheduler ? scheduler->getMaxNumThreads() : 0;
+
+		_MESSAGE("[SOLVER-INIT] enkiTS threads: %d (max: %d), batching threshold: %d, nestedParallel: %s", numThreads,
+				 maxThreads, btSequentialImpulseConstraintSolverMt::s_minimumContactManifoldsForBatching,
+				 btSequentialImpulseConstraintSolverMt::s_allowNestedParallelForLoops ? "true" : "false");
+
+		// HARD CRASH: No silent fallback - if threading is broken, we need to know NOW
+		if (!scheduler || numThreads < 1) {
+			_ERROR("[SOLVER-INIT] FATAL: Task scheduler not initialized! scheduler=%p numThreads=%d", scheduler,
+				   numThreads);
+			__debugbreak();
+		}
 
 		m_windSpeed = _mm_setzero_ps();
 
@@ -55,10 +73,12 @@ namespace hdt
 
 		auto broadphase = new btDbvtBroadphase();
 		m_broadphasePairCache = broadphase;
-		m_solverPool = new btConstraintSolverPoolMt(BT_MAX_THREAD_COUNT);
 
-		// m_islandManager->~btSimulationIslandManager();
-		// new (m_islandManager) SimulationIslandManager();
+		// Create solver pool and connect to base class - CRITICAL for parallel solving
+		m_solverPool = new btConstraintSolverPoolMt(BT_MAX_THREAD_COUNT);
+		setConstraintSolver(m_solverPool);
+
+		_MESSAGE("[SOLVER-INIT] Solver pool created with %d solvers", BT_MAX_THREAD_COUNT);
 	}
 
 	SkinnedMeshWorld::~SkinnedMeshWorld()
@@ -77,6 +97,9 @@ namespace hdt
 		}
 
 		m_systems.clear();
+
+		delete m_solverPool;
+		m_solverPool = nullptr;
 	}
 
 	void SkinnedMeshWorld::addSkinnedMeshSystem(SkinnedMeshSystem* system)
@@ -200,9 +223,6 @@ namespace hdt
 			internalSingleStepSimulation(remainingTimeStep);
 		clearForces();
 
-		_bodies.clear();
-		_shapes.clear();
-
 		return 0;
 	}
 
@@ -308,20 +328,13 @@ namespace hdt
 									   getCollisionWorld()->getDispatcher()->getNumManifolds());
 		}
 
-		m_constraintSolver.m_groups.clear();
-		for (auto& i : m_systems)
-			for (auto& j : i->m_constraintGroups)
-				m_constraintSolver.m_groups.push_back(j);
-
 		btPersistentManifold** manifold = m_dispatcher1->getInternalManifoldPointer();
 		int maxNumManifolds = m_dispatcher1->getNumManifolds();
 		int numConstraints = static_cast<int>(m_constraints.size());
-		int numGroups = static_cast<int>(m_constraintSolver.m_groups.size());
 		int numObjects = static_cast<int>(m_collisionObjects.size());
 
 		HDT_PLOT("Manifolds", static_cast<int64_t>(maxNumManifolds));
 		HDT_PLOT("Constraints", static_cast<int64_t>(numConstraints));
-		HDT_PLOT("ConstraintGroups", static_cast<int64_t>(numGroups));
 		HDT_PLOT("CollisionObjects", static_cast<int64_t>(numObjects));
 
 		// DIAGNOSTIC: Track if manifold count is growing (indicates physics instability)
@@ -329,15 +342,19 @@ namespace hdt
 		static int s_maxManifoldsSeen = 0;
 		s_maxManifoldsSeen = std::max(s_maxManifoldsSeen, maxNumManifolds);
 		if (++s_frameCounter % 120 == 0) { // Every ~2 seconds at 60fps
-			_DMESSAGE("[SOLVER-DIAG] Frame %d: manifolds=%d (max=%d), constraints=%d, groups=%d, objects=%d",
-					  s_frameCounter, maxNumManifolds, s_maxManifoldsSeen, numConstraints, numGroups, numObjects);
+			_DMESSAGE("[SOLVER-DIAG] Frame %d: manifolds=%d (max=%d), constraints=%d, objects=%d", s_frameCounter,
+					  maxNumManifolds, s_maxManifoldsSeen, numConstraints, numObjects);
 		}
 
 		try {
 			{
-				HDT_ZONE_SCOPED_N("SolveGroup");
-				m_solverPool->solveGroup(&m_collisionObjects[0], m_collisionObjects.size(), manifold, maxNumManifolds,
-										 &m_constraints[0], m_constraints.size(), solverInfo, m_debugDrawer,
+				HDT_ZONE_SCOPED_N("BatchedSolve");
+				// Note: m_collisionObjects is guaranteed non-empty by guard at function start.
+				// For m_constraints, solveGroup handles zero constraints correctly.
+				btCollisionObject** objectsPtr = m_collisionObjects.size() ? &m_collisionObjects[0] : nullptr;
+				btTypedConstraint** constraintsPtr = m_constraints.size() ? &m_constraints[0] : nullptr;
+				m_solverPool->solveGroup(objectsPtr, m_collisionObjects.size(), manifold, maxNumManifolds,
+										 constraintsPtr, m_constraints.size(), solverInfo, m_debugDrawer,
 										 m_dispatcher1);
 			}
 
@@ -356,7 +373,6 @@ namespace hdt
 		}
 
 		static_cast<CollisionDispatcher*>(m_dispatcher1)->clearAllManifold();
-		m_constraintSolver.m_groups.clear();
 	}
 
 	void SkinnedMeshWorld::internalSingleStepSimulation(btScalar timeStep)

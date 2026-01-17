@@ -1,6 +1,10 @@
 #pragma once
 
-#include "hdtGroupConstraintSolver.h"
+#include "hdtSkinnedMeshSystem.h"
+
+#include <BulletDynamics/Dynamics/btDiscreteDynamicsWorldMt.h>
+
+#include <atomic>
 
 namespace hdt
 {
@@ -21,8 +25,8 @@ namespace hdt
 						   btScalar fixedTimeStep = btScalar(1.) / btScalar(60.)) override;
 
 		// Global frame counter for dirty flag optimization
-		static uint32_t getCurrentFrame() { return s_currentFrame; }
-		static void incrementFrame();  // Defined in .cpp to update both counters
+		static uint32_t getCurrentFrame() { return s_currentFrame.load(std::memory_order_relaxed); }
+		static void incrementFrame(); // Defined in .cpp to update both counters
 
 		btVector3& getWind() { return m_windSpeed; }
 		const btVector3& getWind() const { return m_windSpeed; }
@@ -60,10 +64,7 @@ namespace hdt
 		btVector3 m_windSpeed; // world windspeed
 
 	private:
-		std::vector<SkinnedMeshBody*> _bodies;
-		std::vector<SkinnedMeshShape*> _shapes;
 		btConstraintSolverPoolMt* m_solverPool;
-		GroupConstraintSolver m_constraintSolver;
-		static uint32_t s_currentFrame;
+		static std::atomic<uint32_t> s_currentFrame;
 	};
 } // namespace hdt
