@@ -237,7 +237,8 @@ namespace hdt
 			btCollisionObject* colObj = nullptr; // nullptr = skip this entry
 			btVector3 minAabb;
 			btVector3 maxAabb;
-			bool deactivate = false; // true = AABB overflow, disable simulation
+			bool deactivate = false;   // true = AABB overflow, disable simulation
+			bool skipVelocity = false; // true = rigid body nearly stationary, skip broadphase
 		};
 
 		// Allocate buffer for computed AABBs
@@ -289,6 +290,19 @@ namespace hdt
 					// Check for valid AABB size (moving objects should be moderately sized)
 					if (colObj->isStaticObject() || (out.maxAabb - out.minAabb).length2() < btScalar(1e12)) {
 						out.colObj = colObj; // Mark as valid for broadphase update
+
+						// Velocity-based skip: If rigid body has near-zero velocity, mark for potential skip
+						// This avoids broadphase tree updates for objects that have settled
+						// Threshold: 0.001 units²/s² linear, 0.001 rad²/s² angular
+						constexpr btScalar VELOCITY_THRESHOLD_SQ = btScalar(0.001);
+						if (colObj->getInternalType() == btCollisionObject::CO_RIGID_BODY) {
+							const btRigidBody* body = static_cast<const btRigidBody*>(colObj);
+							if (body->getLinearVelocity().length2() < VELOCITY_THRESHOLD_SQ &&
+								body->getAngularVelocity().length2() < VELOCITY_THRESHOLD_SQ)
+							{
+								out.skipVelocity = true;
+							}
+						}
 					}
 					else {
 						// AABB overflow - mark for deactivation
@@ -323,7 +337,14 @@ namespace hdt
 			// Using squared distance to avoid sqrt. 0.01 = 0.1 units squared.
 			constexpr btScalar AABB_CHANGE_THRESHOLD_SQ = btScalar(0.01);
 
-			int skippedCount = 0;
+			// Stricter threshold for velocity-based skip (object nearly stationary)
+			// These objects get less frequent updates since they're not moving much
+			constexpr btScalar AABB_VELOCITY_SKIP_THRESHOLD_SQ = btScalar(0.0001);
+
+			int skippedVelocity = 0;
+			int skippedThreshold = 0;
+			int updated = 0;
+
 			for (const ComputedAabb& aabb : computedAabbs) {
 				if (!aabb.colObj)
 					continue;
@@ -334,23 +355,35 @@ namespace hdt
 					continue;
 				}
 
-				// Early-out: Skip broadphase update if AABB hasn't changed significantly
-				// This avoids tree updates and linked list operations for static/slow objects
 				btBroadphaseProxy* proxy = aabb.colObj->getBroadphaseHandle();
-				if (proxy) {
-					btVector3 deltaMin = aabb.minAabb - proxy->m_aabbMin;
-					btVector3 deltaMax = aabb.maxAabb - proxy->m_aabbMax;
-					btScalar changeSq = deltaMin.length2() + deltaMax.length2();
-					if (changeSq < AABB_CHANGE_THRESHOLD_SQ) {
-						++skippedCount;
-						continue;
-					}
+				if (!proxy)
+					continue;
+
+				// Compute AABB change magnitude
+				btVector3 deltaMin = aabb.minAabb - proxy->m_aabbMin;
+				btVector3 deltaMax = aabb.maxAabb - proxy->m_aabbMax;
+				btScalar changeSq = deltaMin.length2() + deltaMax.length2();
+
+				// Velocity-based skip: Nearly stationary rigid bodies use stricter threshold
+				// This reduces broadphase churn for settled objects
+				if (aabb.skipVelocity && changeSq < AABB_VELOCITY_SKIP_THRESHOLD_SQ) {
+					++skippedVelocity;
+					continue;
+				}
+
+				// Standard threshold skip for all objects
+				if (changeSq < AABB_CHANGE_THRESHOLD_SQ) {
+					++skippedThreshold;
+					continue;
 				}
 
 				bp->setAabb(proxy, aabb.minAabb, aabb.maxAabb, m_dispatcher1);
+				++updated;
 			}
 
-			HDT_PLOT("AabbSkipped", static_cast<int64_t>(skippedCount));
+			HDT_PLOT("AabbSkipVelocity", static_cast<int64_t>(skippedVelocity));
+			HDT_PLOT("AabbSkipThreshold", static_cast<int64_t>(skippedThreshold));
+			HDT_PLOT("AabbUpdated", static_cast<int64_t>(updated));
 		}
 
 		m_forceUpdateAllAabbs = false;
