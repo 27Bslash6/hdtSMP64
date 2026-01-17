@@ -986,7 +986,7 @@ namespace hdt
 		// RE-ENTRANCY GUARD: enkiTS work-stealing during WaitforTask can cause nested
 		// processCollision calls on the same thread, corrupting shared buffers.
 		// Solution: Pre-allocated buffer pool indexed by nesting depth (zero heap allocs).
-		static constexpr int MaxNestingDepth = 4; // Should never exceed 2-3 in practice
+		static constexpr int MaxNestingDepth = 8; // enkiTS work-stealing can nest 4-5+ deep
 		thread_local std::array<MergeBuffer, MaxNestingDepth> s_mergePool;
 		thread_local std::array<std::vector<CollisionResult>, MaxNestingDepth> s_collisionPool;
 		thread_local int s_nestingLevel = 0;
@@ -1029,7 +1029,8 @@ namespace hdt
 			heapCollisionBuffer = std::make_unique<std::vector<CollisionResult>>(MaxCollisionCount);
 			mergePtr = heapMerge.get();
 			collisionBufferPtr = heapCollisionBuffer.get();
-			_ERROR("processCollision: nesting depth %d exceeded pool size %d!", level, MaxNestingDepth);
+			_WARNING("processCollision: nesting depth %d exceeded pool size %d, using heap fallback", level,
+					 MaxNestingDepth);
 		}
 
 		MergeBuffer& merge = *mergePtr;

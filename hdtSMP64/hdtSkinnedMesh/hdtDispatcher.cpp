@@ -105,7 +105,7 @@ namespace hdt
 #ifndef CUDA
 			// BUG-001 FIX: Track this worker so suspend() can wait for it
 			WorkerScope workerScope(this);
-			if (isCancelled())
+			if (workerScope.isCancelled())
 				return; // Early exit if suspend requested
 #endif
 
@@ -193,7 +193,7 @@ namespace hdt
 				hdt_parallel_for_each(to_update.begin(), to_update.end(), [this, deviceId](UpdateMap::value_type& o) {
 					// BUG-001 FIX: Track worker for suspend() synchronization
 					WorkerScope workerScope(this);
-					if (isCancelled())
+					if (workerScope.isCancelled())
 						return;
 
 					CudaInterface::instance()->setCurrentDevice();
@@ -227,7 +227,7 @@ namespace hdt
 					hdt_parallel_for_each(to_update.begin(), to_update.end(), [this](UpdateMap::value_type& o) {
 						// BUG-001 FIX: Track worker for suspend() synchronization
 						WorkerScope workerScope(this);
-						if (isCancelled())
+						if (workerScope.isCancelled())
 							return;
 						o.first->updateBones();
 					});
@@ -268,7 +268,7 @@ namespace hdt
 					hdt_parallel_for_each(to_update.begin(), to_update.end(), [this](UpdateMap::value_type& o) {
 						// BUG-001 FIX: Track worker for suspend() synchronization
 						WorkerScope workerScope(this);
-						if (isCancelled())
+						if (workerScope.isCancelled())
 							return;
 
 						if (o.second.first && o.second.first->m_cudaObject) {
@@ -286,7 +286,7 @@ namespace hdt
 			hdt_parallel_for_each(to_update.begin(), to_update.end(), [this](UpdateMap::value_type& o) {
 				// BUG-001 FIX: Track worker for suspend() synchronization
 				WorkerScope workerScope(this);
-				if (isCancelled())
+				if (workerScope.isCancelled())
 					return;
 
 				o.first->internalUpdate();
@@ -316,7 +316,7 @@ namespace hdt
 				hdt_parallel_for(0, pairCount, [this](int i) {
 					// BUG-001 FIX: Track worker for suspend() synchronization
 					WorkerScope workerScope(this);
-					if (isCancelled())
+					if (workerScope.isCancelled())
 						return;
 
 					auto& pair = m_pairs[i];
@@ -346,7 +346,7 @@ namespace hdt
 								  [this](std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
 									  // BUG-001 FIX: Track worker for suspend() synchronization
 									  WorkerScope workerScope(this);
-									  if (isCancelled())
+									  if (workerScope.isCancelled())
 										  return;
 
 									  if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree)) {
@@ -388,19 +388,19 @@ namespace hdt
 		// BUG-001 FIX: Wrap all parallel workers with WorkerScope for suspend() synchronization
 		hdt_parallel_for_each(bodies.begin(), bodies.end(), [this](SkinnedMeshBody* shape) {
 			WorkerScope workerScope(this);
-			if (isCancelled())
+			if (workerScope.isCancelled())
 				return;
 			shape->internalUpdate();
 		});
 		hdt_parallel_for_each(vertex_shapes.begin(), vertex_shapes.end(), [this](PerVertexShape* shape) {
 			WorkerScope workerScope(this);
-			if (isCancelled())
+			if (workerScope.isCancelled())
 				return;
 			shape->internalUpdate();
 		});
 		hdt_parallel_for_each(triangle_shapes.begin(), triangle_shapes.end(), [this](PerTriangleShape* shape) {
 			WorkerScope workerScope(this);
-			if (isCancelled())
+			if (workerScope.isCancelled())
 				return;
 			shape->internalUpdate();
 		});
@@ -413,7 +413,7 @@ namespace hdt
 		hdt_parallel_for_each(m_pairs.begin(), m_pairs.end(),
 							  [this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
 								  WorkerScope workerScope(this);
-								  if (isCancelled())
+								  if (workerScope.isCancelled())
 									  return;
 								  if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree))
 									  SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);

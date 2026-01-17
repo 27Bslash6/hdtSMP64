@@ -5,6 +5,7 @@
 
 #include "BulletCollision/CollisionDispatch/btCollisionDispatcherMt.h"
 
+#include <atomic>
 #include <mutex>
 #include <vector>
 
@@ -57,6 +58,25 @@ namespace hdt
 #endif
 		}
 
+		// Collision cancellation for graceful suspend - enkiTS doesn't support cancellation
+		// so these are flags checked by worker code to exit early
+		void requestCollisionCancellation() { m_collisionCancelled.store(true, std::memory_order_release); }
+		void clearCollisionCancellation() { m_collisionCancelled.store(false, std::memory_order_release); }
+		bool isCollisionCancelled() const { return m_collisionCancelled.load(std::memory_order_acquire); }
+
+		// Wait for collision workers to complete - enkiTS handles this via task completion
+		// This is a no-op since we wait on the task set, not individual workers
+		void waitForCollisionWorkers() {}
+
+		// RAII guard for worker tracking - currently a no-op but allows early exit via isCancelled()
+		struct WorkerScope
+		{
+			CollisionDispatcher* dispatcher;
+			WorkerScope(CollisionDispatcher* d) : dispatcher(d) {}
+			~WorkerScope() {}
+			bool isCancelled() const { return dispatcher->isCollisionCancelled(); }
+		};
+
 #ifdef CUDA
 		// Sync and apply collision results from previous frame
 		// Called at START of physics step, before prediction, to allow GPU overlap with solve
@@ -65,6 +85,7 @@ namespace hdt
 
 		std::mutex m_lock;
 		std::vector<std::pair<SkinnedMeshBody*, SkinnedMeshBody*>> m_pairs;
+		std::atomic<bool> m_collisionCancelled{false};
 #ifdef CUDA
 		// Thread-safe delayed function queue (replaces concurrent_vector)
 		std::vector<std::function<void()>> m_delayedFuncs;

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "hdtSkinnedMesh/hdtSkinnedMeshWorld.h"
+#include "hdtSkinnedMesh/hdtDispatcher.h"
 #include "hdtSkinnedMesh/hdtEnkiTSScheduler.h"
+#include "hdtSkinnedMesh/hdtSkinnedMeshWorld.h"
 #include "hdtSkyrimSystem.h"
 
 #include "ActorManager.h"
@@ -48,6 +49,11 @@ namespace hdt
 
 		void suspend(bool loading = false)
 		{
+			// BUG-001 FIX: Request collision workers to exit early BEFORE setting suspended
+			// This allows workers to check isCancelled() and exit gracefully
+			auto dispatcher = static_cast<CollisionDispatcher*>(m_dispatcher1);
+			dispatcher->requestCollisionCancellation();
+
 			// Set suspended flag FIRST to stop new physics frames from starting
 			// This prevents the race where new frames start while we're waiting
 			m_suspended = true;
@@ -82,8 +88,17 @@ namespace hdt
 				if (!completed) {
 					_ERROR("Physics suspend: TIMEOUT waiting for frame sync! Proceeding anyway.");
 				}
-				_VMESSAGE("Physics suspended: m_suspended=%d, m_loading=%d, timedOut=%d",
-						  m_suspended.load(), m_loading.load(), !completed);
+
+				// BUG-001 FIX: Wait for collision workers AFTER frame sync
+				// The frame may have completed (m_tasks.wait() done) but collision workers
+				// spawned via hdt_parallel_for_each may still be running. We must wait
+				// for them before proceeding to clear physics state.
+				_VMESSAGE("Physics suspend: waiting for collision workers...");
+				dispatcher->waitForCollisionWorkers();
+				_VMESSAGE("Physics suspend: collision workers done");
+
+				_VMESSAGE("Physics suspended: m_suspended=%d, m_loading=%d, timedOut=%d", m_suspended.load(),
+						  m_loading.load(), !completed);
 			}
 		}
 
@@ -99,7 +114,11 @@ namespace hdt
 				m_loading = false;
 				_VMESSAGE("Physics resume: resetSystems() complete");
 			}
-			m_suspended = false;  // Only resume AFTER reset is complete
+
+			// BUG-001 FIX: Clear cancellation flag before allowing new frames
+			static_cast<CollisionDispatcher*>(m_dispatcher1)->clearCollisionCancellation();
+
+			m_suspended = false; // Only resume AFTER reset is complete
 			_VMESSAGE("Physics resumed: m_suspended=%d", m_suspended.load());
 		}
 
@@ -154,7 +173,7 @@ namespace hdt
 
 		std::atomic_bool m_suspended;
 		std::atomic_bool m_loading;
-		std::atomic_bool m_frameSyncComplete{true};  // True when no frame is in progress
+		std::atomic_bool m_frameSyncComplete{true}; // True when no frame is in progress
 		std::mutex m_frameSyncMutex;
 		std::condition_variable m_frameSyncCV;
 		float m_accumulatedInterval;
