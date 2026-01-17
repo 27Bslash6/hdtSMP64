@@ -12,6 +12,9 @@ namespace hdt
 		size_t colliderIndexA; // Index into shape's m_colliders (not pointer - avoids stale pointer bugs)
 		size_t colliderIndexB; // Index into shape's m_colliders (not pointer - avoids stale pointer bugs)
 		float depth;
+		// DEBUG: Track shape sizes at computation time to detect mismatches in doMerge
+		size_t debugSizeA; // Size of shapeA's m_colliders when this result was created
+		size_t debugSizeB; // Size of shapeB's m_colliders when this result was created
 	};
 
 	struct CheckTriangle

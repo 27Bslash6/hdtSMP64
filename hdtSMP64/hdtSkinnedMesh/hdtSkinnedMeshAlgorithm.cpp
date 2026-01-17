@@ -5,6 +5,7 @@
 
 #include "../hdtTracy.h"
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -108,22 +109,33 @@ namespace hdt
 
 		bool addResult(const CollisionResult& res)
 		{
-			// DIAGNOSTIC: Validate indices BEFORE storing
-			{
-				bool validA = res.colliderIndexA < shapeA->m_colliders.size();
-				bool validB = res.colliderIndexB < shapeB->m_colliders.size();
-				if (!validA || !validB) {
-					static thread_local int errCount = 0;
-					if (errCount++ < 3) {
-						_ERROR("addResult[NoSwap]: INVALID index! indexA=%zu max=%zu ok=%d  indexB=%zu max=%zu ok=%d",
-							   res.colliderIndexA, shapeA->m_colliders.size(), validA, res.colliderIndexB,
-							   shapeB->m_colliders.size(), validB);
-					}
+			// CRITICAL: Validate indices BEFORE storing - REJECT invalid to prevent crashes
+			size_t sizeA = shapeA->m_colliders.size();
+			size_t sizeB = shapeB->m_colliders.size();
+			bool validA = res.colliderIndexA < sizeA;
+			bool validB = res.colliderIndexB < sizeB;
+			if (!validA || !validB) {
+				static thread_local int errCount = 0;
+				if (errCount++ < 50) {
+					_ERROR("addResult[NoSwap]: REJECTING! idxA=%zu/%zu idxB=%zu/%zu shapeA=%p shapeB=%p c0=%p c1=%p",
+						   res.colliderIndexA, sizeA, res.colliderIndexB, sizeB, shapeA, shapeB, c0, c1);
 				}
+				return false; // REJECT - do not store invalid result
 			}
 			int p = numResults.fetch_add(1);
 			if (p < SkinnedMeshAlgorithm::MaxCollisionCount) {
 				results[p] = res;
+				// DEBUG: Record shape sizes at storage time for mismatch detection
+				results[p].debugSizeA = sizeA;
+				results[p].debugSizeB = sizeB;
+				// DIAGNOSTIC: Log stored values for debugging index corruption
+				static thread_local int storeCount = 0;
+				if (storeCount++ < 10) {
+					_VMESSAGE("addResult[NoSwap] stored: p=%d idxA=%zu (for shapeA=%p size=%zu) idxB=%zu (for "
+							  "shapeB=%p size=%zu)",
+							  p, results[p].colliderIndexA, shapeA, shapeA->m_colliders.size(),
+							  results[p].colliderIndexB, shapeB, shapeB->m_colliders.size());
+				}
 				return true;
 			}
 			return false;
@@ -139,21 +151,21 @@ namespace hdt
 
 		bool addResult(const CollisionResult& res)
 		{
-			// DIAGNOSTIC: Validate indices BEFORE storing (note: we swap A<->B)
-			// res.colliderIndexA is from shapeA, res.colliderIndexB is from shapeB
-			// After swap: stored colliderIndexA = res.colliderIndexB (from shapeB)
-			//             stored colliderIndexB = res.colliderIndexA (from shapeA)
-			{
-				bool validA = res.colliderIndexA < shapeA->m_colliders.size();
-				bool validB = res.colliderIndexB < shapeB->m_colliders.size();
-				if (!validA || !validB) {
-					static thread_local int errCount = 0;
-					if (errCount++ < 3) {
-						_ERROR("addResult[Swap]: INVALID index! indexA=%zu max=%zu ok=%d  indexB=%zu max=%zu ok=%d",
-							   res.colliderIndexA, shapeA->m_colliders.size(), validA, res.colliderIndexB,
-							   shapeB->m_colliders.size(), validB);
-					}
+			// CRITICAL: Validate indices BEFORE storing - REJECT invalid to prevent crashes
+			// Note: we swap A<->B when storing - colliderIndexA is from shapeA, colliderIndexB is from shapeB
+			// After swap: results[].colliderIndexA = res.colliderIndexB (for shapeB)
+			//             results[].colliderIndexB = res.colliderIndexA (for shapeA)
+			size_t sizeA = shapeA->m_colliders.size();
+			size_t sizeB = shapeB->m_colliders.size();
+			bool validA = res.colliderIndexA < sizeA;
+			bool validB = res.colliderIndexB < sizeB;
+			if (!validA || !validB) {
+				static thread_local int errCount = 0;
+				if (errCount++ < 50) {
+					_ERROR("addResult[Swap]: REJECTING! idxA=%zu/%zu idxB=%zu/%zu shapeA=%p shapeB=%p c0=%p c1=%p",
+						   res.colliderIndexA, sizeA, res.colliderIndexB, sizeB, shapeA, shapeB, c0, c1);
 				}
+				return false; // REJECT - do not store invalid result
 			}
 			int p = numResults.fetch_add(1);
 			if (p < SkinnedMeshAlgorithm::MaxCollisionCount) {
@@ -163,6 +175,18 @@ namespace hdt
 				results[p].colliderIndexB = res.colliderIndexA;
 				results[p].normOnB = -res.normOnB;
 				results[p].depth = res.depth;
+				// DEBUG: Record shape sizes at storage time for mismatch detection
+				// After swap: colliderIndexA is for shapeB, colliderIndexB is for shapeA
+				results[p].debugSizeA = sizeB; // Size that colliderIndexA was validated against
+				results[p].debugSizeB = sizeA; // Size that colliderIndexB was validated against
+				// DIAGNOSTIC: Log stored values for debugging index corruption
+				static thread_local int storeCount = 0;
+				if (storeCount++ < 10) {
+					_VMESSAGE("addResult[Swap] stored: p=%d idxA=%zu (for shapeB=%p size=%zu) idxB=%zu (for shapeA=%p "
+							  "size=%zu)",
+							  p, results[p].colliderIndexA, shapeB, shapeB->m_colliders.size(),
+							  results[p].colliderIndexB, shapeA, shapeA->m_colliders.size());
+				}
 				return true;
 			}
 			return false;
@@ -192,6 +216,16 @@ namespace hdt
 			// Store indices instead of pointers to avoid stale pointer bugs
 			res.colliderIndexA = a - colliderBaseA;
 			res.colliderIndexB = b - colliderBaseB;
+
+			// DIAGNOSTIC: Catch bad indices at computation point
+			if (res.colliderIndexA >= shapeA->m_colliders.size() || res.colliderIndexB >= shapeB->m_colliders.size()) {
+				static thread_local int diagCount = 0;
+				if (diagCount++ < 20) {
+					_ERROR("checkCollide[VV]: BAD INDEX! idxA=%zu/%zu idxB=%zu/%zu a=%p baseA=%p b=%p baseB=%p",
+						   res.colliderIndexA, shapeA->m_colliders.size(), res.colliderIndexB,
+						   shapeB->m_colliders.size(), a, colliderBaseA, b, colliderBaseB);
+				}
+			}
 			return ret;
 		}
 	};
@@ -313,6 +347,16 @@ namespace hdt
 			// Store indices instead of pointers to avoid stale pointer bugs
 			res.colliderIndexA = a - colliderBaseA;
 			res.colliderIndexB = b - colliderBaseB;
+
+			// DIAGNOSTIC: Catch bad indices at computation point
+			if (res.colliderIndexA >= shapeA->m_colliders.size() || res.colliderIndexB >= shapeB->m_colliders.size()) {
+				static thread_local int diagCount = 0;
+				if (diagCount++ < 20) {
+					_ERROR("checkCollide[VT-inTri]: BAD INDEX! idxA=%zu/%zu idxB=%zu/%zu a=%p baseA=%p b=%p baseB=%p",
+						   res.colliderIndexA, shapeA->m_colliders.size(), res.colliderIndexB,
+						   shapeB->m_colliders.size(), a, colliderBaseA, b, colliderBaseB);
+				}
+			}
 			if (pointInTriangle) {
 				res.normOnB.set128(normal);
 				res.posA = s.pos() - res.normOnB * r;
@@ -353,6 +397,16 @@ namespace hdt
 			// Store indices instead of pointers to avoid stale pointer bugs
 			res.colliderIndexA = a - colliderBaseA;
 			res.colliderIndexB = b - colliderBaseB;
+
+			// DIAGNOSTIC: Catch bad indices at computation point
+			if (res.colliderIndexA >= shapeA->m_colliders.size() || res.colliderIndexB >= shapeB->m_colliders.size()) {
+				static thread_local int diagCount = 0;
+				if (diagCount++ < 20) {
+					_ERROR("checkCollide[VT-edge]: BAD INDEX! idxA=%zu/%zu idxB=%zu/%zu a=%p baseA=%p b=%p baseB=%p",
+						   res.colliderIndexA, shapeA->m_colliders.size(), res.colliderIndexB,
+						   shapeB->m_colliders.size(), a, colliderBaseA, b, colliderBaseB);
+				}
+			}
 			return ret;
 		}
 	};
@@ -484,6 +538,10 @@ namespace hdt
 
 				thread_local std::vector<Aabb*> listA;
 				thread_local std::vector<Aabb*> listB;
+				// CRITICAL: Clear at START to prevent stale pointers from previous call on this thread
+				// Early returns can skip the clear at end, leaving garbage for next invocation
+				listA.clear();
+				listB.clear();
 
 				listA.reserve(asize);
 				listB.reserve(bsize);
@@ -572,6 +630,9 @@ namespace hdt
 				bool hasResult = false;
 
 				thread_local std::vector<Aabb*> list;
+				// CRITICAL: Clear at START to prevent stale pointers from previous call on this thread
+				list.clear();
+
 				if (asize > bsize) {
 					list.reserve(std::max<size_t>(bsize, list.capacity()));
 					// AVX2 batch collision filtering - process 2 AABBs at a time
@@ -663,6 +724,14 @@ namespace hdt
 		const Collider* bCollidersBase = b->m_colliders.data();
 		const size_t bCollidersSize = b->m_colliders.size();
 
+		// DIAGNOSTIC: Log doMerge entry parameters for debugging index corruption
+		static thread_local int mergeCount = 0;
+		if (mergeCount++ < 10) {
+			_VMESSAGE("doMerge: a=%p (size=%zu owner=%s) b=%p (size=%zu owner=%s) count=%d", a, aCollidersSize,
+					  (a->m_owner && a->m_owner->m_name()) ? a->m_owner->m_name()->cstr() : "null", b, bCollidersSize,
+					  (b->m_owner && b->m_owner->m_name()) ? b->m_owner->m_name()->cstr() : "null", count);
+		}
+
 		for (int i = 0; i < count; ++i) {
 			auto& res = collision[i];
 #ifdef CUDA
@@ -673,17 +742,33 @@ namespace hdt
 				break;
 #endif
 
+			// DEBUG: Check for shape size mismatch between addResult and doMerge
+			bool shapeMismatchA = res.debugSizeA != aCollidersSize;
+			bool shapeMismatchB = res.debugSizeB != bCollidersSize;
+			if (shapeMismatchA || shapeMismatchB) {
+				static thread_local int mismatchCount = 0;
+				if (mismatchCount++ < 20) {
+					_ERROR("doMerge: SHAPE MISMATCH! addResult used sizes (%zu,%zu) but doMerge has (%zu,%zu) "
+						   "idx=(%zu,%zu) shapeA=%p shapeB=%p",
+						   res.debugSizeA, res.debugSizeB, aCollidersSize, bCollidersSize, res.colliderIndexA,
+						   res.colliderIndexB, a, b);
+				}
+				// Continue processing - mismatch explains the invalid indices
+			}
+
 			// Validate collider indices are within expected ranges
 			if (res.colliderIndexA >= aCollidersSize) {
-				_ERROR("doMerge: colliderIndexA %zu out of range [0, %zu) - invalid index! shapeA=%p ownerA=%s",
+				_ERROR("doMerge: colliderIndexA %zu out of range [0, %zu) - invalid index! shapeA=%p ownerA=%s "
+					   "(debugSizeA=%zu)",
 					   res.colliderIndexA, aCollidersSize, a,
-					   (a->m_owner && a->m_owner->m_name()) ? a->m_owner->m_name()->cstr() : "null");
+					   (a->m_owner && a->m_owner->m_name()) ? a->m_owner->m_name()->cstr() : "null", res.debugSizeA);
 				continue; // Skip this result instead of crashing
 			}
 			if (res.colliderIndexB >= bCollidersSize) {
-				_ERROR("doMerge: colliderIndexB %zu out of range [0, %zu) - invalid index! shapeB=%p ownerB=%s",
+				_ERROR("doMerge: colliderIndexB %zu out of range [0, %zu) - invalid index! shapeB=%p ownerB=%s "
+					   "(debugSizeB=%zu)",
 					   res.colliderIndexB, bCollidersSize, b,
-					   (b->m_owner && b->m_owner->m_name()) ? b->m_owner->m_name()->cstr() : "null");
+					   (b->m_owner && b->m_owner->m_name()) ? b->m_owner->m_name()->cstr() : "null", res.debugSizeB);
 				continue; // Skip this result instead of crashing
 			}
 
@@ -898,14 +983,60 @@ namespace hdt
 			return;
 		}
 
-		// Thread-local buffers to avoid per-call allocations (86K+ calls per frame)
-		thread_local MergeBuffer merge;
-		thread_local std::vector<CollisionResult> collisionBuffer(MaxCollisionCount);
+		// RE-ENTRANCY GUARD: enkiTS work-stealing during WaitforTask can cause nested
+		// processCollision calls on the same thread, corrupting shared buffers.
+		// Solution: Pre-allocated buffer pool indexed by nesting depth (zero heap allocs).
+		static constexpr int MaxNestingDepth = 4; // Should never exceed 2-3 in practice
+		thread_local std::array<MergeBuffer, MaxNestingDepth> s_mergePool;
+		thread_local std::array<std::vector<CollisionResult>, MaxNestingDepth> s_collisionPool;
+		thread_local int s_nestingLevel = 0;
+		thread_local bool s_poolInitialized = false;
 
+		// One-time initialization of collision buffers
+		if (!s_poolInitialized) {
+			for (auto& buf : s_collisionPool) {
+				buf.resize(MaxCollisionCount);
+			}
+			s_poolInitialized = true;
+		}
+
+		// Get current nesting level and increment
+		const int level = s_nestingLevel++;
+
+		// RAII guard to decrement nesting level on exit
+		struct NestingGuard
+		{
+			int& nestingLevel;
+			NestingGuard(int& nl) : nestingLevel(nl) {}
+			~NestingGuard() { --nestingLevel; }
+		};
+		NestingGuard guard(s_nestingLevel);
+
+		MergeBuffer* mergePtr;
+		std::vector<CollisionResult>* collisionBufferPtr;
+		std::unique_ptr<MergeBuffer> heapMerge;
+		std::unique_ptr<std::vector<CollisionResult>> heapCollisionBuffer;
+
+		if (level < MaxNestingDepth) {
+			// Normal case - use pre-allocated pool (zero allocation)
+			mergePtr = &s_mergePool[level];
+			collisionBufferPtr = &s_collisionPool[level];
+		}
+		else {
+			// Overflow (shouldn't happen) - fall back to heap
+			HDT_ZONE_SCOPED_N("NestingOverflowAlloc");
+			heapMerge = std::make_unique<MergeBuffer>();
+			heapCollisionBuffer = std::make_unique<std::vector<CollisionResult>>(MaxCollisionCount);
+			mergePtr = heapMerge.get();
+			collisionBufferPtr = heapCollisionBuffer.get();
+			_ERROR("processCollision: nesting depth %d exceeded pool size %d!", level, MaxNestingDepth);
+		}
+
+		MergeBuffer& merge = *mergePtr;
 		merge.ensureCapacity(body0->m_skinnedBones.size(), body1->m_skinnedBones.size());
 		merge.clear();
 
-		CollisionResult* collision = collisionBuffer.data();
+		CollisionResult* collision = collisionBufferPtr->data();
 		if (body0->m_shape->asPerTriangleShape() && body1->m_shape->asPerTriangleShape()) {
 			processCollision(body0->m_shape->asPerTriangleShape(), body1->m_shape->asPerVertexShape(), merge,
 							 collision);
@@ -922,7 +1053,6 @@ namespace hdt
 			processCollision(body0->m_shape->asPerVertexShape(), body1->m_shape->asPerVertexShape(), merge, collision);
 
 		merge.apply(body0, body1, dispatcher);
-		// No release needed - thread_local persists and reuses memory
 	}
 
 	void SkinnedMeshAlgorithm::registerAlgorithm(btCollisionDispatcherMt* dispatcher)

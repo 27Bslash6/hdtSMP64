@@ -21,7 +21,17 @@ namespace hdt
 
 	void SkinnedMeshWorld::incrementFrame()
 	{
-		++s_currentFrame;
+		// Reset counter before overflow to prevent dirty flag comparison bugs.
+		// When s_currentFrame wraps to 0, it would match uninitialized m_lastUpdateFrame (= 0),
+		// causing objects to incorrectly skip updates. Reset to 1 to avoid this.
+		// Threshold of 0xC0000000 (~3 billion) gives ~1.6 years buffer before overflow at 60fps.
+		constexpr uint32_t RESET_THRESHOLD = 0xC0000000;
+		if (s_currentFrame >= RESET_THRESHOLD) {
+			s_currentFrame = 1;
+		}
+		else {
+			++s_currentFrame;
+		}
 		// Keep logging namespace in sync for log prefix
 		hdt::logging::currentFrameNumber.store(s_currentFrame, std::memory_order_relaxed);
 	}
@@ -319,8 +329,8 @@ namespace hdt
 		static int s_maxManifoldsSeen = 0;
 		s_maxManifoldsSeen = std::max(s_maxManifoldsSeen, maxNumManifolds);
 		if (++s_frameCounter % 120 == 0) { // Every ~2 seconds at 60fps
-			_MESSAGE("[SOLVER-DIAG] Frame %d: manifolds=%d (max=%d), constraints=%d, groups=%d, objects=%d",
-					 s_frameCounter, maxNumManifolds, s_maxManifoldsSeen, numConstraints, numGroups, numObjects);
+			_DMESSAGE("[SOLVER-DIAG] Frame %d: manifolds=%d (max=%d), constraints=%d, groups=%d, objects=%d",
+					  s_frameCounter, maxNumManifolds, s_maxManifoldsSeen, numConstraints, numGroups, numObjects);
 		}
 
 		try {

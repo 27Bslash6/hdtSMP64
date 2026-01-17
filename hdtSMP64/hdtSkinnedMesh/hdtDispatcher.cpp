@@ -79,7 +79,7 @@ namespace hdt
 		HDT_ZONE_SCOPED_N("DispatchCollisionPairs");
 		auto size = pairCache->getNumOverlappingPairs();
 		HDT_ZONE_VALUE(static_cast<int64_t>(size));
-		_VMESSAGE("dispatchAllCollisionPairs: entering with %d pairs", size);
+		_DMESSAGE("dispatchAllCollisionPairs: entering with %d pairs", size);
 		if (!size)
 			return;
 

@@ -172,6 +172,20 @@ namespace hdt
 	{
 		HDT_ZONE_SCOPED_N("SuspendSimulation");
 		this->m_isStasis = true;
+
+		// BUG-002 FIX: Wait for in-progress async work before running callback
+		// Without this, Papyrus scripts can modify physics bodies while workers
+		// are still accessing them, causing data corruption.
+		{
+			HDT_ZONE_SCOPED_N("WaitForAsyncTasks");
+			m_tasks.wait();
+		}
+		{
+			HDT_ZONE_SCOPED_N("WaitForCollisionWorkers");
+			auto dispatcher = static_cast<CollisionDispatcher*>(m_dispatcher1);
+			dispatcher->waitForCollisionWorkers();
+		}
+
 		try {
 			process();
 		}
@@ -396,7 +410,7 @@ namespace hdt
 		// NOW mark frame as in-progress - we're about to do physics work.
 		// If console thread calls suspend() after this point, it will wait for FrameSyncEvent.
 		m_frameSyncComplete.store(false, std::memory_order_release);
-		_VMESSAGE("FrameEvent: set frameSyncComplete=false, about to do physics work");
+		_DMESSAGE("FrameEvent: set frameSyncComplete=false, about to do physics work");
 
 		// Capture metrics flag ONCE to prevent race condition
 		const bool captureMetrics = m_doMetrics;
@@ -427,8 +441,11 @@ namespace hdt
 
 	void SkyrimPhysicsWorld::onEvent(const FrameSyncEvent& e)
 	{
-		// Early exit if suspended - no tasks were started, nothing to sync
+		// Early exit if suspended - but still signal completion to unblock suspend()
+		// BUG-003 FIX: Without this signaling, suspend() waits for 5-second timeout
 		if (m_suspended) {
+			m_frameSyncComplete.store(true, std::memory_order_release);
+			m_frameSyncCV.notify_all();
 			return;
 		}
 
@@ -448,18 +465,29 @@ namespace hdt
 				(m_averageSMPProcessingTimeInMainLoop * (m_sampleSize - 1) + m_SMPProcessingTimeInMainLoop) /
 				m_sampleSize;
 			float totalSMPTime = m_averageSMPProcessingTimeInMainLoop + m_2ndStepAverageProcessingTime;
-			_MESSAGE("Physics timing: %.2f ms main thread | %.2f ms async | %.1f%% async of total %.2f ms",
-					 m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime,
-					 100. * m_2ndStepAverageProcessingTime / totalSMPTime, totalSMPTime);
+			_DMESSAGE("Physics timing: %.2f ms main thread | %.2f ms async | %.1f%% async of total %.2f ms",
+					  m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime,
+					  100. * m_2ndStepAverageProcessingTime / totalSMPTime, totalSMPTime);
 		}
 		else
 			m_tasks.wait();
+
+		// CRITICAL FIX: Wait for collision workers before signaling frame complete
+		// The doUpdate2ndStep task may have spawned parallel collision workers via
+		// hdt_parallel_for_each that are still running after m_tasks.wait() returns.
+		// Without this, the next frame can start while collision workers from this
+		// frame are still reading/writing collider tree nodes, causing index corruption.
+		{
+			HDT_ZONE_SCOPED_N("FrameSync::WaitCollisionWorkers");
+			auto dispatcher = static_cast<CollisionDispatcher*>(m_dispatcher1);
+			dispatcher->waitForCollisionWorkers();
+		}
 
 		// Mark frame as complete for suspend() synchronization
 		m_frameSyncComplete.store(true, std::memory_order_release);
 		// Notify any waiting suspend() call (console thread)
 		m_frameSyncCV.notify_all();
-		_VMESSAGE("FrameSyncEvent: set frameSyncComplete=true, frame complete");
+		_DMESSAGE("FrameSyncEvent: set frameSyncComplete=true, frame complete");
 	}
 
 	void SkyrimPhysicsWorld::onEvent(const ShutdownEvent& e)

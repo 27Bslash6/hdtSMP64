@@ -878,7 +878,7 @@ btScalar btSequentialImpulseConstraintSolverMt::solveGroupCacheFriendlySetup(
 	// DEBUG: Log batching decision (every ~2 seconds at 60fps)
 	static int s_batchingLogCounter = 0;
 	if (++s_batchingLogCounter % 120 == 0) {
-		_MESSAGE("[SOLVER-MT] Batching=%s (manifolds=%d>=%d? %s, nested=%s, threadsRunning=%s)",
+		_DMESSAGE("[SOLVER-MT] Batching=%s (manifolds=%d>=%d? %s, nested=%s, threadsRunning=%s)",
 			m_useBatching ? "ON" : "OFF",
 			numManifolds, s_minimumContactManifoldsForBatching,
 			hasEnoughManifolds ? "yes" : "no",

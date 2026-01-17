@@ -416,10 +416,10 @@ namespace hdt
 			if (activeSkeletons > 0) {
 				averageTimePerSkeletonInMainLoop = averageProcessingTimeInMainLoop / activeSkeletons;
 			}
-			_MESSAGE("Skeleton metrics: %d active / %d max / %zu total | %.2f ms/skeleton | %.2f ms used / %.2f ms "
-					 "budget",
-					 activeSkeletons, maxActiveSkeletons, m_skeletons.size(), averageTimePerSkeletonInMainLoop,
-					 averageProcessingTimeInMainLoop, target_time);
+			_DMESSAGE("Skeleton metrics: %d active / %d max / %zu total | %.2f ms/skeleton | %.2f ms used / %.2f ms "
+					  "budget",
+					  activeSkeletons, maxActiveSkeletons, m_skeletons.size(), averageTimePerSkeletonInMainLoop,
+					  averageProcessingTimeInMainLoop, target_time);
 			if (m_autoAdjustMaxSkeletons) {
 				const bool windowHasFocus = isGameWindowFocused();
 
