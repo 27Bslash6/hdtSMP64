@@ -4,3 +4,6 @@
 [submodule "external/enkiTS"]
 	path = external/enkiTS
 	url = https://github.com/dougbinks/enkiTS.git
+[submodule "external/highway"]
+	path = external/highway
+	url = https://github.com/google/highway.git
