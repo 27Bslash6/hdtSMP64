@@ -14,6 +14,7 @@
 #include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h>
 
 #include <exception>
+#include <LinearMath/btThreads.h>
 #include <random>
 
 namespace hdt
@@ -73,6 +74,16 @@ namespace hdt
 
 		auto broadphase = new btDbvtBroadphase();
 		m_broadphasePairCache = broadphase;
+
+		// Optimization: Defer collision pair detection to calculateOverlappingPairs()
+		// instead of doing it incrementally during setAabb(). This allows the AABB
+		// update loop to be much faster since it only updates the tree, not the pairs.
+		broadphase->m_deferedcollide = true;
+
+		// Optimization: Enable velocity-based AABB prediction to reduce update frequency.
+		// When an object moves, expand AABB in direction of motion by (size/2 * prediction).
+		// This reduces tree updates for smoothly moving objects.
+		broadphase->m_prediction = 1.0f;
 
 		// Create solver pool and connect to base class - CRITICAL for parallel solving
 		m_solverPool = new btConstraintSolverPoolMt(BT_MAX_THREAD_COUNT);
@@ -202,6 +213,147 @@ namespace hdt
 				rig->setBroadphaseHandle(proxy);
 			}
 		}
+	}
+
+	// Two-phase parallel AABB update:
+	// Phase 1: Compute AABBs in parallel (thread-safe - pure computation)
+	// Phase 2: Update broadphase sequentially (NOT thread-safe - tree/list mutations)
+	void SkinnedMeshWorld::updateAabbs()
+	{
+		HDT_ZONE_SCOPED_N("UpdateAabbs_Parallel");
+		BT_PROFILE("updateAabbs");
+
+		const int numObjects = m_collisionObjects.size();
+		if (numObjects == 0)
+			return;
+
+		// Pre-compute dispatch info flags to avoid virtual calls in parallel loop
+		const bool useContinuous = getDispatchInfo().m_useContinuous;
+		const bool forceUpdate = m_forceUpdateAllAabbs;
+
+		// Structure to hold computed AABB data
+		struct ComputedAabb
+		{
+			btCollisionObject* colObj = nullptr; // nullptr = skip this entry
+			btVector3 minAabb;
+			btVector3 maxAabb;
+			bool deactivate = false; // true = AABB overflow, disable simulation
+		};
+
+		// Allocate buffer for computed AABBs
+		std::vector<ComputedAabb> computedAabbs(numObjects);
+
+		// Phase 1: Parallel AABB computation
+		struct ComputeAabbLoop : public btIParallelForBody
+		{
+			btCollisionObjectArray* objects;
+			ComputedAabb* results;
+			bool forceUpdate;
+			bool useContinuous;
+
+			void forLoop(int iBegin, int iEnd) const override
+			{
+				HDT_ZONE_SCOPED_N("ComputeAabbBatch");
+
+				for (int i = iBegin; i < iEnd; ++i) {
+					btCollisionObject* colObj = (*objects)[i];
+					ComputedAabb& out = results[i];
+					out.colObj = nullptr; // Mark as skip by default
+
+					// Only update active objects unless forced
+					if (!forceUpdate && !colObj->isActive())
+						continue;
+
+					// Compute AABB from collision shape (same logic as btCollisionWorld::updateSingleAabb)
+					colObj->getCollisionShape()->getAabb(colObj->getWorldTransform(), out.minAabb, out.maxAabb);
+
+					// Expand by contact threshold
+					btVector3 contactThreshold(gContactBreakingThreshold, gContactBreakingThreshold,
+											   gContactBreakingThreshold);
+					out.minAabb -= contactThreshold;
+					out.maxAabb += contactThreshold;
+
+					// Handle continuous collision detection (interpolation AABB)
+					if (useContinuous && colObj->getInternalType() == btCollisionObject::CO_RIGID_BODY &&
+						!colObj->isStaticOrKinematicObject())
+					{
+						btVector3 minAabb2, maxAabb2;
+						colObj->getCollisionShape()->getAabb(colObj->getInterpolationWorldTransform(), minAabb2,
+															 maxAabb2);
+						minAabb2 -= contactThreshold;
+						maxAabb2 += contactThreshold;
+						out.minAabb.setMin(minAabb2);
+						out.maxAabb.setMax(maxAabb2);
+					}
+
+					// Check for valid AABB size (moving objects should be moderately sized)
+					if (colObj->isStaticObject() || (out.maxAabb - out.minAabb).length2() < btScalar(1e12)) {
+						out.colObj = colObj; // Mark as valid for broadphase update
+					}
+					else {
+						// AABB overflow - mark for deactivation
+						out.colObj = colObj;
+						out.deactivate = true;
+					}
+				}
+			}
+		};
+
+		{
+			HDT_ZONE_SCOPED_N("UpdateAabbs_Compute");
+			ComputeAabbLoop loop;
+			loop.objects = &m_collisionObjects;
+			loop.results = computedAabbs.data();
+			loop.forceUpdate = forceUpdate;
+			loop.useContinuous = useContinuous;
+
+			// Grain size tuned for typical collision object count (64 objects per task)
+			// Small grain = more parallelism but more overhead
+			// Large grain = less overhead but less parallelism
+			const int grainSize = 64;
+			btParallelFor(0, numObjects, grainSize, loop);
+		}
+
+		// Phase 2: Sequential broadphase update (NOT thread-safe)
+		{
+			HDT_ZONE_SCOPED_N("UpdateAabbs_Apply");
+			btBroadphaseInterface* bp = m_broadphasePairCache;
+
+			// Threshold for AABB change detection - skip update if change is tiny
+			// Using squared distance to avoid sqrt. 0.01 = 0.1 units squared.
+			constexpr btScalar AABB_CHANGE_THRESHOLD_SQ = btScalar(0.01);
+
+			int skippedCount = 0;
+			for (const ComputedAabb& aabb : computedAabbs) {
+				if (!aabb.colObj)
+					continue;
+
+				if (aabb.deactivate) {
+					// Something went wrong with AABB computation - disable this object
+					aabb.colObj->setActivationState(DISABLE_SIMULATION);
+					continue;
+				}
+
+				// Early-out: Skip broadphase update if AABB hasn't changed significantly
+				// This avoids tree updates and linked list operations for static/slow objects
+				btBroadphaseProxy* proxy = aabb.colObj->getBroadphaseHandle();
+				if (proxy) {
+					btVector3 deltaMin = aabb.minAabb - proxy->m_aabbMin;
+					btVector3 deltaMax = aabb.maxAabb - proxy->m_aabbMax;
+					btScalar changeSq = deltaMin.length2() + deltaMax.length2();
+					if (changeSq < AABB_CHANGE_THRESHOLD_SQ) {
+						++skippedCount;
+						continue;
+					}
+				}
+
+				bp->setAabb(proxy, aabb.minAabb, aabb.maxAabb, m_dispatcher1);
+			}
+
+			HDT_PLOT("AabbSkipped", static_cast<int64_t>(skippedCount));
+		}
+
+		m_forceUpdateAllAabbs = false;
 	}
 
 	int SkinnedMeshWorld::stepSimulation(btScalar remainingTimeStep, int maxSubSteps, btScalar fixedTimeStep)

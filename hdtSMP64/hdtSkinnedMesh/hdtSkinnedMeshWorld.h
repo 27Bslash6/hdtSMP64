@@ -53,6 +53,7 @@ namespace hdt
 		void applyGravity() override;
 		void applyWind();
 
+		void updateAabbs() override;
 		void predictUnconstraintMotion(btScalar timeStep) override;
 		void integrateTransforms(btScalar timeStep) override;
 		void performDiscreteCollisionDetection() override;
