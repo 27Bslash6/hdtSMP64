@@ -47,6 +47,9 @@
     <ClInclude Include="hdtSkinnedMesh\hdtDispatcher.h">
       <Filter>hdtSkinnedMesh</Filter>
     </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtEnkiTSScheduler.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
     <ClInclude Include="hdtSkinnedMesh\hdtGeneric6DofConstraint.h">
       <Filter>hdtSkinnedMesh</Filter>
     </ClInclude>
@@ -78,6 +81,15 @@
       <Filter>hdtSkinnedMesh</Filter>
     </ClInclude>
     <ClInclude Include="hdtSkinnedMesh\hdtVertex.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtHighwaySkinning.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtHighway.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtHighwayAABB.h">
       <Filter>hdtSkinnedMesh</Filter>
     </ClInclude>
     <ClInclude Include="hdtConvertNi.h">
@@ -888,6 +900,9 @@
     <ClCompile Include="hdtSkinnedMesh\hdtDispatcher.cpp">
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
+    <ClCompile Include="hdtSkinnedMesh\enkiTS_TaskScheduler.cpp">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtGeneric6DofConstraint.cpp">
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
@@ -913,6 +928,12 @@
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtSkinnedMeshWorld.cpp">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="hdtSkinnedMesh\hdtHighwaySkinning.cpp">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="hdtSkinnedMesh\hdtHighwayAABB.cpp">
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtStiffSpringConstraint.cpp">

@@ -517,7 +517,8 @@ static void writeGrainSizes(btBatchedConstraints* bc)
 	typedef btBatchedConstraints::Range Range;
 	int numPhases = bc->m_phases.size();
 	bc->m_phaseGrainSize.resizeNoInitialize(numPhases);
-	int numThreads = btGetTaskScheduler()->getNumThreads();
+	btITaskScheduler* scheduler = btGetTaskScheduler();
+	int numThreads = scheduler ? scheduler->getNumThreads() : 1;
 	for (int iPhase = 0; iPhase < numPhases; ++iPhase)
 	{
 		const Range& phase = bc->m_phases[iPhase];

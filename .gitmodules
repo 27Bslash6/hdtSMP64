@@ -1,3 +1,9 @@
 [submodule "external/tracy"]
 	path = external/tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "external/enkiTS"]
+	path = external/enkiTS
+	url = https://github.com/dougbinks/enkiTS.git
+[submodule "external/highway"]
+	path = external/highway
+	url = https://github.com/google/highway.git

@@ -3,9 +3,9 @@
 namespace hdt
 {
 	ConeTwistConstraint::ConeTwistConstraint(SkinnedMeshBone* a, SkinnedMeshBone* b, const btTransform& frameInA,
-	                                         const btTransform& frameInB)
-		: BoneScaleConstraint(a, b, static_cast<btConeTwistConstraint*>(this))
-		  , btConeTwistConstraint(a->m_rig, b->m_rig, btTransform::getIdentity(), btTransform::getIdentity())
+											 const btTransform& frameInB)
+		: BoneScaleConstraint(a, b, static_cast<btConeTwistConstraint*>(this)),
+		  btConeTwistConstraint(a->m_rig, b->m_rig, btTransform::getIdentity(), btTransform::getIdentity())
 	{
 		auto fa = a->m_rigToLocal * frameInA;
 		auto fb = b->m_rigToLocal * frameInB;
@@ -30,4 +30,4 @@ namespace hdt
 		m_scaleA = newScaleA;
 		m_scaleB = newScaleB;
 	}
-}
+} // namespace hdt

@@ -1,0 +1,58 @@
+# Pre-commit hooks for hdtSMP64
+# Install: pip install pre-commit && pre-commit install
+# Manual run: pre-commit run --all-files
+
+repos:
+  # Basic hygiene hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(external/|hdtSMP64/Bullet|hdtSMP64/LinearMath)
+      - id: end-of-file-fixer
+        exclude: ^(external/|hdtSMP64/Bullet|hdtSMP64/LinearMath)
+      - id: check-yaml
+      - id: check-xml
+        exclude: ^fomod/  # FOMOD XML uses non-standard format
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: ^(external/|.*\.sln$|.*\.vcxproj)
+
+  # clang-format for C++ formatting
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.3
+    hooks:
+      - id: clang-format
+        types_or: [c++, c]
+        # Exclude: vendored libs, UTF-16 encoded files (stdafx, targetver, hdtConstraintGroup)
+        exclude: ^(external/|hdtSMP64/Bullet|hdtSMP64/LinearMath|hdtSMP64/Bullet3|.*stdafx.*|.*targetver.*|.*hdtConstraintGroup.*)
+        args: [-i]  # Auto-fix in place
+
+  # cppcheck static analysis
+  - repo: local
+    hooks:
+      - id: cppcheck
+        name: cppcheck
+        entry: powershell.exe -NoProfile -File scripts/cppcheck.ps1
+        language: system
+        types: [c++]
+        pass_filenames: false
+        stages: [pre-commit]
+
+  # Commit message validation (conventional commits)
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.1.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]
+
+# CI configuration
+ci:
+  autofix_commit_msg: 'style: auto-fix formatting [pre-commit.ci]'
+  autofix_prs: true
+  autoupdate_commit_msg: 'chore: update pre-commit hooks'
+  autoupdate_schedule: monthly
+  skip: [cppcheck]  # Skip cppcheck in CI (runs separately)

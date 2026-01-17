@@ -2,17 +2,17 @@
 
 namespace hdt
 {
-	template <class Event = void>
+	template<class Event = void>
 	class IEventListener
 	{
 	public:
 		virtual void onEvent(const Event&) = 0;
 	};
 
-	template <>
+	template<>
 	class IEventListener<void>
 	{
 	public:
 		virtual void onEvent() = 0;
 	};
-}
+} // namespace hdt

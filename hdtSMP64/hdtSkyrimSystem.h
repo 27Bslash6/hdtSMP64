@@ -1,19 +1,20 @@
 #pragma once
 
 #include "hdtConvertNi.h"
-#include "hdtSkyrimBone.h"
-#include "hdtSkyrimBody.h"
-#include "hdtSkinnedMesh/hdtSkinnedMeshSystem.h"
-#include "hdtSkinnedMesh/hdtGeneric6DofConstraint.h"
-#include "hdtSkinnedMesh/hdtStiffSpringConstraint.h"
-#include "hdtSkinnedMesh/hdtConeTwistConstraint.h"
 #include "hdtDefaultBBP.h"
+#include "hdtSkinnedMesh/hdtConeTwistConstraint.h"
+#include "hdtSkinnedMesh/hdtGeneric6DofConstraint.h"
+#include "hdtSkinnedMesh/hdtSkinnedMeshSystem.h"
+#include "hdtSkinnedMesh/hdtStiffSpringConstraint.h"
+#include "hdtSkyrimBody.h"
+#include "hdtSkyrimBone.h"
 
 namespace hdt
 {
 	class SkyrimSystem : public SkinnedMeshSystem
 	{
 		friend class SkyrimSystemCreator;
+
 	public:
 		struct BoneData
 		{
@@ -36,7 +37,8 @@ namespace hdt
 		Ref<NiNode> m_skeleton;
 		Ref<NiNode> m_oldRoot;
 		bool m_initialized = false;
-		float m_windFactor = 1.f; // wind factor for the system (i.e., full actor/skeleton) (calculated based off obstructions)
+		float m_windFactor = 1.f; // wind factor for the system (i.e., full actor/skeleton) (calculated based off
+								  // obstructions)
 
 		// angular velocity damper
 		btQuaternion m_lastRootRotation;
@@ -48,9 +50,10 @@ namespace hdt
 	{
 	public:
 		SkyrimSystemCreator();
-		Ref<SkyrimSystem> createOrUpdateSystem(NiNode* skeleton, NiAVObject* model, DefaultBBP::PhysicsFile *file, std::unordered_map<IDStr, IDStr> renameMap, SkyrimSystem* old_system);
-	protected:
+		Ref<SkyrimSystem> createOrUpdateSystem(NiNode* skeleton, NiAVObject* model, DefaultBBP::PhysicsFile* file,
+											   std::unordered_map<IDStr, IDStr> renameMap, SkyrimSystem* old_system);
 
+	protected:
 		using VertexOffsetMap = std::unordered_map<std::string, int>;
 
 		IDStr getRenamedBone(IDStr name);
@@ -101,7 +104,7 @@ namespace hdt
 
 		bool parseFrameType(const std::string& name, FrameType& type, btTransform& frame);
 		static void calcFrame(FrameType type, const btTransform& frame, const btQsTransform& trA,
-		                      const btQsTransform& trB, btTransform& frameA, btTransform& frameB);
+							  const btQsTransform& trB, btTransform& frameA, btTransform& frameB);
 
 		struct GenericConstraintTemplate
 		{
@@ -127,7 +130,8 @@ namespace hdt
 			bool springDampingLimited = true;
 			bool linearMotors = false;
 			bool angularMotors = false;
-			// TODO: Test if servo motors go to [0, 0, 0], or whatever equilibrium is.  Provide option to set server motor target.  Hard coded to equilibrium right now.
+			// TODO: Test if servo motors go to [0, 0, 0], or whatever equilibrium is.  Provide option to set server
+			// motor target.  Hard coded to equilibrium right now.
 			bool linearServoMotors = false;
 			bool angularServoMotors = false;
 			btVector3 linearNonHookeanDamping = btVector3(0, 0, 0);
@@ -172,7 +176,8 @@ namespace hdt
 		std::unordered_map<IDStr, ConeTwistConstraintTemplate> m_coneTwistConstraintTemplates;
 		std::unordered_map<IDStr, std::shared_ptr<btCollisionShape>> m_shapes;
 
-		std::pair< Ref<SkyrimBody>, VertexOffsetMap > generateMeshBody(const std::string name, DefaultBBP::NameSet* names);
+		std::pair<Ref<SkyrimBody>, VertexOffsetMap> generateMeshBody(const std::string name,
+																	 DefaultBBP::NameSet* names);
 
 		void readFrameLerp(btTransform& tr);
 		void readBoneTemplate(BoneTemplate& dest);
@@ -185,7 +190,9 @@ namespace hdt
 		const StiffSpringConstraintTemplate& getStiffSpringConstraintTemplate(const IDStr& name);
 		const ConeTwistConstraintTemplate& getConeTwistConstraintTemplate(const IDStr& name);
 
-		SkyrimBone* SkyrimSystemCreator::createBoneFromNodeName(const IDStr& bodyName, const IDStr& templateName = "", const bool readTemplate = false, SkyrimSystem* old_system = nullptr);
+		SkyrimBone* SkyrimSystemCreator::createBoneFromNodeName(const IDStr& bodyName, const IDStr& templateName = "",
+																const bool readTemplate = false,
+																SkyrimSystem* old_system = nullptr);
 		void SkyrimSystemCreator::readOrUpdateBone(SkyrimSystem* old_system = nullptr);
 		Ref<SkyrimBody> readPerVertexShape(DefaultBBP::NameMap meshNameMap);
 		Ref<SkyrimBody> readPerTriangleShape(DefaultBBP::NameMap* meshNameMap);
@@ -195,13 +202,15 @@ namespace hdt
 		Ref<ConstraintGroup> readConstraintGroup();
 		std::shared_ptr<btCollisionShape> readShape();
 
-		template <typename ... Args>
-		void Error(const char* fmt, Args ... args);
-		template <typename ... Args>
-		void Warning(const char* fmt, Args ... args);
-		template <typename ... Args>
-		void VMessage(const char* fmt, Args ... args);
+		template<typename... Args>
+		void Error(const char* fmt, Args... args);
+		template<typename... Args>
+		void Warning(const char* fmt, Args... args);
+		template<typename... Args>
+		void VMessage(const char* fmt, Args... args);
+		template<typename... Args>
+		void DMessage(const char* fmt, Args... args);
 
 		std::vector<std::shared_ptr<btCollisionShape>> m_shapeRefs;
 	};
-}
+} // namespace hdt

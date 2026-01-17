@@ -1,11 +1,15 @@
 #pragma once
 
 #include "hdtBulletHelper.h"
+#include "hdtHighwayAABB.h"
+
+#include "../config.h"
+
 #include <amp.h>
 #include <amp_graphics.h>
 #include <amp_math.h>
 #include <amp_short_vectors.h>
-#include <immintrin.h>  // AVX2 intrinsics
+#include <immintrin.h> // AVX2 intrinsics
 
 namespace hdt
 {
@@ -13,9 +17,7 @@ namespace hdt
 	{
 		Aabb() { invalidate(); }
 
-		Aabb(__m128 mmin, __m128 mmax) : m_min(mmin), m_max(mmax)
-		{
-		}
+		Aabb(__m128 mmin, __m128 mmax) : m_min(mmin), m_max(mmax) {}
 
 		__m128 m_min;
 		__m128 m_max;
@@ -55,13 +57,11 @@ namespace hdt
 			return overlap;*/
 		}
 
-		bool collideWithSphere(const btVector3& p, float radius) const
-		{
-			return extended(radius).collideWith(p);
-		}
+		bool collideWithSphere(const btVector3& p, float radius) const { return extended(radius).collideWith(p); }
 
 		// AVX2 batch collision check: test 2 AABBs against this AABB simultaneously
 		// Returns bitmask: bit 0 = aabb0 collides, bit 1 = aabb1 collides
+#ifdef __AVX2__
 		__forceinline int collideWith2(const Aabb& aabb0, const Aabb& aabb1) const
 		{
 			// Broadcast this AABB's min/max to both lanes of 256-bit registers
@@ -84,64 +84,111 @@ namespace hdt
 			// mask bits: [7:4] = aabb1, [3:0] = aabb0
 			// Collision if NO separation on x,y,z (bits 0-2 for aabb0, bits 4-6 for aabb1)
 			int result = 0;
-			if (!(mask & 0x07)) result |= 1;  // aabb0 collides
-			if (!(mask & 0x70)) result |= 2;  // aabb1 collides
+			if (!(mask & 0x07))
+				result |= 1; // aabb0 collides
+			if (!(mask & 0x70))
+				result |= 2; // aabb1 collides
 			return result;
 		}
+#else
+		// Scalar fallback for non-AVX2 builds
+		__forceinline int collideWith2(const Aabb& aabb0, const Aabb& aabb1) const
+		{
+			int result = 0;
+			if (collideWith(aabb0))
+				result |= 1;
+			if (collideWith(aabb1))
+				result |= 2;
+			return result;
+		}
+#endif
 
 		// AVX-512 batch collision check: test 4 AABBs against this AABB simultaneously
 		// Returns bitmask: bit N = aabbN collides (bits 0-3)
 #ifdef __AVX512F__
-		__forceinline int collideWith4(const Aabb& aabb0, const Aabb& aabb1,
-		                               const Aabb& aabb2, const Aabb& aabb3) const
+		__forceinline int collideWith4(const Aabb& aabb0, const Aabb& aabb1, const Aabb& aabb2, const Aabb& aabb3) const
 		{
 			__m512 thisMin = _mm512_broadcast_f32x4(m_min);
 			__m512 thisMax = _mm512_broadcast_f32x4(m_max);
 
 			// Build 512-bit registers from four 128-bit AABBs using insertf32x4
 			__m512 testMin = _mm512_insertf32x4(
-				_mm512_insertf32x4(
-					_mm512_insertf32x4(_mm512_castps128_ps512(aabb0.m_min), aabb1.m_min, 1),
-					aabb2.m_min, 2),
+				_mm512_insertf32x4(_mm512_insertf32x4(_mm512_castps128_ps512(aabb0.m_min), aabb1.m_min, 1), aabb2.m_min,
+								   2),
 				aabb3.m_min, 3);
 			__m512 testMax = _mm512_insertf32x4(
-				_mm512_insertf32x4(
-					_mm512_insertf32x4(_mm512_castps128_ps512(aabb0.m_max), aabb1.m_max, 1),
-					aabb2.m_max, 2),
+				_mm512_insertf32x4(_mm512_insertf32x4(_mm512_castps128_ps512(aabb0.m_max), aabb1.m_max, 1), aabb2.m_max,
+								   2),
 				aabb3.m_max, 3);
 
 			__mmask16 sep = _mm512_cmp_ps_mask(testMax, thisMin, _CMP_LT_OQ) |
-			                _mm512_cmp_ps_mask(thisMax, testMin, _CMP_LT_OQ);
+							_mm512_cmp_ps_mask(thisMax, testMin, _CMP_LT_OQ);
 
 			// Each AABB uses 4 bits; check xyz (lower 3 bits of each lane)
-			return (!(sep & 0x0007)) | ((!(sep & 0x0070)) << 1) |
-			       ((!(sep & 0x0700)) << 2) | ((!(sep & 0x7000)) << 3);
+			return (!(sep & 0x0007)) | ((!(sep & 0x0070)) << 1) | ((!(sep & 0x0700)) << 2) | ((!(sep & 0x7000)) << 3);
 		}
 #endif
 
 		// Batch collision check against array of AABBs
-		// Uses AVX-512 (4 at a time) or AVX2 (2 at a time) depending on build
+		// Uses Highway runtime dispatch when enabled, falls back to AVX-512/AVX2/scalar
 		template<typename OutputIt>
 		static int collideWithMany(const Aabb& ref, const Aabb* aabbs, int count, OutputIt out)
 		{
+			if (count <= 0)
+				return 0;
+
+			// Highway path - runtime SIMD dispatch, portable across all targets
+			if (g_highwayConfig.enabled && count >= g_highwayConfig.batchThreshold) {
+				// Support up to 128 candidates per batch (2 uint64_t = 128 bits)
+				constexpr size_t MAX_HIGHWAY_BATCH = 128;
+				uint64_t resultBits[2] = {0, 0};
+				size_t batchCount = (count > static_cast<int>(MAX_HIGHWAY_BATCH)) ? MAX_HIGHWAY_BATCH : count;
+
+				size_t hits = highway::batchCollideWith(ref, aabbs, batchCount, resultBits);
+
+				// Convert bitmask to output iterator
+				for (size_t i = 0; i < batchCount; ++i) {
+					size_t wordIdx = i / 64;
+					size_t bitIdx = i % 64;
+					if (resultBits[wordIdx] & (1ULL << bitIdx))
+						*out++ = const_cast<Aabb*>(&aabbs[i]);
+				}
+
+				// Handle overflow beyond MAX_HIGHWAY_BATCH with scalar fallback
+				for (int i = static_cast<int>(batchCount); i < count; ++i) {
+					if (ref.collideWith(aabbs[i])) {
+						*out++ = const_cast<Aabb*>(&aabbs[i]);
+						++hits;
+					}
+				}
+
+				return static_cast<int>(hits);
+			}
+
+			// Legacy SIMD path - compile-time dispatch via #ifdef
 			int collisions = 0;
 			int i = 0;
 
 			// Helper to emit collisions from bitmask
 			auto emit = [&](int mask, int base, int n) {
 				for (int b = 0; b < n; ++b)
-					if (mask & (1 << b)) { *out++ = const_cast<Aabb*>(&aabbs[base + b]); ++collisions; }
+					if (mask & (1 << b)) {
+						*out++ = const_cast<Aabb*>(&aabbs[base + b]);
+						++collisions;
+					}
 			};
 
 #ifdef __AVX512F__
 			for (; i + 3 < count; i += 4)
-				emit(ref.collideWith4(aabbs[i], aabbs[i+1], aabbs[i+2], aabbs[i+3]), i, 4);
+				emit(ref.collideWith4(aabbs[i], aabbs[i + 1], aabbs[i + 2], aabbs[i + 3]), i, 4);
 #endif
 			for (; i + 1 < count; i += 2)
-				emit(ref.collideWith2(aabbs[i], aabbs[i+1]), i, 2);
+				emit(ref.collideWith2(aabbs[i], aabbs[i + 1]), i, 2);
 
-			if (i < count && ref.collideWith(aabbs[i]))
-				{ *out++ = const_cast<Aabb*>(&aabbs[i]); ++collisions; }
+			if (i < count && ref.collideWith(aabbs[i])) {
+				*out++ = const_cast<Aabb*>(&aabbs[i]);
+				++collisions;
+			}
 
 			return collisions;
 		}
@@ -165,9 +212,11 @@ namespace hdt
 		}
 
 		// AVX2 batch merge: merge multiple AABBs into this one efficiently
+#ifdef __AVX2__
 		void mergeMany(const Aabb* aabbs, int count)
 		{
-			if (count <= 0) return;
+			if (count <= 0)
+				return;
 
 			int i = 0;
 			// Start with first AABB
@@ -176,8 +225,7 @@ namespace hdt
 			i = 1;
 
 			// Process pairs with AVX2
-			for (; i + 1 < count; i += 2)
-			{
+			for (; i + 1 < count; i += 2) {
 				__m256 pairMin = _mm256_set_m128(aabbs[i + 1].m_min, aabbs[i].m_min);
 				__m256 pairMax = _mm256_set_m128(aabbs[i + 1].m_max, aabbs[i].m_max);
 				accMin = _mm256_min_ps(accMin, pairMin);
@@ -196,6 +244,14 @@ namespace hdt
 			if (i < count)
 				merge(aabbs[i]);
 		}
+#else
+		// Scalar fallback for non-AVX2 builds
+		void mergeMany(const Aabb* aabbs, int count)
+		{
+			for (int i = 0; i < count; ++i)
+				merge(aabbs[i]);
+		}
+#endif
 
 		void mergeAdd(const btVector3& p)
 		{
@@ -212,15 +268,9 @@ namespace hdt
 
 	struct BoundingSphere
 	{
-		BoundingSphere()
-		{
-		}
+		BoundingSphere() {}
 
-		BoundingSphere(const btVector3& center, float radius)
-			: m_centerRadius(center)
-		{
-			m_centerRadius[3] = radius;
-		}
+		BoundingSphere(const btVector3& center, float radius) : m_centerRadius(center) { m_centerRadius[3] = radius; }
 
 		bool isCollide(const BoundingSphere& rhs) const
 		{
@@ -237,4 +287,4 @@ namespace hdt
 
 		btVector4 m_centerRadius;
 	};
-}
+} // namespace hdt

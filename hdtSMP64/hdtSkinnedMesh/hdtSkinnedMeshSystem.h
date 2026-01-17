@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ppltasks.h>
 #include "hdtBulletHelper.h"
 #include "hdtConstraintGroup.h"
 
@@ -15,14 +14,14 @@ namespace hdt
 	class SkinnedMeshSystem : public RefObject
 	{
 		friend class hdt::SkinnedMeshWorld;
-	public:
 
+	public:
 		virtual void resetTransformsToOriginal();
 		virtual void readTransform(float timeStep);
 		virtual void writeTransform();
 
 		void internalUpdate();
-		//void internalUpdateCL();
+		// void internalUpdateCL();
 		void gather(std::vector<SkinnedMeshBody*>& bodies, std::vector<SkinnedMeshShape*>& shapes);
 
 		bool valid() const { return !m_bones.empty(); }
@@ -38,9 +37,5 @@ namespace hdt
 		std::vector<Ref<SkinnedMeshBody>> m_meshes;
 		std::vector<Ref<BoneScaleConstraint>> m_constraints;
 		std::vector<Ref<ConstraintGroup>> m_constraintGroups;
-
-	private:
-		typedef concurrency::task<void> task;
-		typedef concurrency::task_group task_group;
 	};
-}
+} // namespace hdt

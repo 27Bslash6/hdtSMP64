@@ -1,18 +1,25 @@
 #include "hdtSkyrimPhysicsWorld.h"
+
 #include "hdtLog.h"
-#include "hdtTracy.h"
 #include "hdtSkinnedMesh/hdtConstraintGroup.h"
-#include <ppl.h>
+#include "hdtSkinnedMesh/hdtDispatcher.h"
+#include "hdtTracy.h"
+#ifdef CUDA
+#include "hdtSkinnedMesh/hdtCudaInterface.h"
+#include "hdtSkinnedMesh/hdtFrameTimer.h"
+#endif
+
 #include "Offsets.h"
 #include "PluginInterfaceImpl.h"
-
 #include "skse64/GameMenus.h"
 
 // Local wrapper for MenuManager::IsGamePaused()
 // Official SKSE 2.2.6 doesn't expose this - numPauseGame is private at offset 0x160
 // Verified against SKSE64 2.2.6 - GameMenus.h line 1075
-inline bool IsMenuManagerGamePaused(MenuManager* mm) {
-	if (!mm) return false;
+inline bool IsMenuManagerGamePaused(MenuManager* mm)
+{
+	if (!mm)
+		return false;
 	return *reinterpret_cast<UInt32*>(reinterpret_cast<uintptr_t>(mm) + 0x160) > 0;
 }
 
@@ -30,35 +37,33 @@ namespace hdt
 		m_accumulatedInterval = 0;
 	}
 
-	SkyrimPhysicsWorld::~SkyrimPhysicsWorld(void)
-	{
-	}
+	SkyrimPhysicsWorld::~SkyrimPhysicsWorld(void) {}
 
-	//void hdtSkyrimPhysicsWorld::suspend()
+	// void hdtSkyrimPhysicsWorld::suspend()
 	//{
 	//	m_suspended++;
-	//}
+	// }
 
-	//void hdtSkyrimPhysicsWorld::resume()
+	// void hdtSkyrimPhysicsWorld::resume()
 	//{
 	//	--m_suspended;
-	//}
+	// }
 
-	//void hdtSkyrimPhysicsWorld::switchToSeperateClock()
+	// void hdtSkyrimPhysicsWorld::switchToSeperateClock()
 	//{
 	//	m_lock.lock();
 	//	m_useSeperatedClock = true;
 	//	m_timeLastUpdate = clock()*0.001;
 	//	m_lock.unlock();
-	//}
+	// }
 
-	//void hdtSkyrimPhysicsWorld::switchToInternalClock()
+	// void hdtSkyrimPhysicsWorld::switchToInternalClock()
 	//{
 	//	m_lock.lock();
 	//	m_useSeperatedClock = false;
 	//	m_timeLastUpdate = *timeStamp;
 	//	m_lock.unlock();
-	//}
+	// }
 
 	SkyrimPhysicsWorld* SkyrimPhysicsWorld::get()
 	{
@@ -92,18 +97,17 @@ namespace hdt
 		m_averageInterval += (interval - m_averageInterval) * .125f;
 
 		// No need to calculate physics if there is no active skeleton.
-		if (!disabled && hdt::ActorManager::instance()->activeSkeletons)
-		{
+		if (!disabled && hdt::ActorManager::instance()->activeSkeletons) {
 			// The tick is the given time for each computation substep. We set it to the average fps
 			// to have one average computation each frame when everything is usual.
 			// In case of poor fps, we set it to the configured minimum engine value (60 Hz),
 			// to still allow a physics with max increments of 1/60s.
 			const auto tick = std::min(m_averageInterval, m_timeTick);
 
-			// No need to calculate physics when too little time has passed (time exceptionally short since last computation).
-			// This magic value directly impacts the number of computations and the time cost of the mod...
-			if (m_accumulatedInterval * 2.0f > tick)
-			{
+			// No need to calculate physics when too little time has passed (time exceptionally short since last
+			// computation). This magic value directly impacts the number of computations and the time cost of the
+			// mod...
+			if (m_accumulatedInterval * 2.0f > tick) {
 				// The interval is limited to a configurable number of substeps, by default 4.
 				// Additional substeps happens when there is a very sudden slowdown, or when fps is lower than min-fps,
 				// we have to compute for the passed time we haven't computed.
@@ -115,7 +119,8 @@ namespace hdt
 
 				readTransform(remainingTimeStep);
 
-				m_tasks.run([this, interval, tick, remainingTimeStep] { doUpdate2ndStep(interval, tick, remainingTimeStep); });
+				m_tasks.run(
+					[this, interval, tick, remainingTimeStep] { doUpdate2ndStep(interval, tick, remainingTimeStep); });
 			}
 		}
 	}
@@ -123,22 +128,26 @@ namespace hdt
 	void SkyrimPhysicsWorld::doUpdate2ndStep(float interval, const float tick, const float remainingTimeStep)
 	{
 		HDT_ZONE_SCOPED_N("hdtSMP::doUpdate2ndStep");
-		if (m_suspended || m_isStasis)
+		if (m_suspended || m_isStasis) {
+			_VMESSAGE("doUpdate2ndStep: early return (suspended=%d, stasis=%d)", m_suspended.load(), m_isStasis.load());
 			return;
+		}
 
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 
 		_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 
+		// Capture metrics flag ONCE to prevent race condition where m_doMetrics changes
+		// between start and end timing checks (it's set by ActorManager on another event)
+		const bool captureMetrics = m_doMetrics;
 		LARGE_INTEGER ticks;
 		int64_t startTime = 0;
-		if (m_doMetrics)
-		{
+		if (captureMetrics) {
 			QueryPerformanceCounter(&ticks);
 			startTime = ticks.QuadPart;
 		}
 
-		g_pluginInterface.onPreStep({ getCollisionObjectArray(), remainingTimeStep });
+		g_pluginInterface.onPreStep({getCollisionObjectArray(), remainingTimeStep});
 
 		updateActiveState();
 		auto offset = applyTranslationOffset();
@@ -146,16 +155,14 @@ namespace hdt
 		restoreTranslationOffset(offset);
 		m_accumulatedInterval = 0;
 
-		g_pluginInterface.onPostStep({ getCollisionObjectArray(), remainingTimeStep });
+		g_pluginInterface.onPostStep({getCollisionObjectArray(), remainingTimeStep});
 
 		writeTransform();
 
-		if (m_doMetrics)
-		{
+		if (captureMetrics) {
 			QueryPerformanceCounter(&ticks);
 			int64_t endTime = ticks.QuadPart;
 			QueryPerformanceFrequency(&ticks);
-			// float ticks_per_ms = static_cast<float>(ticks.QuadPart) * 1e-3;
 			float lastProcessingTime = (endTime - startTime) / static_cast<float>(ticks.QuadPart) * 1e3;
 			m_2ndStepAverageProcessingTime = (m_2ndStepAverageProcessingTime + lastProcessingTime) * 0.5;
 		}
@@ -165,6 +172,20 @@ namespace hdt
 	{
 		HDT_ZONE_SCOPED_N("SuspendSimulation");
 		this->m_isStasis = true;
+
+		// BUG-002 FIX: Wait for in-progress async work before running callback
+		// Without this, Papyrus scripts can modify physics bodies while workers
+		// are still accessing them, causing data corruption.
+		{
+			HDT_ZONE_SCOPED_N("WaitForAsyncTasks");
+			m_tasks.wait();
+		}
+		{
+			HDT_ZONE_SCOPED_N("WaitForCollisionWorkers");
+			auto dispatcher = static_cast<CollisionDispatcher*>(m_dispatcher1);
+			dispatcher->waitForCollisionWorkers();
+		}
+
 		try {
 			process();
 		}
@@ -182,23 +203,20 @@ namespace hdt
 		btVector3 center;
 		center.setZero();
 		int count = 0;
-		for (int i = 0; i < m_collisionObjects.size(); ++i)
-		{
+		for (int i = 0; i < m_collisionObjects.size(); ++i) {
 			auto rig = btRigidBody::upcast(m_collisionObjects[i]);
-			if (rig)
-			{
+			if (rig) {
 				center += rig->getWorldTransform().getOrigin();
 				++count;
 			}
 		}
 
-		if (count > 0)
-		{
+		if (count > 0) {
 			center /= count;
-			for (int i = 0; i < m_collisionObjects.size(); ++i)
-			{
+			for (int i = 0; i < m_collisionObjects.size(); ++i) {
 				auto rig = btRigidBody::upcast(m_collisionObjects[i]);
-				if (rig) rig->getWorldTransform().getOrigin() -= center;
+				if (rig)
+					rig->getWorldTransform().getOrigin() -= center;
 			}
 		}
 		return center;
@@ -206,11 +224,9 @@ namespace hdt
 
 	void SkyrimPhysicsWorld::restoreTranslationOffset(const btVector3& offset)
 	{
-		for (int i = 0; i < m_collisionObjects.size(); ++i)
-		{
+		for (int i = 0; i < m_collisionObjects.size(); ++i) {
 			auto rig = btRigidBody::upcast(m_collisionObjects[i]);
-			if (rig)
-			{
+			if (rig) {
 				rig->getWorldTransform().getOrigin() += offset;
 			}
 		}
@@ -224,8 +240,12 @@ namespace hdt
 		}
 		const auto oldValueWeight = a_smoothingSamples - 1;
 		if (!btFuzzyZero((m_windSpeed - btVector3(a_point->x, a_point->y, a_point->z)).length())) {
-			m_windSpeed.setValue((oldValueWeight * m_windSpeed.getX() + a_point->x * a_scale) / a_smoothingSamples, (oldValueWeight * m_windSpeed.getY() + a_point->y * a_scale) / a_smoothingSamples, (oldValueWeight * m_windSpeed.getZ() + a_point->z * a_scale) / a_smoothingSamples);
-			_DMESSAGE("Wind Speed now (%2.2g, %2.2g, %2.2g), target (%2.2g, %2.2g, %2.2g) using %d samples.", m_windSpeed.getX(), m_windSpeed.getY(), m_windSpeed.getZ(), a_point->x * a_scale, a_point->y * a_scale, a_point->z * a_scale, a_smoothingSamples);
+			m_windSpeed.setValue((oldValueWeight * m_windSpeed.getX() + a_point->x * a_scale) / a_smoothingSamples,
+								 (oldValueWeight * m_windSpeed.getY() + a_point->y * a_scale) / a_smoothingSamples,
+								 (oldValueWeight * m_windSpeed.getZ() + a_point->z * a_scale) / a_smoothingSamples);
+			_DMESSAGE("Wind Speed now (%2.2g, %2.2g, %2.2g), target (%2.2g, %2.2g, %2.2g) using %d samples.",
+					  m_windSpeed.getX(), m_windSpeed.getY(), m_windSpeed.getZ(), a_point->x * a_scale,
+					  a_point->y * a_scale, a_point->z * a_scale, a_smoothingSamples);
 		}
 	}
 
@@ -240,44 +260,36 @@ namespace hdt
 		std::unordered_map<NiNode*, Group> maps;
 
 		IDStr invalidString;
-		for (auto& i : m_systems)
-		{
+		for (auto& i : m_systems) {
 			auto system = static_cast<SkyrimSystem*>(i());
 			auto& map = maps[system->m_skeleton];
-			for (auto& j : system->meshes())
-			{
+			for (auto& j : system->meshes()) {
 				auto shape = static_cast<SkyrimBody*>(j());
-				if (!shape) continue;
+				if (!shape)
+					continue;
 
-				if (shape->m_disableTag == invalidString)
-				{
+				if (shape->m_disableTag == invalidString) {
 					for (auto& k : shape->m_tags)
 						map.tags.insert(k);
 				}
-				else
-				{
+				else {
 					map.list[shape->m_disableTag].push_back(shape);
 				}
 			}
 		}
 
-		for (auto& i : maps)
-		{
-			for (auto& j : i.second.list)
-			{
-				if (i.second.tags.find(j.first) != i.second.tags.end())
-				{
+		for (auto& i : maps) {
+			for (auto& j : i.second.list) {
+				if (i.second.tags.find(j.first) != i.second.tags.end()) {
 					for (auto& k : j.second)
 						k->m_disabled = true;
 				}
-				else if (j.second.size())
-				{
-					std::sort(j.second.begin(), j.second.end(), [](SkyrimBody* a, SkyrimBody* b)
-						{
-							if (a->m_disablePriority != b->m_disablePriority)
-								return a->m_disablePriority > b->m_disablePriority;
-							return a < b;
-						});
+				else if (j.second.size()) {
+					std::sort(j.second.begin(), j.second.end(), [](SkyrimBody* a, SkyrimBody* b) {
+						if (a->m_disablePriority != b->m_disablePriority)
+							return a->m_disablePriority > b->m_disablePriority;
+						return a < b;
+					});
 
 					for (auto& k : j.second)
 						k->m_disabled = true;
@@ -291,9 +303,10 @@ namespace hdt
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 		auto s = dynamic_cast<SkyrimSystem*>(system);
-		if (!s) return;
+		if (!s)
+			return;
 
-		HDT_LOG_DEBUG("Adding skinned mesh system: %s", s->m_skeleton ? s->m_skeleton->m_name : "unknown");
+		_DMESSAGE("Adding skinned mesh system: %s", s->m_skeleton ? s->m_skeleton->m_name : "unknown");
 
 		s->m_initialized = false;
 		SkinnedMeshWorld::addSkinnedMeshSystem(system);
@@ -310,12 +323,12 @@ namespace hdt
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 
-		for (int i = 0; i < m_systems.size();)
-		{
+		for (int i = 0; i < m_systems.size();) {
 			Ref<SkyrimSystem> s = m_systems[i].cast<SkyrimSystem>();
 			if (s && s->m_skeleton == root)
 				SkinnedMeshWorld::removeSkinnedMeshSystem(s);
-			else ++i;
+			else
+				++i;
 		}
 	}
 
@@ -330,22 +343,39 @@ namespace hdt
 		HDT_ZONE_SCOPED_N("ResetSystems");
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 
+		// Clear collision state FIRST to prevent stale references from crashing collision processing
+		// This must happen before any physics step runs after a load/reset
+		static_cast<CollisionDispatcher*>(m_dispatcher1)->clearCollisionState();
+
+		// Also reset the broadphase pair cache - this is where the actual stale body pointers live
+		// The dispatcher's m_pairs is separate from the broadphase's overlapping pair cache
+		getBroadphase()->resetPool(m_dispatcher1);
+
+		// Force re-registration of all bodies to ensure fresh broadphase proxies
+		// This prevents any stale collision state from surviving the reset
+		reregisterAllBodies();
+		_VMESSAGE("resetSystems: cleared collision state and re-registered all bodies");
+
 		// Log performance config on reset
 		_MESSAGE("=== SMP Physics Reset ===");
-		_MESSAGE("  Solver: numIterations=%d, groupIterations=%d, MLCP=%s, erp=%.3f",
-			getSolverInfo().m_numIterations,
-			ConstraintGroup::MaxIterations,
-			ConstraintGroup::EnableMLCP ? "ON" : "OFF",
-			getSolverInfo().m_erp);
-		_MESSAGE("  Timing: min_fps=%d (tick=%.4fs), maxSubSteps=%d, realTime=%s",
-			min_fps, m_timeTick, m_maxSubSteps,
-			m_useRealTime ? "ON" : "OFF");
+#ifdef CUDA
+		auto cuda = hdt::CudaInterface::instance();
+		auto ft = FrameTimer::instance();
+		bool cudaEnabled = cuda->hasCuda() && (!ft->running() || ft->cudaFrame());
+		_MESSAGE("  CUDA: compiled=YES, available=%s, enabled=%s, device=%d/%d", cuda->hasCuda() ? "YES" : "NO",
+				 cudaEnabled ? "YES" : "NO", CudaInterface::currentDevice, cuda->deviceCount());
+#else
+		_MESSAGE("  CUDA: compiled=NO");
+#endif
+		_MESSAGE("  Solver: numIterations=%d, groupIterations=%d, MLCP=%s, erp=%.3f", getSolverInfo().m_numIterations,
+				 ConstraintGroup::MaxIterations, ConstraintGroup::EnableMLCP ? "ON" : "OFF", getSolverInfo().m_erp);
+		_MESSAGE("  Timing: min_fps=%d (tick=%.4fs), maxSubSteps=%d, realTime=%s", min_fps, m_timeTick, m_maxSubSteps,
+				 m_useRealTime ? "ON" : "OFF");
 		_MESSAGE("  Limits: clampRotations=%s (limit=%.1f rad/s), unclampedResets=%s (angle=%.1f)",
-			m_clampRotations ? "ON" : "OFF", m_rotationSpeedLimit,
-			m_unclampedResets ? "ON" : "OFF", m_unclampedResetAngle);
-		_MESSAGE("  Active: systems=%zu, wind=%s (strength=%.1f)",
-			m_systems.size(),
-			m_enableWind ? "ON" : "OFF", m_windStrength);
+				 m_clampRotations ? "ON" : "OFF", m_rotationSpeedLimit, m_unclampedResets ? "ON" : "OFF",
+				 m_unclampedResetAngle);
+		_MESSAGE("  Active: systems=%zu, wind=%s (strength=%.1f)", m_systems.size(), m_enableWind ? "ON" : "OFF",
+				 m_windStrength);
 
 		for (auto& i : m_systems)
 			i->readTransform(RESET_PHYSICS);
@@ -355,44 +385,71 @@ namespace hdt
 	{
 		auto mm = MenuManager::GetSingleton();
 
-		if ((e.gamePaused || IsMenuManagerGamePaused(mm)) && !m_suspended)
+		// Pause/resume handling FIRST - suspend() may be called here.
+		// At this point m_frameSyncComplete is still true (from previous FrameSyncEvent),
+		// so if suspend() is called from here (same thread), it won't deadlock waiting for itself.
+		if ((e.gamePaused || IsMenuManagerGamePaused(mm)) && !m_suspended) {
+			_VMESSAGE("FrameEvent: game paused, calling suspend()");
 			suspend();
-		else if (!(e.gamePaused || IsMenuManagerGamePaused(mm)) && m_suspended)
+		}
+		else if (!(e.gamePaused || IsMenuManagerGamePaused(mm)) && m_suspended) {
+			_VMESSAGE("FrameEvent: game unpaused while suspended, calling resume()");
 			resume();
+			// Skip physics update in the same frame as resume() to let systems stabilize
+			// Otherwise doUpdate() dispatches collision work while resetSystems() just ran
+			_VMESSAGE("FrameEvent: skipping doUpdate() after resume, returning early");
+			return;
+		}
 
+		// Early exit if suspended (e.g., by FreezeHandler for Main Menu/Loading)
+		// This prevents frame sync machinery from running when physics is disabled
+		if (m_suspended) {
+			return;
+		}
+
+		// NOW mark frame as in-progress - we're about to do physics work.
+		// If console thread calls suspend() after this point, it will wait for FrameSyncEvent.
+		m_frameSyncComplete.store(false, std::memory_order_release);
+		_DMESSAGE("FrameEvent: set frameSyncComplete=false, about to do physics work");
+
+		// Capture metrics flag ONCE to prevent race condition
+		const bool captureMetrics = m_doMetrics;
 		LARGE_INTEGER ticks;
 		int64_t startTime = 0;
-		int64_t endTime = 0;
-		float lastProcessingTime = 0.f;
-		if (m_doMetrics)
-		{
+		if (captureMetrics) {
 			QueryPerformanceCounter(&ticks);
 			startTime = ticks.QuadPart;
 		}
 
 		std::lock_guard<decltype(m_lock)> l(m_lock);
 
-		float interval = *(float*)(RelocationManager::s_baseAddr + (m_useRealTime ? offset::GameStepTimer_RealTime : offset::GameStepTimer_SlowTime));
+		float interval = *(float*)(RelocationManager::s_baseAddr +
+								   (m_useRealTime ? offset::GameStepTimer_RealTime : offset::GameStepTimer_SlowTime));
 
 		if (interval > FLT_EPSILON && !m_suspended && !m_isStasis && !m_systems.empty())
 			doUpdate(interval);
 		else if (m_isStasis || (m_suspended && !m_loading))
 			writeTransform();
 
-		if (m_doMetrics)
-		{
+		if (captureMetrics) {
 			QueryPerformanceCounter(&ticks);
-			endTime = ticks.QuadPart;
+			int64_t endTime = ticks.QuadPart;
 			QueryPerformanceFrequency(&ticks);
-			// float ticks_per_ms = static_cast<float>(ticks.QuadPart) * 1e-3;
 			m_SMPProcessingTimeInMainLoop = (endTime - startTime) / static_cast<float>(ticks.QuadPart) * 1e3;
 		}
 	}
 
 	void SkyrimPhysicsWorld::onEvent(const FrameSyncEvent& e)
 	{
-		if (m_doMetrics)
-		{
+		// Early exit if suspended - but still signal completion to unblock suspend()
+		// BUG-003 FIX: Without this signaling, suspend() waits for 5-second timeout
+		if (m_suspended) {
+			m_frameSyncComplete.store(true, std::memory_order_release);
+			m_frameSyncCV.notify_all();
+			return;
+		}
+
+		if (m_doMetrics) {
 			LARGE_INTEGER ticks;
 			QueryPerformanceCounter(&ticks);
 			int64_t startTime = ticks.QuadPart;
@@ -404,20 +461,41 @@ namespace hdt
 			QueryPerformanceFrequency(&ticks);
 			// float ticks_per_ms = static_cast<float>(ticks.QuadPart) * 1e-3;
 			m_SMPProcessingTimeInMainLoop += (endTime - startTime) / static_cast<float>(ticks.QuadPart) * 1e3;
-			m_averageSMPProcessingTimeInMainLoop = (m_averageSMPProcessingTimeInMainLoop * (m_sampleSize - 1) + m_SMPProcessingTimeInMainLoop) / m_sampleSize;
+			m_averageSMPProcessingTimeInMainLoop =
+				(m_averageSMPProcessingTimeInMainLoop * (m_sampleSize - 1) + m_SMPProcessingTimeInMainLoop) /
+				m_sampleSize;
 			float totalSMPTime = m_averageSMPProcessingTimeInMainLoop + m_2ndStepAverageProcessingTime;
-			HDT_LOG_INFO("Physics timing: %.2f ms main thread | %.2f ms async | %.1f%% async of total %.2f ms",
-			m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime,
-			100. * m_2ndStepAverageProcessingTime / totalSMPTime, totalSMPTime);
+			_DMESSAGE("Physics timing: %.2f ms main thread | %.2f ms async | %.1f%% async of total %.2f ms",
+					  m_averageSMPProcessingTimeInMainLoop, m_2ndStepAverageProcessingTime,
+					  100. * m_2ndStepAverageProcessingTime / totalSMPTime, totalSMPTime);
 		}
 		else
 			m_tasks.wait();
+
+		// CRITICAL FIX: Wait for collision workers before signaling frame complete
+		// The doUpdate2ndStep task may have spawned parallel collision workers via
+		// hdt_parallel_for_each that are still running after m_tasks.wait() returns.
+		// Without this, the next frame can start while collision workers from this
+		// frame are still reading/writing collider tree nodes, causing index corruption.
+		{
+			HDT_ZONE_SCOPED_N("FrameSync::WaitCollisionWorkers");
+			auto dispatcher = static_cast<CollisionDispatcher*>(m_dispatcher1);
+			dispatcher->waitForCollisionWorkers();
+		}
+
+		// Mark frame as complete for suspend() synchronization
+		m_frameSyncComplete.store(true, std::memory_order_release);
+		// Notify any waiting suspend() call (console thread)
+		m_frameSyncCV.notify_all();
+		_DMESSAGE("FrameSyncEvent: set frameSyncComplete=true, frame complete");
 	}
 
 	void SkyrimPhysicsWorld::onEvent(const ShutdownEvent& e)
 	{
-		while (m_systems.size())
-		{
+		// Wait for any running async physics tasks before shutdown
+		// This prevents use-after-free when destroying systems
+		m_tasks.wait();
+		while (m_systems.size()) {
 			SkinnedMeshWorld::removeSkinnedMeshSystem(m_systems.back());
 		}
 	}
@@ -425,10 +503,9 @@ namespace hdt
 	EventResult SkyrimPhysicsWorld::ReceiveEvent(SKSECameraEvent* evn, EventDispatcher<SKSECameraEvent>* dispatcher)
 	{
 		if (evn && evn->oldState && evn->newState)
-			if (evn->oldState->stateId == 0 && evn->newState->stateId == 9)
-			{
+			if (evn->oldState->stateId == 0 && evn->newState->stateId == 9) {
 				m_resetPc = 3;
 			}
 		return kEvent_Continue;
 	}
-}
+} // namespace hdt

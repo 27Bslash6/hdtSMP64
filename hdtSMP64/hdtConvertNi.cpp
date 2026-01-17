@@ -4,12 +4,12 @@ namespace hdt
 {
 	btQuaternion convertNi(const NiMatrix33& rhs)
 	{
-		//using namespace DirectX;
-		//auto mat = XMLoadFloat3x3((const XMFLOAT3X3*)&rhs);
-		//auto q = XMQuaternionRotationMatrix(XMMatrixTranspose(mat));
-		//if (XMQuaternionIsInfinite(q) || XMQuaternionIsNaN(q))
+		// using namespace DirectX;
+		// auto mat = XMLoadFloat3x3((const XMFLOAT3X3*)&rhs);
+		// auto q = XMQuaternionRotationMatrix(XMMatrixTranspose(mat));
+		// if (XMQuaternionIsInfinite(q) || XMQuaternionIsNaN(q))
 		//	return XMQuaternionIdentity();
-		//return q;
+		// return q;
 		btMatrix3x3 mat;
 		mat[0][0] = rhs.data[0][0];
 		mat[0][1] = rhs.data[0][1];
@@ -65,4 +65,4 @@ namespace hdt
 		ret.data[2][2] = rhs[2][2];
 		return ret;
 	}
-}
+} // namespace hdt

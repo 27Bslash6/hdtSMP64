@@ -1,30 +1,35 @@
 #include "WeatherManager.h"
+
+#include <mutex>
+
 using namespace hdt;
 
 
 Sky** g_SkyPtr = nullptr;
-NiPoint3 precipDirection {0.f, 0.f, 0.f};
-std::vector<UInt32> notExteriorWorlds = { 0x69857, 0x1EE62, 0x20DCB, 0x1FAE2, 0x34240, 0x50015, 0x2C965, 0x29AB7, 0x4F838, 0x3A9D6, 0x243DE, 0xC97EB, 0xC350D, 0x1CDD3, 0x1CDD9, 0x21EDB, 0x1E49D, 0x2B101, 0x2A9D8, 0x20BFE };
+static std::mutex g_windMutex;
+static NiPoint3 precipDirection{0.f, 0.f, 0.f};
+std::vector<UInt32> notExteriorWorlds = {0x69857, 0x1EE62, 0x20DCB, 0x1FAE2, 0x34240, 0x50015, 0x2C965,
+										 0x29AB7, 0x4F838, 0x3A9D6, 0x243DE, 0xC97EB, 0xC350D, 0x1CDD3,
+										 0x1CDD9, 0x21EDB, 0x1E49D, 0x2B101, 0x2A9D8, 0x20BFE};
 
 
-static inline size_t randomGeneratorLowMoreProbable(size_t lowermin, size_t lowermax, size_t highermin, size_t highermax, int probability) {
-
+static inline size_t randomGeneratorLowMoreProbable(size_t lowermin, size_t lowermax, size_t highermin,
+													size_t highermax, int probability)
+{
 	std::mt19937 rng;
 	rng.seed(std::random_device()());
 
 	std::uniform_int_distribution<std::mt19937::result_type> dist(1, probability);
 
-	if (dist(rng) == 1)
-	{
-		//higher
+	if (dist(rng) == 1) {
+		// higher
 		rng.seed(std::random_device()());
 
 		std::uniform_int_distribution<std::mt19937::result_type> distir(highermin, highermax);
 
 		return distir(rng);
 	}
-	else
-	{
+	else {
 		rng.seed(std::random_device()());
 
 		std::uniform_int_distribution<std::mt19937::result_type> distir(lowermin, lowermax);
@@ -33,10 +38,11 @@ static inline size_t randomGeneratorLowMoreProbable(size_t lowermin, size_t lowe
 	}
 }
 
-size_t hdt::randomGenerator(size_t min, size_t max) {
+size_t hdt::randomGenerator(size_t min, size_t max)
+{
 	std::mt19937 rng;
 	rng.seed(std::random_device()());
-	//rng.seed(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+	// rng.seed(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 	std::uniform_int_distribution<std::mt19937::result_type> dist(min, max);
 
 	return dist(rng);
@@ -79,22 +85,19 @@ void hdt::WeatherCheck()
 	g_SkyPtr = RelocPtr<Sky*>(offset::SkyPointer);
 
 	const auto world = SkyrimPhysicsWorld::get();
-	while (true)
-	{
+	while (true) {
 		player = DYNAMIC_CAST(LookupFormByID(0x14), TESForm, Actor);
-		if (!player || !player->loadedState)
-		{
-			//LOG("player null. Waiting for 5seconds");
-			world->setWind(&NiPoint3{ 0,0,0 }, 0, 1); // remove wind immediately
+		if (!player || !player->loadedState) {
+			// LOG("player null. Waiting for 5seconds");
+			world->setWind(&NiPoint3{0, 0, 0}, 0, 1); // remove wind immediately
 			Sleep(5000);
 			continue;
 		}
 
 		cell = player->parentCell;
 
-		if (!cell)
-		{
-			world->setWind(&NiPoint3{ 0,0,0 }, 0, 1); // remove wind immediately
+		if (!cell) {
+			world->setWind(&NiPoint3{0, 0, 0}, 0, 1); // remove wind immediately
 			continue;
 		}
 
@@ -105,60 +108,65 @@ void hdt::WeatherCheck()
 #endif
 		if (!worldSpace) // Interior cell
 		{
-			//LOG("In interior cell. Waiting for 5 seconds");
-			world->setWind(&NiPoint3{ 0,0,0 }, 0, 1); // remove wind immediately
+			// LOG("In interior cell. Waiting for 5 seconds");
+			world->setWind(&NiPoint3{0, 0, 0}, 0, 1); // remove wind immediately
 			Sleep(5000);
 			continue;
 		}
-		else
-		{
-			if (std::find(notExteriorWorlds.begin(), notExteriorWorlds.end(), worldSpace->formID) != notExteriorWorlds.end())
+		else {
+			if (std::find(notExteriorWorlds.begin(), notExteriorWorlds.end(), worldSpace->formID) !=
+				notExteriorWorlds.end())
 			{
-				//LOG("In interior cell world. Waiting for 5 seconds");
-				world->setWind(&NiPoint3{ 0,0,0 }, 0, 1); // remove wind immediately
+				// LOG("In interior cell world. Waiting for 5 seconds");
+				world->setWind(&NiPoint3{0, 0, 0}, 0, 1); // remove wind immediately
 				Sleep(5000);
 				continue;
 			}
 		}
 
 		const auto skyPtr = *g_SkyPtr;
-		if (skyPtr)
-		{
-			//Wind Detection
+		if (skyPtr) {
+			// Wind Detection - compute locally, then update global under lock
 			const float range = (randomGeneratorLowMoreProbable(0, 5, 6, 50, 10) / 10.0f);
-			precipDirection = NiPoint3{ 0.f, 1.f, 0.f };
-			if (skyPtr->currentWeather)
-			{
-				_MESSAGE("Wind Speed: %2.2g, Wind Direction: %2.2g, Weather Wind Speed: %2.2g WindDir:%2.2g WindDirRange:%2.2g", skyPtr->windSpeed, skyPtr->windDirection,
-					skyPtr->currentWeather->general.windSpeed, skyPtr->currentWeather->general.windDirection * 180.0f / 256.0f, skyPtr->currentWeather->general.windDirRange * 360.0f / 256.0f
-				);
+			NiPoint3 localWindDir{0.f, 1.f, 0.f};
+			if (skyPtr->currentWeather) {
+				_DMESSAGE("Wind Speed: %2.2g, Wind Direction: %2.2g, Weather Wind Speed: %2.2g WindDir:%2.2g "
+						  "WindDirRange:%2.2g",
+						  skyPtr->windSpeed, skyPtr->windDirection, skyPtr->currentWeather->general.windSpeed,
+						  skyPtr->currentWeather->general.windDirection * 180.0f / 256.0f,
+						  skyPtr->currentWeather->general.windDirRange * 360.0f / 256.0f);
 				// use weather wind info
-				//Wind Speed is the only thing that changes. Wind direction and range are same all the time as set in CK.
-				const float theta = (((
-					skyPtr->currentWeather->general.windDirection
-					) * 180.0f) / 256.0f) - 90.f + randomGenerator(-range, range);
-				precipDirection = rotate(precipDirection, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
-				world->setWind(&precipDirection, world->m_windStrength * scaleSkyrim * skyPtr->windSpeed);
-			}else {
-				_MESSAGE("Wind Speed: %2.2g, Wind Direction: %2.2g", skyPtr->windSpeed, skyPtr->windDirection);
-				// use sky wind info
-				const float theta = (((skyPtr->windDirection) * 180.0f) / 256.0f) - 90.f + (randomGenerator(0, 2 * range) - range);
-				precipDirection = rotate(precipDirection, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
-				world->setWind(&precipDirection, world->m_windStrength * scaleSkyrim * skyPtr->windSpeed);
+				// Wind Speed is the only thing that changes. Wind direction and range are same all the time as set in
+				// CK.
+				const float theta = (((skyPtr->currentWeather->general.windDirection) * 180.0f) / 256.0f) - 90.f +
+									randomGenerator(-range, range);
+				localWindDir = rotate(localWindDir, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
 			}
+			else {
+				_DMESSAGE("Wind Speed: %2.2g, Wind Direction: %2.2g", skyPtr->windSpeed, skyPtr->windDirection);
+				// use sky wind info
+				const float theta =
+					(((skyPtr->windDirection) * 180.0f) / 256.0f) - 90.f + (randomGenerator(0, 2 * range) - range);
+				localWindDir = rotate(localWindDir, NiPoint3(0, 0, 1.0f), theta / 57.295776f);
+			}
+			// Update global state under lock
+			{
+				std::lock_guard<std::mutex> lock(g_windMutex);
+				precipDirection = localWindDir;
+			}
+			world->setWind(&localWindDir, world->m_windStrength * scaleSkyrim * skyPtr->windSpeed);
 			Sleep(500);
 		}
-		else
-		{
-			world->setWind(&NiPoint3{ 0,0,0 }, 0, 1); // remove wind immediately
-			//LOG("Sky is null. waiting for 5 seconds.");
+		else {
+			world->setWind(&NiPoint3{0, 0, 0}, 0, 1); // remove wind immediately
+			// LOG("Sky is null. waiting for 5 seconds.");
 			Sleep(5000);
 		}
 	}
 }
 
-NiPoint3* hdt::getWindDirection()
+NiPoint3 hdt::getWindDirection()
 {
-	return &precipDirection;
+	std::lock_guard<std::mutex> lock(g_windMutex);
+	return precipDirection;
 }
-

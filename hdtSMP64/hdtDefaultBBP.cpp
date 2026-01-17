@@ -1,12 +1,10 @@
 #include "hdtDefaultBBP.h"
 
+#include "../hdtSSEUtils/NetImmerseUtils.h"
 #include "XmlReader.h"
 
-#include <clocale>
-
-#include "../hdtSSEUtils/NetImmerseUtils.h"
-
 #include <algorithm>
+#include <clocale>
 
 namespace hdt
 {
@@ -18,11 +16,10 @@ namespace hdt
 
 	DefaultBBP::PhysicsFile DefaultBBP::scanBBP(NiNode* scan)
 	{
-		for (int i = 0; i < scan->m_extraDataLen; ++i)
-		{
+		for (int i = 0; i < scan->m_extraDataLen; ++i) {
 			auto stringData = ni_cast(scan->m_extraData[i], NiStringExtraData);
 			if (stringData && !strcmp(stringData->m_pcName, "HDT Skinned Mesh Physics Object") && stringData->m_pString)
-				return { stringData->m_pString, defaultNameMap(scan) };
+				return {stringData->m_pString, defaultNameMap(scan)};
 		}
 
 		return scanDefaultBBP(scan);
@@ -38,7 +35,8 @@ namespace hdt
 		auto path = "SKSE/Plugins/hdtSkinnedMeshConfigs/defaultBBPs.xml";
 
 		auto loaded = readAllFile(path);
-		if (loaded.empty()) return;
+		if (loaded.empty())
+			return;
 
 		// Store original locale
 		char saved_locale[32];
@@ -53,63 +51,50 @@ namespace hdt
 		if (reader.GetName() != "default-bbps")
 			return;
 
-		while (reader.Inspect())
-		{
-			if (reader.GetInspected() == Xml::Inspected::StartTag)
-			{
-				if (reader.GetName() == "map")
-				{
-					try
-					{
+		while (reader.Inspect()) {
+			if (reader.GetInspected() == Xml::Inspected::StartTag) {
+				if (reader.GetName() == "map") {
+					try {
 						auto shape = reader.getAttribute("shape");
 						auto file = reader.getAttribute("file");
 						bbpFileList.insert(std::make_pair(shape, file));
 					}
-					catch (...)
-					{
+					catch (...) {
 						_WARNING("defaultBBP(%d,%d) : invalid map", reader.GetRow(), reader.GetColumn());
 					}
 					reader.skipCurrentElement();
 				}
-				else if (reader.GetName() == "remap")
-				{
+				else if (reader.GetName() == "remap") {
 					auto target = reader.getAttribute("target");
-					Remap remap = { target, { }, { } };
-					while (reader.Inspect())
-					{
-						if (reader.GetInspected() == Xml::Inspected::StartTag)
-						{
-							if (reader.GetName() == "source")
-							{
+					Remap remap = {target, {}, {}};
+					while (reader.Inspect()) {
+						if (reader.GetInspected() == Xml::Inspected::StartTag) {
+							if (reader.GetName() == "source") {
 								int priority = 0;
-								try
-								{
+								try {
 									priority = reader.getAttributeAsInt("priority");
 								}
-								catch (...) {}
+								catch (...) {
+								}
 								auto source = reader.readText();
-								remap.entries.insert({ priority, source });
+								remap.entries.insert({priority, source});
 							}
-							else if (reader.GetName() == "requires")
-							{
+							else if (reader.GetName() == "requires") {
 								auto req = reader.readText();
 								remap.required.insert(req);
 							}
-							else
-							{
+							else {
 								_WARNING("defaultBBP(%d,%d) : unknown element", reader.GetRow(), reader.GetColumn());
 								reader.skipCurrentElement();
 							}
 						}
-						else if (reader.GetInspected() == Xml::Inspected::EndTag)
-						{
+						else if (reader.GetInspected() == Xml::Inspected::EndTag) {
 							break;
 						}
 					}
 					remaps.push_back(remap);
 				}
-				else
-				{
+				else {
 					_WARNING("defaultBBP(%d,%d) : unknown element", reader.GetRow(), reader.GetColumn());
 					reader.skipCurrentElement();
 				}
@@ -127,49 +112,43 @@ namespace hdt
 		static std::mutex s_lock;
 		std::lock_guard<std::mutex> l(s_lock);
 
-		if (bbpFileList.empty()) return { "", {} };
+		if (bbpFileList.empty())
+			return {"", {}};
 
 		auto remappedNames = DefaultBBP::instance()->getNameMap(armor);
 
-		auto it = std::find_if(bbpFileList.begin(), bbpFileList.end(), [&](const std::pair<std::string, std::string>& e)
-			{ return remappedNames.find(e.first) != remappedNames.end(); });
-		return { it == bbpFileList.end() ? "" : it->second, remappedNames };
+		auto it =
+			std::find_if(bbpFileList.begin(), bbpFileList.end(), [&](const std::pair<std::string, std::string>& e) {
+				return remappedNames.find(e.first) != remappedNames.end();
+			});
+		return {it == bbpFileList.end() ? "" : it->second, remappedNames};
 	}
 
 	DefaultBBP::NameMap DefaultBBP::getNameMap(NiNode* armor)
 	{
 		auto nameMap = defaultNameMap(armor);
 
-		for (auto remap : remaps)
-		{
+		for (auto remap : remaps) {
 			bool doRemap = true;
-			for (auto req : remap.required)
-			{
-				if (nameMap.find(req) == nameMap.end())
-				{
+			for (auto req : remap.required) {
+				if (nameMap.find(req) == nameMap.end()) {
 					doRemap = false;
 				}
 			}
-			if (doRemap)
-			{
-				auto start = std::find_if(remap.entries.rbegin(), remap.entries.rend(), [&](const RemapEntry& e)
-					{ return nameMap.find(e.second) != nameMap.end(); });
-				auto end = std::find_if(start, remap.entries.rend(), [&](const RemapEntry& e)
-					{ return e.first != start->first; });
-				if (start != remap.entries.rend())
-				{
-					auto& s = nameMap.insert({ remap.name, { } }).first;
-					std::for_each(start, end, [&](const RemapEntry& e)
-						{
-							auto it = nameMap.find(e.second);
-							if (it != nameMap.end())
-							{
-								std::for_each(it->second.begin(), it->second.end(), [&](const std::string& name)
-									{
-										s->second.insert(name);
-									});
-							}
-						});
+			if (doRemap) {
+				auto start = std::find_if(remap.entries.rbegin(), remap.entries.rend(),
+										  [&](const RemapEntry& e) { return nameMap.find(e.second) != nameMap.end(); });
+				auto end = std::find_if(start, remap.entries.rend(),
+										[&](const RemapEntry& e) { return e.first != start->first; });
+				if (start != remap.entries.rend()) {
+					auto& s = nameMap.insert({remap.name, {}}).first;
+					std::for_each(start, end, [&](const RemapEntry& e) {
+						auto it = nameMap.find(e.second);
+						if (it != nameMap.end()) {
+							std::for_each(it->second.begin(), it->second.end(),
+										  [&](const std::string& name) { s->second.insert(name); });
+						}
+					});
 				}
 			}
 		}
@@ -178,26 +157,27 @@ namespace hdt
 
 	DefaultBBP::NameMap DefaultBBP::defaultNameMap(NiNode* armor)
 	{
-		std::unordered_map<std::string, std::unordered_set<std::string> > nameMap;
+		std::unordered_map<std::string, std::unordered_set<std::string>> nameMap;
 		// This case never happens to a lurker skeleton, thus we don't need to test.
 		auto skinned = findNode(armor, "BSFaceGenNiNodeSkinned");
-		if (skinned)
-		{
-			for (int i = 0; i < skinned->m_children.m_arrayBufLen; ++i)
-			{
-				if (!skinned->m_children.m_data[i]) continue;
+		if (skinned) {
+			for (int i = 0; i < skinned->m_children.m_arrayBufLen; ++i) {
+				if (!skinned->m_children.m_data[i])
+					continue;
 				auto tri = skinned->m_children.m_data[i]->GetAsBSTriShape();
-				if (!tri || !tri->m_name) continue;
-				nameMap.insert({ tri->m_name, {tri->m_name} });
+				if (!tri || !tri->m_name)
+					continue;
+				nameMap.insert({tri->m_name, {tri->m_name}});
 			}
 		}
-		for (int i = 0; i < armor->m_children.m_arrayBufLen; ++i)
-		{
-			if (!armor->m_children.m_data[i]) continue;
+		for (int i = 0; i < armor->m_children.m_arrayBufLen; ++i) {
+			if (!armor->m_children.m_data[i])
+				continue;
 			auto tri = armor->m_children.m_data[i]->GetAsBSTriShape();
-			if (!tri || !tri->m_name) continue;
-			nameMap.insert({ tri->m_name, {tri->m_name} });
+			if (!tri || !tri->m_name)
+				continue;
+			nameMap.insert({tri->m_name, {tri->m_name}});
 		}
 		return nameMap;
 	}
-}
+} // namespace hdt

@@ -27,6 +27,7 @@ subject to the following restrictions:
 //rigidbody & constraints
 #include "BulletDynamics/Dynamics/btRigidBody.h"
 #include "BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolver.h"
+#include "BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolverMt.h"
 #include "BulletDynamics/ConstraintSolver/btContactSolverInfo.h"
 #include "BulletDynamics/ConstraintSolver/btTypedConstraint.h"
 #include "BulletDynamics/ConstraintSolver/btPoint2PointConstraint.h"
@@ -90,7 +91,7 @@ btConstraintSolverPoolMt::btConstraintSolverPoolMt(int numSolvers)
 	solvers.reserve(numSolvers);
 	for (int i = 0; i < numSolvers; ++i)
 	{
-		btConstraintSolver* solver = new btSequentialImpulseConstraintSolver();
+		btConstraintSolver* solver = new btSequentialImpulseConstraintSolverMt();
 		solvers.push_back(solver);
 	}
 	init(&solvers[0], numSolvers);
@@ -113,6 +114,14 @@ btConstraintSolverPoolMt::~btConstraintSolverPoolMt()
 	}
 }
 
+// RAII guard for btSpinMutex - ensures unlock even if exception is thrown
+struct SpinMutexGuard
+{
+	btSpinMutex& m_mutex;
+	SpinMutexGuard(btSpinMutex& mutex) : m_mutex(mutex) {}
+	~SpinMutexGuard() { m_mutex.unlock(); }
+};
+
 ///solve a group of constraints
 btScalar btConstraintSolverPoolMt::solveGroup(btCollisionObject** bodies,
 											  int numBodies,
@@ -125,8 +134,8 @@ btScalar btConstraintSolverPoolMt::solveGroup(btCollisionObject** bodies,
 											  btDispatcher* dispatcher)
 {
 	ThreadSolver* ts = getAndLockThreadSolver();
+	SpinMutexGuard guard(ts->mutex);  // FIX: RAII ensures unlock on exception
 	ts->solver->solveGroup(bodies, numBodies, manifolds, numManifolds, constraints, numConstraints, info, debugDrawer, dispatcher);
-	ts->mutex.unlock();
 	return 0.0f;
 }
 

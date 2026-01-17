@@ -13,9 +13,10 @@ subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 */
 
-#if defined(_WIN32) && BT_THREADSAFE
-
+// Include btScalar.h first to get BT_THREADSAFE definition
 #include "LinearMath/btScalar.h"
+
+#if defined(_WIN32) && BT_THREADSAFE
 #include "LinearMath/btMinMax.h"
 #include "LinearMath/btAlignedObjectArray.h"
 #include "LinearMath/btThreads.h"

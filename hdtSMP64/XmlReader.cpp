@@ -23,13 +23,11 @@ namespace hdt
 		char* end;
 
 		int radix = 10;
-		if (!str.compare(0, 2, "0x"))
-		{
+		if (!str.compare(0, 2, "0x")) {
 			radix = 16;
 			begin += 2;
 		}
-		else if (str.length() > 1 && str[0] == '0')
-		{
+		else if (str.length() > 1 && str[0] == '0') {
 			begin += 1;
 			radix = 8;
 		}
@@ -53,7 +51,8 @@ namespace hdt
 	{
 		if (Base::GetInspected() == Inspected::EmptyElementTag && isEmptyStart)
 			return isEmptyStart = false, true;
-		if (!Base::Inspect()) return false;
+		if (!Base::Inspect())
+			return false;
 		if (Base::GetInspected() == Inspected::EmptyElementTag)
 			isEmptyStart = true;
 		return true;
@@ -62,9 +61,9 @@ namespace hdt
 	Xml::Inspected XMLReader::GetInspected()
 	{
 		auto ret = Base::GetInspected();
-		if (ret == Inspected::EmptyElementTag)
-		{
-			if (isEmptyStart) return Inspected::StartTag;
+		if (ret == Inspected::EmptyElementTag) {
+			if (isEmptyStart)
+				return Inspected::StartTag;
 			return Inspected::EndTag;
 		}
 		return ret;
@@ -72,13 +71,12 @@ namespace hdt
 
 	void XMLReader::skipCurrentElement()
 	{
-		if (GetInspected() == Inspected::EndTag) return;
+		if (GetInspected() == Inspected::EndTag)
+			return;
 
 		int currentDepth = 1;
-		while (currentDepth && Inspect())
-		{
-			switch (GetInspected())
-			{
+		while (currentDepth && Inspect()) {
+			switch (GetInspected()) {
 			case Inspected::StartTag:
 				++currentDepth;
 				break;
@@ -91,13 +89,13 @@ namespace hdt
 
 	void XMLReader::nextStartElement()
 	{
-		while (Inspect() && GetInspected() != Inspected::StartTag);
+		while (Inspect() && GetInspected() != Inspected::StartTag)
+			;
 	}
 
 	bool XMLReader::hasAttribute(const std::string& name)
 	{
-		for (int i = 0; i < GetAttributesCount(); ++i)
-		{
+		for (int i = 0; i < GetAttributesCount(); ++i) {
 			auto attr = GetAttributeAt(i);
 			if (attr.Name == name)
 				return true;
@@ -107,8 +105,7 @@ namespace hdt
 
 	std::string XMLReader::getAttribute(const std::string& name)
 	{
-		for (int i = 0; i < GetAttributesCount(); ++i)
-		{
+		for (int i = 0; i < GetAttributesCount(); ++i) {
 			auto attr = GetAttributeAt(i);
 			if (attr.Name == name)
 				return attr.Value;
@@ -118,8 +115,7 @@ namespace hdt
 
 	std::string XMLReader::getAttribute(const std::string& name, const std::string& def)
 	{
-		for (int i = 0; i < GetAttributesCount(); ++i)
-		{
+		for (int i = 0; i < GetAttributesCount(); ++i) {
 			auto attr = GetAttributeAt(i);
 			if (attr.Name == name)
 				return attr.Value;
@@ -193,7 +189,8 @@ namespace hdt
 		btQuaternion q(x, y, z, w);
 		if (btFuzzyZero(q.length2()))
 			q = btQuaternion::getIdentity();
-		else q.normalize();
+		else
+			q.normalize();
 		return q;
 	}
 
@@ -206,12 +203,12 @@ namespace hdt
 		skipCurrentElement();
 		btQuaternion q;
 		btVector3 axis(x, y, z);
-		if (axis.fuzzyZero())
-		{
+		if (axis.fuzzyZero()) {
 			axis.setX(1);
 			w = 0;
 		}
-		else axis.normalize();
+		else
+			axis.normalize();
 		q.setRotation(axis, w);
 		return q;
 	}
@@ -219,10 +216,8 @@ namespace hdt
 	btTransform XMLReader::readTransform()
 	{
 		btTransform ret(btTransform::getIdentity());
-		while (Inspect())
-		{
-			switch (GetInspected())
-			{
+		while (Inspect()) {
+			switch (GetInspected()) {
 			case Inspected::StartTag:
 				if (GetName() == "basis")
 					ret.setRotation(readQuaternion());
@@ -237,4 +232,4 @@ namespace hdt
 		}
 		return ret;
 	}
-}
+} // namespace hdt

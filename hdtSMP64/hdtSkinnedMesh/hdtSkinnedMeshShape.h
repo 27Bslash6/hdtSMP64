@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hdtCollisionAlgorithm.h"
 #include "hdtCollider.h"
+#include "hdtCollisionAlgorithm.h"
 #include "hdtSkinnedMeshBody.h"
 
 namespace hdt
@@ -33,11 +33,46 @@ namespace hdt
 		virtual void markUsedVertices(bool* flags) = 0;
 		virtual void remapVertices(UINT* map) = 0;
 
+		// Base pointer accessors for collision code
+		// ColliderTree nodes store offsets, compute actual pointers using these bases
+		Collider* getColliderBase() { return m_colliders.data(); }
+		const Collider* getColliderBase() const { return m_colliders.data(); }
+#ifdef CUDA
+		Aabb* getAabbBase() { return m_aabb.get(); }
+		const Aabb* getAabbBase() const { return m_aabb.get(); }
+#else
+		Aabb* getAabbBase() { return m_aabb.data(); }
+		const Aabb* getAabbBase() const { return m_aabb.data(); }
+#endif
+
+		// Validate all tree nodes have colliderOffset within bounds
+		bool validateColliderOffsets() const { return validateTreeNodeOffset(m_tree, m_colliders.size()); }
+
+	private:
+		bool validateTreeNodeOffset(const ColliderTree& node, size_t maxOffset) const
+		{
+			if (node.numCollider > 0) {
+				if (node.colliderOffset + node.numCollider > maxOffset) {
+					const char* ownerName = (m_owner && m_owner->m_name()) ? m_owner->m_name()->cstr() : "null";
+					_ERROR("validateColliderOffsets FAIL: shape=%p owner=%s node.key=%u offset=%zu numCollider=%u "
+						   "maxOffset=%zu",
+						   this, ownerName, node.key, node.colliderOffset, node.numCollider, maxOffset);
+					return false;
+				}
+			}
+			for (const auto& child : node.children) {
+				if (!validateTreeNodeOffset(child, maxOffset))
+					return false;
+			}
+			return true;
+		}
+
+	public:
 		virtual float getColliderBoneWeight(const Collider* c, int boneIdx) = 0;
 		virtual int getColliderBoneIndex(const Collider* c, int boneIdx) = 0;
 #ifndef CUDA
 		virtual btVector3 baryCoord(const Collider* c, const btVector3& p) = 0;
-		virtual float baryWeight(const btVector3 & w, int boneIdx) = 0;
+		virtual float baryWeight(const btVector3& w, int boneIdx) = 0;
 #endif // !CUDA
 
 		SkinnedMeshBody* m_owner;
@@ -48,12 +83,12 @@ namespace hdt
 #endif // CUDA
 		vectorA16<Collider> m_colliders;
 		ColliderTree m_tree;
-		float m_windEffect = 0.f; //effect from xml m_windEffect
+		float m_windEffect = 0.f; // effect from xml m_windEffect
 
 #ifdef ENABLE_CL
-		cl::Buffer		m_aabbCL;
-		cl::Buffer		m_colliderCL;
-		cl::Event		m_eDoneCL;
+		cl::Buffer m_aabbCL;
+		cl::Buffer m_colliderCL;
+		cl::Event m_eDoneCL;
 		virtual void internalUpdateCL() = 0;
 #endif
 	};
@@ -85,7 +120,7 @@ namespace hdt
 
 #ifndef CUDA
 		btVector3 baryCoord(const Collider* c, const btVector3& p) override { return btVector3(1, 1, 1); }
-		float baryWeight(const btVector3 & w, int boneIdx) override { return 1; }
+		float baryWeight(const btVector3& w, int boneIdx) override { return 1; }
 #endif // !CUDA
 		void finishBuild() override;
 		void markUsedVertices(bool* flags) override;
@@ -103,7 +138,7 @@ namespace hdt
 #endif // CUDA
 
 #ifdef ENABLE_CL
-		static hdtCLKernel		m_kernel;
+		static hdtCLKernel m_kernel;
 		virtual void internalUpdateCL();
 #endif
 	};
@@ -138,13 +173,10 @@ namespace hdt
 #ifndef CUDA
 		btVector3 baryCoord(const Collider* c, const btVector3& p) override
 		{
-			return BaryCoord(
-				m_owner->m_vpos[c->vertices[0]].pos(),
-				m_owner->m_vpos[c->vertices[1]].pos(),
-				m_owner->m_vpos[c->vertices[2]].pos(),
-				p);
+			return BaryCoord(m_owner->m_vpos[c->vertices[0]].pos(), m_owner->m_vpos[c->vertices[1]].pos(),
+							 m_owner->m_vpos[c->vertices[2]].pos(), p);
 		}
-		float baryWeight(const btVector3 & w, int boneIdx) override { return w[boneIdx / 4]; }
+		float baryWeight(const btVector3& w, int boneIdx) override { return w[boneIdx / 4]; }
 #endif
 		void finishBuild() override;
 		void markUsedVertices(bool* flags) override;
@@ -165,8 +197,8 @@ namespace hdt
 #endif
 
 #ifdef ENABLE_CL
-		static hdtCLKernel		m_kernel;
+		static hdtCLKernel m_kernel;
 		virtual void internalUpdateCL();
 #endif
 	};
-}
+} // namespace hdt

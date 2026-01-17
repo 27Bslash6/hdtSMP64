@@ -1,21 +1,25 @@
-#include <detours.h>
+#include "Hooks.h"
 
+#include "ActorManager.h"
+#include "HookEvents.h"
+#include "Offsets.h"
 #include "skse64/GameData.h"
 #include "skse64/GameForms.h"
 #include "skse64/GameReferences.h"
-#include "skse64/NiObjects.h"
-#include "skse64/NiGeometry.h"
-#include "skse64/NiExtraData.h"
-
-#include "Hooks.h"
-#include "HookEvents.h"
-#include "Offsets.h"
-#include "skse64/NiNodes.h"
 #include "skse64/GameRTTI.h"
-#include "skse64_common/SafeWrite.h"
-#include <xbyak/xbyak.h>
+#include "skse64/NiExtraData.h"
+#include "skse64/NiGeometry.h"
+#include "skse64/NiNodes.h"
+#include "skse64/NiObjects.h"
 #include "skse64_common/BranchTrampoline.h"
-#include "ActorManager.h"
+#include "skse64_common/SafeWrite.h"
+
+#include <detours.h>
+#include <xbyak/xbyak.h>
+
+#ifdef CUDA
+#include "hdtSkinnedMesh/hdtCudaInterface.h"
+#endif
 
 namespace hdt
 {
@@ -24,23 +28,22 @@ namespace hdt
 		MEMBER_FN_PREFIX(BSFaceGenNiNodeEx);
 
 	public:
-		DEFINE_MEMBER_FN_HOOK(SkinAllGeometry, void, offset::BSFaceGenNiNode_SkinAllGeometry, NiNode* a_skeleton, BSGeometry* a_geometry, char a_unk);
-		DEFINE_MEMBER_FN_HOOK(SkinSingleGeometry, void, offset::BSFaceGenNiNode_SkinSingleGeometry, NiNode* a_skeleton, BSGeometry* a_geometry, BSTriShape* a_trishape);
+		DEFINE_MEMBER_FN_HOOK(SkinAllGeometry, void, offset::BSFaceGenNiNode_SkinAllGeometry, NiNode* a_skeleton,
+							  BSGeometry* a_geometry, char a_unk);
+		DEFINE_MEMBER_FN_HOOK(SkinSingleGeometry, void, offset::BSFaceGenNiNode_SkinSingleGeometry, NiNode* a_skeleton,
+							  BSGeometry* a_geometry, BSTriShape* a_trishape);
 
 		void ProcessHeadPart(BGSHeadPart* headPart, NiNode* a_skeleton)
 		{
-			if (headPart)
-			{
+			if (headPart) {
 				NiAVObject* headNode = this->GetObjectByName(&headPart->partName.data);
-				if (headNode)
-				{
+				if (headNode) {
 					BSGeometry* headGeo = headNode->GetAsBSGeometry();
 					if (headGeo)
 						SkinSingleGeometry(a_skeleton, headGeo, nullptr);
 				}
 				BGSHeadPart* extraPart = NULL;
-				for (UInt32 p = 0; p < headPart->extraParts.count; p++)
-				{
+				for (UInt32 p = 0; p < headPart->extraParts.count; p++) {
 					if (headPart->extraParts.GetNthItem(p, extraPart))
 						ProcessHeadPart(extraPart, a_skeleton);
 				}
@@ -50,12 +53,10 @@ namespace hdt
 		void SkinAllGeometryCalls(NiNode* a_skeleton, BSGeometry* a_geometry, char a_unk)
 		{
 			bool needRegularCall = true;
-			if (ActorManager::instance()->skeletonNeedsParts(a_skeleton))
-			{
+			if (ActorManager::instance()->skeletonNeedsParts(a_skeleton)) {
 				TESForm* form = LookupFormByID(a_skeleton->m_owner->formID);
 				Actor* actor = DYNAMIC_CAST(form, TESForm, Actor);
-				if (actor)
-				{
+				if (actor) {
 					TESNPC* actorBase = DYNAMIC_CAST(actor->baseForm, TESForm, TESNPC);
 					UInt32 numHeadParts = 0;
 					BGSHeadPart** Headparts = nullptr;
@@ -67,8 +68,7 @@ namespace hdt
 						numHeadParts = actorBase->numHeadParts;
 						Headparts = actorBase->headparts;
 					}
-					if (Headparts)
-					{
+					if (Headparts) {
 						for (UInt32 i = 0; i < numHeadParts; i++) {
 							if (Headparts[i]) {
 								ProcessHeadPart(Headparts[i], a_skeleton);
@@ -88,8 +88,7 @@ namespace hdt
 			const char* name = "";
 			uint32_t formId = 0x0;
 
-			if (a_skeleton->m_owner && a_skeleton->m_owner->baseForm)
-			{
+			if (a_skeleton->m_owner && a_skeleton->m_owner->baseForm) {
 				auto bname = DYNAMIC_CAST(a_skeleton->m_owner->baseForm, TESForm, TESFullName);
 				if (bname)
 					name = bname->GetName();
@@ -97,10 +96,12 @@ namespace hdt
 				if (bnpc && bnpc->nextTemplate)
 					formId = bnpc->nextTemplate->formID;
 			}
-			_MESSAGE("SkinSingleGeometry %s %d - %s, %s, (formid %08x base form %08x head template form %08x)",
-				a_skeleton->m_name, a_skeleton->m_children.m_size, a_geometry->m_name, name,
-				a_skeleton->m_owner ? a_skeleton->m_owner->formID : 0x0,
-				a_skeleton->m_owner ? a_skeleton->m_owner->baseForm->formID : 0x0, formId);
+			_DMESSAGE("SkinSingleGeometry %s %d - %s, %s, (formid %08x base form %08x head template form %08x)",
+					  a_skeleton->m_name, a_skeleton->m_children.m_size, a_geometry->m_name, name,
+					  a_skeleton->m_owner ? a_skeleton->m_owner->formID : 0x0,
+					  (a_skeleton->m_owner && a_skeleton->m_owner->baseForm) ? a_skeleton->m_owner->baseForm->formID
+																			 : 0x0,
+					  formId);
 
 			SkinSingleHeadGeometryEvent e;
 			e.skeleton = a_skeleton;
@@ -113,8 +114,7 @@ namespace hdt
 		{
 			const char* name = "";
 			uint32_t formId = 0x0;
-			if (a_skeleton->m_owner && a_skeleton->m_owner->baseForm)
-			{
+			if (a_skeleton->m_owner && a_skeleton->m_owner->baseForm) {
 				auto bname = DYNAMIC_CAST(a_skeleton->m_owner->baseForm, TESForm, TESFullName);
 				if (bname)
 					name = bname->GetName();
@@ -122,10 +122,11 @@ namespace hdt
 				if (bnpc && bnpc->nextTemplate)
 					formId = bnpc->nextTemplate->formID;
 			}
-			_MESSAGE("SkinAllGeometry %s %d, %s, (formid %08x base form %08x head template form %08x)",
-				a_skeleton->m_name, a_skeleton->m_children.m_size, name,
-				a_skeleton->m_owner ? a_skeleton->m_owner->formID : 0x0,
-				a_skeleton->m_owner ? a_skeleton->m_owner->baseForm->formID : 0x0, formId);
+			_DMESSAGE(
+				"SkinAllGeometry %s %d, %s, (formid %08x base form %08x head template form %08x)", a_skeleton->m_name,
+				a_skeleton->m_children.m_size, name, a_skeleton->m_owner ? a_skeleton->m_owner->formID : 0x0,
+				(a_skeleton->m_owner && a_skeleton->m_owner->baseForm) ? a_skeleton->m_owner->baseForm->formID : 0x0,
+				formId);
 
 			SkinAllHeadGeometryEvent e;
 			e.skeleton = a_skeleton;
@@ -148,9 +149,9 @@ namespace hdt
 	void hookFaceGen()
 	{
 		DetourAttach((void**)BSFaceGenNiNodeEx::_SkinSingleGeometry_GetPtrAddr(),
-			(void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinSingleGeometry));
+					 (void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinSingleGeometry));
 		DetourAttach((void**)BSFaceGenNiNodeEx::_SkinAllGeometry_GetPtrAddr(),
-			(void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinAllGeometry));
+					 (void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinAllGeometry));
 
 		RelocAddr<uintptr_t> addr(offset::BSFaceGenNiNode_SkinSingleGeometry_bug);
 		SafeWrite8(addr.GetUIntPtr(), 0x7);
@@ -184,15 +185,14 @@ namespace hdt
 		g_localTrampoline.EndAlloc(code.getCurr());
 
 		g_branchTrampoline.Write5Branch(BoneLimit.GetUIntPtr(), uintptr_t(code.getCode()));
-
 	}
 
 	void unhookFaceGen()
 	{
 		DetourDetach((void**)BSFaceGenNiNodeEx::_SkinSingleGeometry_GetPtrAddr(),
-		             (void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinSingleGeometry));
+					 (void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinSingleGeometry));
 		DetourDetach((void**)BSFaceGenNiNodeEx::_SkinAllGeometry_GetPtrAddr(),
-		             (void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinAllGeometry));
+					 (void*)GetFnAddr(&BSFaceGenNiNodeEx::SkinAllGeometry));
 	}
 
 	struct Unk001CB0E0
@@ -200,7 +200,7 @@ namespace hdt
 		MEMBER_FN_PREFIX(Unk001CB0E0);
 
 		DEFINE_MEMBER_FN_HOOK(unk001CB0E0, NiAVObject*, offset::ArmorAttachFunction, NiNode* armor, NiNode* skeleton,
-		                      void* unk3, char unk4, char unk5, void* unk6);
+							  void* unk3, char unk4, char unk5, void* unk6);
 
 		NiAVObject* unk001CB0E0(NiNode* armor, NiNode* skeleton, void* unk3, char unk4, char unk5, void* unk6)
 		{
@@ -212,9 +212,9 @@ namespace hdt
 			auto ret = CALL_MEMBER_FN(this, unk001CB0E0)(armor, skeleton, unk3, unk4, unk5, unk6);
 
 			if (ret) {
-			event.attachedNode = ret;
-			event.hasAttached = true;
-			g_armorAttachEventDispatcher.dispatch(event);
+				event.attachedNode = ret;
+				event.hasAttached = true;
+				g_armorAttachEventDispatcher.dispatch(event);
 			}
 			return ret;
 		}
@@ -224,15 +224,19 @@ namespace hdt
 	{
 		MEMBER_FN_PREFIX(UnequipItem);
 
-		DEFINE_MEMBER_FN_HOOK(unequipItem, bool, offset::ItemUnequipFunction, Actor* actor, TESForm* item, BaseExtraList* extraData, SInt32 count, BGSEquipSlot* equipSlot, bool unkFlag1, bool preventEquip, bool unkFlag2, bool unkFlag3, void* unk);
+		DEFINE_MEMBER_FN_HOOK(unequipItem, bool, offset::ItemUnequipFunction, Actor* actor, TESForm* item,
+							  BaseExtraList* extraData, SInt32 count, BGSEquipSlot* equipSlot, bool unkFlag1,
+							  bool preventEquip, bool unkFlag2, bool unkFlag3, void* unk);
 
-		bool unequipItem(Actor* actor, TESForm* item, BaseExtraList* extraData, SInt32 count, BGSEquipSlot* equipSlot, bool unkFlag1, bool preventEquip, bool unkFlag2, bool unkFlag3, void* unk)
+		bool unequipItem(Actor* actor, TESForm* item, BaseExtraList* extraData, SInt32 count, BGSEquipSlot* equipSlot,
+						 bool unkFlag1, bool preventEquip, bool unkFlag2, bool unkFlag3, void* unk)
 		{
 			ArmorDetachEvent event;
 			event.actor = actor;
 			g_armorDetachEventDispatcher.dispatch(event);
 
-			auto ret = CALL_MEMBER_FN(this, unequipItem)(actor, item, extraData, count, equipSlot, unkFlag1, preventEquip, unkFlag2, unkFlag3, unk);
+			auto ret = CALL_MEMBER_FN(this, unequipItem)(actor, item, extraData, count, equipSlot, unkFlag1,
+														 preventEquip, unkFlag2, unkFlag3, unk);
 
 			event.hasDetached = true;
 			g_armorDetachEventDispatcher.dispatch(event);
@@ -263,7 +267,7 @@ namespace hdt
 	struct UnkEngine
 	{
 		// This is the main loop
-		//https://github.com/powerof3/CommonLibSSE/blob/master/include/RE/M/Main.h
+		// https://github.com/powerof3/CommonLibSSE/blob/master/include/RE/M/Main.h
 		MEMBER_FN_PREFIX(UnkEngine);
 
 		DEFINE_MEMBER_FN_HOOK(onFrame, void, offset::GameLoopFunction);
@@ -273,27 +277,27 @@ namespace hdt
 		// members
 #ifndef SKYRIMVR
 		char unk[0x10];
-		bool                         quitGame;                     // 010
-		bool                         resetGame;                    // 011
-		bool                         fullReset;                    // 012
-		bool                         gameActive;                   // 013
-		bool                         onIdle;                       // 014
-		bool                         reloadContent;                // 015
-		bool                         freezeTime;                   // 016
-		bool                         freezeNextFrame;              // 017
+		bool quitGame;		  // 010
+		bool resetGame;		  // 011
+		bool fullReset;		  // 012
+		bool gameActive;	  // 013
+		bool onIdle;		  // 014
+		bool reloadContent;	  // 015
+		bool freezeTime;	  // 016
+		bool freezeNextFrame; // 017
 	};
 	static_assert(offsetof(UnkEngine, quitGame) == 0x10);
 	static_assert(offsetof(UnkEngine, freezeTime) == 0x16);
 #else
 		char unk[0x8];
-		bool                         quitGame;                     // 008
-		bool                         resetGame;                    // 009
-		bool                         fullReset;                    // 00a
-		bool                         gameActive;                   // 00b
-		bool                         onIdle;                       // 00c
-		bool                         reloadContent;                // 00d
-		bool                         freezeTime;                   // 00e
-		bool                         freezeNextFrame;              // 00f
+		bool quitGame;		  // 008
+		bool resetGame;		  // 009
+		bool fullReset;		  // 00a
+		bool gameActive;	  // 00b
+		bool onIdle;		  // 00c
+		bool reloadContent;	  // 00d
+		bool freezeTime;	  // 00e
+		bool freezeNextFrame; // 00f
 	};
 	static_assert(offsetof(UnkEngine, quitGame) == 0x08);
 	static_assert(offsetof(UnkEngine, freezeTime) == 0x0e);
@@ -311,12 +315,15 @@ namespace hdt
 	{
 		CALL_MEMBER_FN(this, onFrame)();
 
-		if (quitGame)
-		{
+		if (quitGame) {
+			_MESSAGE("hdtSMP64 shutting down gracefully");
+#ifdef CUDA
+			CudaInterface::instance()->synchronize(); // Finish pending GPU work
+#endif
 			g_shutdownEventDispatcher.dispatch(ShutdownEvent());
+			hdt::logging::AsyncLogger::getInstance().shutdown();
 		}
-		else
-		{
+		else {
 			FrameEvent e;
 			e.gamePaused = this->freezeTime;
 			g_frameEventDispatcher.dispatch(e);
@@ -373,4 +380,4 @@ namespace hdt
 		unhookSyncFrame();
 		DetourTransactionCommit();
 	}
-}
+} // namespace hdt

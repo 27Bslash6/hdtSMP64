@@ -15,6 +15,10 @@ subject to the following restrictions:
 #ifndef BT_SCALAR_H
 #define BT_SCALAR_H
 
+// Enable thread-safe Bullet code paths for parallel constraint solving
+// Required for btSequentialImpulseConstraintSolverMt and btConstraintSolverPoolMt
+#define BT_THREADSAFE 1
+
 #ifdef BT_MANAGED_CODE
 //Aligned data types not supported in managed code
 #pragma unmanaged

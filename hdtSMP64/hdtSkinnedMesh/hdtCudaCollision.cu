@@ -262,7 +262,7 @@ namespace hdt
 
         int tid = threadIdx.x;
         int threadInWarp = tid & 0x1f;
-        
+
         for (int block = blockIdx.x; block < n; block += gridDim.x)
         {
             int firstBox = nodeData[block].first;
@@ -609,11 +609,11 @@ namespace hdt
         int threadInWarp = tid & 0x1f;
         int warpid = tid >> 5;
         constexpr int nwarps = BlockSize >> 5;
-        
+
         for (int block = blockIdx.x; block < n; block += gridDim.x)
         {
             int nA = setup[block].sizeA;
-            int nB = setup[block].sizeB; 
+            int nB = setup[block].sizeB;
             int offsetA = setup[block].offsetA;
             int offsetB = setup[block].offsetB;
 
@@ -794,19 +794,28 @@ namespace hdt
                 int j_map = swap ? bodyA.boneMap[boneA] : bodyB.boneMap[boneB];
 
                 cuCollisionMerge* c;
+                size_t offset;
 
                 if (i_map == -1 && j_map != -1)
                 {
-                    c = mergeBuffer.buffer + mergeBuffer.dynx * mergeBuffer.y + mergeBuffer.x * j_map + i;
+                    offset = static_cast<size_t>(mergeBuffer.dynx) * mergeBuffer.y +
+                             static_cast<size_t>(mergeBuffer.x) * j_map + i;
                 }
                 else if (i_map != -1)
                 {
-                    c = mergeBuffer.buffer + i_map * mergeBuffer.y + j;
+                    offset = static_cast<size_t>(i_map) * mergeBuffer.y + j;
                 }
                 else
                 {
                     return;
                 }
+
+                // BOUNDS CHECK: Skip write if offset exceeds buffer size
+                if (mergeBuffer.bufferSize > 0 && offset >= mergeBuffer.bufferSize)
+                {
+                    return;
+                }
+                c = mergeBuffer.buffer + offset;
 
                 atomicAdd(&c->weight, w2);
 
@@ -1091,14 +1100,36 @@ namespace hdt
     void cuRecordEvent(void* ptr, void* stream)
     {
         cudaEvent_t* e = reinterpret_cast<cudaEvent_t*>(ptr);
-        cudaStream_t* s = reinterpret_cast<cudaStream_t*>(stream);
-        cudaEventRecord(*e, *s);
+        // Handle nullptr for default stream (0)
+        cudaStream_t s = stream ? *reinterpret_cast<cudaStream_t*>(stream) : 0;
+        cudaEventRecord(*e, s);
     }
 
     void cuWaitEvent(void* ptr)
     {
         cudaEvent_t* e = reinterpret_cast<cudaEvent_t*>(ptr);
         cudaEventSynchronize(*e);
+    }
+
+    float cuEventElapsedTime(void* startEvent, void* endEvent)
+    {
+        cudaEvent_t* start = reinterpret_cast<cudaEvent_t*>(startEvent);
+        cudaEvent_t* end = reinterpret_cast<cudaEvent_t*>(endEvent);
+        float ms = 0.0f;
+        cudaEventElapsedTime(&ms, *start, *end);
+        return ms;
+    }
+
+    cuResult cuCreateEventWithFlags(void** ptr, unsigned int flags)
+    {
+        *ptr = new cudaEvent_t;
+        return cudaEventCreateWithFlags(reinterpret_cast<cudaEvent_t*>(*ptr), flags);
+    }
+
+    bool cuEventQuery(void* ptr)
+    {
+        cudaEvent_t* e = reinterpret_cast<cudaEvent_t*>(ptr);
+        return cudaEventQuery(*e) == cudaSuccess;
     }
 
     void cuInitialize()
@@ -1153,7 +1184,18 @@ namespace hdt
     {
         cudaGraphExec_t* ge = reinterpret_cast<cudaGraphExec_t*>(graphExec);
         cudaGraph_t g = reinterpret_cast<cudaGraph_t>(graph);
-        return cudaGraphInstantiate(ge, g, nullptr, nullptr, 0);
+        // Use cudaGraphInstantiateWithFlags for CUDA 11.4+ with better perf characteristics
+        // Flag 0 = default behavior, fully resolve at instantiation time
+        return cudaGraphInstantiateWithFlags(ge, g, 0);
+    }
+
+    cuResult cuGraphUpload(void* graphExec, void* stream)
+    {
+        // Pre-upload graph to device to eliminate first-launch overhead
+        // This moves the upload cost from cudaGraphLaunch to this explicit call
+        cudaGraphExec_t ge = reinterpret_cast<cudaGraphExec_t>(graphExec);
+        cudaStream_t* s = reinterpret_cast<cudaStream_t*>(stream);
+        return cudaGraphUpload(ge, *s);
     }
 
     cuResult cuGraphLaunch(void* graphExec, void* stream)

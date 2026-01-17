@@ -1,41 +1,31 @@
 #pragma once
 
-// Unified timestamped logging for hdtSMP64
-// Uses SKSE's gLog (writes to hdtSMP64.log) with microsecond timestamps
+// Unified logging for hdtSMP64
+// All logging goes through hdtPrefix.h macros which:
+// - Respect configured log level from configs.xml
+// - Add timestamps with microsecond precision
+// - Add level prefixes ([INFO], [WARN], etc.)
+//
+// The HDT_LOG_* macros below are aliases for the _MESSAGE/_WARNING/etc. macros.
+// This ensures a single source of truth for log level and consistent formatting.
 
-#include <chrono>
-#include <ctime>
-#include <cstdio>
-#include <cstdarg>
-#include <mutex>
-
-// Forward declare gLog from SKSE
-extern IDebugLog gLog;
+#include "hdtPrefix.h"
 
 namespace hdt
 {
+	// LogLevel enum preserved for backwards compatibility
+	// Maps to IDebugLog::LogLevel values
 	enum class LogLevel
 	{
-		Debug = 0,
-		Info = 1,
-		Warning = 2,
-		Error = 3
+		Debug = 5,	 // IDebugLog::kLevel_DebugMessage
+		Info = 3,	 // IDebugLog::kLevel_Message
+		Warning = 2, // IDebugLog::kLevel_Warning
+		Error = 1	 // IDebugLog::kLevel_Error
 	};
 
-	// Shared timestamp formatting with microsecond precision
-	inline void formatTimestamp(char* buf, size_t bufSize)
-	{
-		auto now = std::chrono::system_clock::now();
-		auto time_t_now = std::chrono::system_clock::to_time_t(now);
-		auto micros = std::chrono::duration_cast<std::chrono::microseconds>(
-			now.time_since_epoch()) % 1000000;
-
-		struct tm tm;
-		localtime_s(&tm, &time_t_now);
-		std::strftime(buf, bufSize, "[%H:%M:%S", &tm);
-		snprintf(buf + 9, bufSize - 9, ".%06lld]", micros.count());
-	}
-
+	// Deprecated: Logger class no longer used
+	// All logging now goes through hdtPrefix.h's unified system
+	// Kept for any code that might reference Logger::getInstance()
 	class Logger
 	{
 	public:
@@ -45,62 +35,44 @@ namespace hdt
 			return instance;
 		}
 
-		void init(const char* /*filename*/) { m_initialized = true; }
-		void setLevel(LogLevel level) { m_level = level; }
-		void setEnabled(bool enabled) { m_enabled = enabled; }
+		// No-op: log level is now controlled via configs.xml
+		void setLevel(LogLevel /*level*/) {}
+		void setEnabled(bool /*enabled*/) {}
 
+		// No-op: initialization handled by SKSE
+		void init(const char* /*filename*/) {}
+		void close() {}
+
+		// Redirect to unified logging
 		void log(LogLevel level, const char* format, ...)
 		{
-			if (!m_enabled || level < m_level)
-				return;
+			va_list args;
+			va_start(args, format);
 
-			std::lock_guard<std::mutex> lock(m_mutex);
+			char msgBuf[2048];
+			vsnprintf(msgBuf, sizeof(msgBuf), format, args);
+			va_end(args);
 
-			try
-			{
-				char timeBuf[32];
-				formatTimestamp(timeBuf, sizeof(timeBuf));
-
-				const char* levelStr = "";
-				switch (level)
-				{
-				case LogLevel::Debug:   levelStr = "[DEBUG]"; break;
-				case LogLevel::Info:    levelStr = "[INFO] "; break;
-				case LogLevel::Warning: levelStr = "[WARN] "; break;
-				case LogLevel::Error:   levelStr = "[ERROR]"; break;
-				}
-
-				char msgBuf[2048];
-				va_list args;
-				va_start(args, format);
-				vsnprintf(msgBuf, sizeof(msgBuf), format, args);
-				va_end(args);
-
-				char finalBuf[2200];
-				snprintf(finalBuf, sizeof(finalBuf), "%s %s %s", timeBuf, levelStr, msgBuf);
-				gLog.Message(finalBuf);
-			}
-			catch (...)
-			{
-				// Silently fail - don't crash the game over logging
+			switch (level) {
+			case LogLevel::Debug:
+				_DMESSAGE("%s", msgBuf);
+				break;
+			case LogLevel::Info:
+				_MESSAGE("%s", msgBuf);
+				break;
+			case LogLevel::Warning:
+				_WARNING("%s", msgBuf);
+				break;
+			case LogLevel::Error:
+				_ERROR("%s", msgBuf);
+				break;
 			}
 		}
 
-		void close() { /* gLog handles its own cleanup */ }
-
 	private:
-		Logger() : m_enabled(true), m_level(LogLevel::Info), m_initialized(false) {}
-		~Logger() = default;
-
-		std::mutex m_mutex;
-		bool m_enabled;
-		bool m_initialized;
-		LogLevel m_level;
+		Logger() = default;
 	};
+} // namespace hdt
 
-	// Primary logging macros - use these throughout hdtSMP64
-	#define HDT_LOG_DEBUG(fmt, ...) hdt::Logger::getInstance().log(hdt::LogLevel::Debug, fmt, ##__VA_ARGS__)
-	#define HDT_LOG_INFO(fmt, ...)  hdt::Logger::getInstance().log(hdt::LogLevel::Info, fmt, ##__VA_ARGS__)
-	#define HDT_LOG_WARN(fmt, ...)  hdt::Logger::getInstance().log(hdt::LogLevel::Warning, fmt, ##__VA_ARGS__)
-	#define HDT_LOG_ERROR(fmt, ...) hdt::Logger::getInstance().log(hdt::LogLevel::Error, fmt, ##__VA_ARGS__)
-}
+// All logging uses the unified _MESSAGE family from hdtPrefix.h
+// No separate HDT_LOG_* macros - use _DMESSAGE, _MESSAGE, _WARNING, _ERROR directly

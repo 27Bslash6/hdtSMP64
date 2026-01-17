@@ -85,6 +85,7 @@
     <ClCompile Include="unit\test_non_hookean.cpp" />
     <ClCompile Include="unit\test_dispatcher.cpp" />
     <ClCompile Include="unit\test_serialization.cpp" />
+    <ClCompile Include="unit\test_highway_skinning.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\catch.hpp" />

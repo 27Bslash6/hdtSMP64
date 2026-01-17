@@ -47,62 +47,61 @@
 #endif
 
 // Zone profiling macros
-#define HDT_ZONE_SCOPED           ZoneScoped
-#define HDT_ZONE_SCOPED_N(name)   ZoneScopedN(name)
-#define HDT_ZONE_TEXT(text, len)  ZoneText(text, len)
-#define HDT_ZONE_VALUE(value)     ZoneValue(value)
+#define HDT_ZONE_SCOPED ZoneScoped
+#define HDT_ZONE_SCOPED_N(name) ZoneScopedN(name)
+#define HDT_ZONE_TEXT(text, len) ZoneText(text, len)
+#define HDT_ZONE_VALUE(value) ZoneValue(value)
 
 // Frame markers
-#define HDT_FRAME_MARK            FrameMark
-#define HDT_FRAME_MARK_N(name)    FrameMarkNamed(name)
+#define HDT_FRAME_MARK FrameMark
+#define HDT_FRAME_MARK_N(name) FrameMarkNamed(name)
 #define HDT_FRAME_MARK_START(name) FrameMarkStart(name)
-#define HDT_FRAME_MARK_END(name)   FrameMarkEnd(name)
+#define HDT_FRAME_MARK_END(name) FrameMarkEnd(name)
 
 // Value plotting
-#define HDT_PLOT(name, value)     TracyPlot(name, value)
-#define HDT_PLOT_CONFIG(name, type, step, fill, color) \
-    TracyPlotConfig(name, type, step, fill, color)
+#define HDT_PLOT(name, value) TracyPlot(name, value)
+#define HDT_PLOT_CONFIG(name, type, step, fill, color) TracyPlotConfig(name, type, step, fill, color)
 
 // Memory tracking (optional - use with custom allocators)
-#define HDT_ALLOC(ptr, size)      TracyAlloc(ptr, size)
-#define HDT_FREE(ptr)             TracyFree(ptr)
+#define HDT_ALLOC(ptr, size) TracyAlloc(ptr, size)
+#define HDT_FREE(ptr) TracyFree(ptr)
 
 // Lock profiling
-#define HDT_LOCKABLE(type, var)   TracyLockable(type, var)
+#define HDT_LOCKABLE(type, var) TracyLockable(type, var)
 #define HDT_LOCKABLE_N(type, var, name) TracyLockableN(type, var, name)
 
 // Message logging
-#define HDT_MESSAGE(text, len)    TracyMessage(text, len)
-#define HDT_MESSAGE_L(text)       TracyMessageL(text)
+#define HDT_MESSAGE(text, len) TracyMessage(text, len)
+#define HDT_MESSAGE_L(text) TracyMessageL(text)
 
 // Connection status
-#define HDT_IS_CONNECTED          TracyIsConnected
+#define HDT_IS_CONNECTED TracyIsConnected
 
 #else // HDT_TRACY_ENABLE not defined
 
 // No-op versions - zero overhead when profiling disabled
-#define HDT_ZONE_SCOPED           (void)0
-#define HDT_ZONE_SCOPED_N(name)   (void)0
-#define HDT_ZONE_TEXT(text, len)  (void)0
-#define HDT_ZONE_VALUE(value)     (void)0
+#define HDT_ZONE_SCOPED (void)0
+#define HDT_ZONE_SCOPED_N(name) (void)0
+#define HDT_ZONE_TEXT(text, len) (void)0
+#define HDT_ZONE_VALUE(value) (void)0
 
-#define HDT_FRAME_MARK            (void)0
-#define HDT_FRAME_MARK_N(name)    (void)0
+#define HDT_FRAME_MARK (void)0
+#define HDT_FRAME_MARK_N(name) (void)0
 #define HDT_FRAME_MARK_START(name) (void)0
-#define HDT_FRAME_MARK_END(name)   (void)0
+#define HDT_FRAME_MARK_END(name) (void)0
 
-#define HDT_PLOT(name, value)     (void)0
+#define HDT_PLOT(name, value) (void)0
 #define HDT_PLOT_CONFIG(name, type, step, fill, color) (void)0
 
-#define HDT_ALLOC(ptr, size)      (void)0
-#define HDT_FREE(ptr)             (void)0
+#define HDT_ALLOC(ptr, size) (void)0
+#define HDT_FREE(ptr) (void)0
 
-#define HDT_LOCKABLE(type, var)   type var
+#define HDT_LOCKABLE(type, var) type var
 #define HDT_LOCKABLE_N(type, var, name) type var
 
-#define HDT_MESSAGE(text, len)    (void)0
-#define HDT_MESSAGE_L(text)       (void)0
+#define HDT_MESSAGE(text, len) (void)0
+#define HDT_MESSAGE_L(text) (void)0
 
-#define HDT_IS_CONNECTED          false
+#define HDT_IS_CONNECTED false
 
 #endif // HDT_TRACY_ENABLE

@@ -22,8 +22,11 @@ subject to the following restrictions:
 #include "BulletDynamics/ConstraintSolver/btTypedConstraint.h"
 #include "BulletDynamics/Dynamics/btRigidBody.h"
 
+// Tracy profiler integration for parallel solver visibility
+#include "../../hdtTracy.h"
+
 bool btSequentialImpulseConstraintSolverMt::s_allowNestedParallelForLoops = false;  // some task schedulers don't like nested loops
-int btSequentialImpulseConstraintSolverMt::s_minimumContactManifoldsForBatching = 250;
+int btSequentialImpulseConstraintSolverMt::s_minimumContactManifoldsForBatching = 4;
 int btSequentialImpulseConstraintSolverMt::s_minBatchSize = 50;
 int btSequentialImpulseConstraintSolverMt::s_maxBatchSize = 100;
 btBatchedConstraints::BatchingMethod btSequentialImpulseConstraintSolverMt::s_contactBatchingMethod = btBatchedConstraints::BATCHING_METHOD_SPATIAL_GRID_2D;
@@ -393,8 +396,23 @@ void btSequentialImpulseConstraintSolverMt::internalCollectContactManifoldCached
 	{
 		btContactManifoldCachedInfo* cachedInfo = &cachedInfoArray[i];
 		btPersistentManifold* manifold = manifoldPtr[i];
+
+		// Safety check: skip invalid manifolds
+		if (!manifold)
+		{
+			cachedInfo->numTouchingContacts = 0;
+			continue;
+		}
+
 		btCollisionObject* colObj0 = (btCollisionObject*)manifold->getBody0();
 		btCollisionObject* colObj1 = (btCollisionObject*)manifold->getBody1();
+
+		// Safety check: skip manifolds with NULL bodies
+		if (!colObj0 || !colObj1)
+		{
+			cachedInfo->numTouchingContacts = 0;
+			continue;
+		}
 
 		int solverBodyIdA = getOrInitSolverBodyThreadsafe(*colObj0, infoGlobal.m_timeStep);
 		int solverBodyIdB = getOrInitSolverBodyThreadsafe(*colObj1, infoGlobal.m_timeStep);
@@ -835,14 +853,40 @@ btScalar btSequentialImpulseConstraintSolverMt::solveGroupCacheFriendlySetup(
 	const btContactSolverInfo& infoGlobal,
 	btIDebugDraw* debugDrawer)
 {
+	// FIX: Clear batch structures at start of frame to prevent stale data from previous frames
+	// causing crashes when batching state changes between frames
+	m_batchedContactConstraints.m_constraintIndices.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_batches.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_phases.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_phaseGrainSize.resizeNoInitialize(0);
+	m_batchedContactConstraints.m_phaseOrder.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_constraintIndices.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_batches.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_phases.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_phaseGrainSize.resizeNoInitialize(0);
+	m_batchedJointConstraints.m_phaseOrder.resizeNoInitialize(0);
+
 	m_numFrictionDirections = (infoGlobal.m_solverMode & SOLVER_USE_2_FRICTION_DIRECTIONS) ? 2 : 1;
 	m_useBatching = false;
-	if (numManifolds >= s_minimumContactManifoldsForBatching &&
-		(s_allowNestedParallelForLoops || !btThreadsAreRunning()))
+	// Batching enables btParallelFor inside convertJoints/convertContacts
+	// Requires: enough manifolds AND (nested parallelism allowed OR not already threading)
+	bool hasEnoughManifolds = numManifolds >= s_minimumContactManifoldsForBatching;
+	bool canNest = s_allowNestedParallelForLoops || !btThreadsAreRunning();
+	if (hasEnoughManifolds && canNest)
 	{
 		m_useBatching = true;
 		m_batchedContactConstraints.m_debugDrawer = debugDrawer;
 		m_batchedJointConstraints.m_debugDrawer = debugDrawer;
+	}
+	// Log batching decision (every ~2 seconds at 60fps) - uses _MESSAGE for visibility
+	static int s_batchingLogCounter = 0;
+	if (++s_batchingLogCounter % 120 == 0) {
+		_MESSAGE("[SOLVER-MT] Batching=%s (manifolds=%d>=%d? %s, nested=%s, threadsRunning=%s)",
+			m_useBatching ? "ON" : "OFF",
+			numManifolds, s_minimumContactManifoldsForBatching,
+			hasEnoughManifolds ? "yes" : "no",
+			s_allowNestedParallelForLoops ? "allowed" : "blocked",
+			btThreadsAreRunning() ? "yes" : "no");
 	}
 	btSequentialImpulseConstraintSolver::solveGroupCacheFriendlySetup(bodies,
 																	  numBodies,
@@ -882,6 +926,7 @@ struct ContactSplitPenetrationImpulseSolverLoop : public btIParallelSumBody
 	}
 	btScalar sumLoop(int iBegin, int iEnd) const BT_OVERRIDE
 	{
+		HDT_ZONE_SCOPED_N("SplitPenetrationSolverLoop");
 		BT_PROFILE("ContactSplitPenetrationImpulseSolverLoop");
 		btScalar sum = 0;
 		for (int iBatch = iBegin; iBatch < iEnd; ++iBatch)
@@ -905,7 +950,6 @@ void btSequentialImpulseConstraintSolverMt::solveGroupCacheFriendlySplitImpulseI
 			{
 				const btBatchedConstraints& batchedCons = m_batchedContactConstraints;
 				ContactSplitPenetrationImpulseSolverLoop loop(this, &batchedCons);
-				btScalar leastSquaresResidual = 0.f;
 				for (int iiPhase = 0; iiPhase < batchedCons.m_phases.size(); ++iiPhase)
 				{
 					int iPhase = batchedCons.m_phaseOrder[iiPhase];
@@ -934,8 +978,10 @@ btScalar btSequentialImpulseConstraintSolverMt::solveSingleIteration(int iterati
 {
 	if (!m_useBatching)
 	{
+		HDT_ZONE_SCOPED_N("SolveSingleIter_NoBatch");
 		return btSequentialImpulseConstraintSolver::solveSingleIteration(iteration, bodies, numBodies, manifoldPtr, numManifolds, constraints, numConstraints, infoGlobal, debugDrawer);
 	}
+	HDT_ZONE_SCOPED_N("SolveSingleIter_Batched");
 	BT_PROFILE("solveSingleIterationMt");
 	btScalar leastSquaresResidual = 0.f;
 
@@ -1040,7 +1086,7 @@ btScalar btSequentialImpulseConstraintSolverMt::resolveMultipleContactFrictionCo
 			int iEnd = iBegin + m_numFrictionDirections;
 			for (int iFriction = iBegin; iFriction < iEnd; ++iFriction)
 			{
-				btSolverConstraint& solveManifold = m_tmpSolverContactFrictionConstraintPool[iFriction++];
+				btSolverConstraint& solveManifold = m_tmpSolverContactFrictionConstraintPool[iFriction];
 				btAssert(solveManifold.m_frictionIndex == iContact);
 
 				solveManifold.m_lowerLimit = -(solveManifold.m_friction * totalImpulse);
@@ -1215,6 +1261,7 @@ struct JointSolverLoop : public btIParallelSumBody
 	}
 	btScalar sumLoop(int iBegin, int iEnd) const BT_OVERRIDE
 	{
+		HDT_ZONE_SCOPED_N("JointSolverLoop");
 		BT_PROFILE("JointSolverLoop");
 		btScalar sum = 0;
 		for (int iBatch = iBegin; iBatch < iEnd; ++iBatch)
@@ -1228,6 +1275,7 @@ struct JointSolverLoop : public btIParallelSumBody
 
 btScalar btSequentialImpulseConstraintSolverMt::resolveAllJointConstraints(int iteration)
 {
+	HDT_ZONE_SCOPED_N("ResolveJoints_Batched");
 	BT_PROFILE("resolveAllJointConstraints");
 	const btBatchedConstraints& batchedCons = m_batchedJointConstraints;
 	JointSolverLoop loop(this, &batchedCons, iteration);
@@ -1254,6 +1302,7 @@ struct ContactSolverLoop : public btIParallelSumBody
 	}
 	btScalar sumLoop(int iBegin, int iEnd) const BT_OVERRIDE
 	{
+		HDT_ZONE_SCOPED_N("ContactSolverLoop");
 		BT_PROFILE("ContactSolverLoop");
 		btScalar sum = 0;
 		for (int iBatch = iBegin; iBatch < iEnd; ++iBatch)
@@ -1267,6 +1316,7 @@ struct ContactSolverLoop : public btIParallelSumBody
 
 btScalar btSequentialImpulseConstraintSolverMt::resolveAllContactConstraints()
 {
+	HDT_ZONE_SCOPED_N("ResolveContacts_Batched");
 	BT_PROFILE("resolveAllContactConstraints");
 	const btBatchedConstraints& batchedCons = m_batchedContactConstraints;
 	ContactSolverLoop loop(this, &batchedCons);
@@ -1293,6 +1343,7 @@ struct ContactFrictionSolverLoop : public btIParallelSumBody
 	}
 	btScalar sumLoop(int iBegin, int iEnd) const BT_OVERRIDE
 	{
+		HDT_ZONE_SCOPED_N("ContactFrictionSolverLoop");
 		BT_PROFILE("ContactFrictionSolverLoop");
 		btScalar sum = 0;
 		for (int iBatch = iBegin; iBatch < iEnd; ++iBatch)
@@ -1306,6 +1357,7 @@ struct ContactFrictionSolverLoop : public btIParallelSumBody
 
 btScalar btSequentialImpulseConstraintSolverMt::resolveAllContactFrictionConstraints()
 {
+	HDT_ZONE_SCOPED_N("ResolveFriction_Batched");
 	BT_PROFILE("resolveAllContactFrictionConstraints");
 	const btBatchedConstraints& batchedCons = m_batchedContactConstraints;
 	ContactFrictionSolverLoop loop(this, &batchedCons);
@@ -1332,6 +1384,7 @@ struct InterleavedContactSolverLoop : public btIParallelSumBody
 	}
 	btScalar sumLoop(int iBegin, int iEnd) const BT_OVERRIDE
 	{
+		HDT_ZONE_SCOPED_N("InterleavedContactSolverLoop");
 		BT_PROFILE("InterleavedContactSolverLoop");
 		btScalar sum = 0;
 		for (int iBatch = iBegin; iBatch < iEnd; ++iBatch)
@@ -1345,6 +1398,7 @@ struct InterleavedContactSolverLoop : public btIParallelSumBody
 
 btScalar btSequentialImpulseConstraintSolverMt::resolveAllContactConstraintsInterleaved()
 {
+	HDT_ZONE_SCOPED_N("ResolveInterleaved_Batched");
 	BT_PROFILE("resolveAllContactConstraintsInterleaved");
 	const btBatchedConstraints& batchedCons = m_batchedContactConstraints;
 	InterleavedContactSolverLoop loop(this, &batchedCons);
@@ -1371,6 +1425,7 @@ struct ContactRollingFrictionSolverLoop : public btIParallelSumBody
 	}
 	btScalar sumLoop(int iBegin, int iEnd) const BT_OVERRIDE
 	{
+		HDT_ZONE_SCOPED_N("RollingFrictionSolverLoop");
 		BT_PROFILE("ContactFrictionSolverLoop");
 		btScalar sum = 0;
 		for (int iBatch = iBegin; iBatch < iEnd; ++iBatch)
@@ -1384,6 +1439,7 @@ struct ContactRollingFrictionSolverLoop : public btIParallelSumBody
 
 btScalar btSequentialImpulseConstraintSolverMt::resolveAllRollingFrictionConstraints()
 {
+	HDT_ZONE_SCOPED_N("ResolveRolling_Batched");
 	BT_PROFILE("resolveAllRollingFrictionConstraints");
 	btScalar leastSquaresResidual = 0.f;
 	//

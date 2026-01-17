@@ -1,6 +1,5 @@
 #include "hdtSkinnedMeshShape.h"
 
-#include <ppl.h>
 #include "../hdtTracy.h"
 
 namespace hdt
@@ -13,21 +12,22 @@ namespace hdt
 
 	SkinnedMeshShape::~SkinnedMeshShape()
 	{
-		//m_aabbGridLink.discard_data();
-		//m_aabbGridBuffer.discard_data();
+		_VMESSAGE("SkinnedMeshShape::~dtor: shape=%p owner=%s m_colliders.data()=%p size=%zu", this,
+				  (m_owner && m_owner->m_name()) ? m_owner->m_name()->cstr() : "null", m_colliders.data(),
+				  m_colliders.size());
+		// m_aabbGridLink.discard_data();
+		// m_aabbGridBuffer.discard_data();
 	}
 
 	void SkinnedMeshShape::clipColliders()
 	{
 		auto& v = m_owner->m_vertices;
-		m_tree.clipCollider([&, this](const Collider& n)-> bool
-		{
+		m_tree.clipCollider([&, this](const Collider& n) -> bool {
 			bool flg = false;
-			for (int i = 0; i < getBonePerCollider() && !flg; ++i)
-			{
+			for (int i = 0; i < getBonePerCollider() && !flg; ++i) {
 				float weight = getColliderBoneWeight(&n, i);
-				if (weight > FLT_EPSILON && weight > m_owner->m_skinnedBones[getColliderBoneIndex(&n, i)].
-					weightThreshold)
+				if (weight > FLT_EPSILON &&
+					weight > m_owner->m_skinnedBones[getColliderBoneIndex(&n, i)].weightThreshold)
 					flg = true;
 			}
 			return !flg;
@@ -48,11 +48,11 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 	float4 data = vertices[colliders[idx].x];
 	float3 p0 = data.xyz;
 	float m = margin * data.w;
-	
+
 	Aabb aabb;
 	aabb.aabbMin.xyz = p0 - m;
 	aabb.aabbMax.xyz = p0 + m;
-	
+
 	aabbs[idx] = aabb;
 }
 )__KERNEL";
@@ -63,11 +63,11 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 	{
 		auto cl = hdtCL::instance();
 
-		if (!m_colliderCL())
-		{
-			m_colliderCL = cl->createBuffer(sizeof(Collider)* m_colliders.size(), CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 0);
-			m_aabbCL = cl->createBuffer(sizeof(Aabb)* m_aabb.size(), CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY, 0);
-			cl->writeBuffer(m_colliderCL, m_colliders.data(), sizeof(Collider)* m_colliders.size(), true);
+		if (!m_colliderCL()) {
+			m_colliderCL =
+				cl->createBuffer(sizeof(Collider) * m_colliders.size(), CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 0);
+			m_aabbCL = cl->createBuffer(sizeof(Aabb) * m_aabb.size(), CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY, 0);
+			cl->writeBuffer(m_colliderCL, m_colliders.data(), sizeof(Collider) * m_colliders.size(), true);
 		}
 
 		m_kernel.lock();
@@ -75,9 +75,9 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		m_kernel.setArg(1, m_colliderCL);
 		m_kernel.setArg(2, m_aabbCL);
 		m_kernel.setArg(3, m_shapeProp.margin);
-		auto e0 = m_kernel.runE({ m_colliders.size() });
+		auto e0 = m_kernel.runE({m_colliders.size()});
 		m_kernel.unlock();
-		m_eDoneCL = cl->readBufferE(m_aabb.data(), m_aabbCL, m_aabb.size() * sizeof(Aabb), { e0 });
+		m_eDoneCL = cl->readBufferE(m_aabb.data(), m_aabbCL, m_aabb.size() * sizeof(Aabb), {e0});
 	}
 
 	static const std::string sourceTriUpdate = R"__KERNEL(
@@ -106,13 +106,13 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 	float3 p1 = vertices[colliders[idx].y].s012;
 	float3 p2 = vertices[colliders[idx].z].s012;
 	float m = vertices[colliders[idx].x].w + vertices[colliders[idx].y].w + vertices[colliders[idx].z].w;
-	
+
 	Aabb aabb;
 	aabb.aabbMin = aabb.aabbMax = p0;
 	aabbMerge(&aabb, p1);
 	aabbMerge(&aabb, p2);
 	aabbExpand(&aabb, margin * m / 3.0f);
-	
+
 	if(penetration > FLT_EPSILON || penetration < -FLT_EPSILON)
 	{
 		float3 normal = cross((p1-p0).s012, (p2-p0).s012);
@@ -134,11 +134,11 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 	{
 		auto cl = hdtCL::instance();
 
-		if (!m_colliderCL())
-		{
-			m_colliderCL = cl->createBuffer(sizeof(Collider)* m_colliders.size(), CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 0);
-			m_aabbCL = cl->createBuffer(sizeof(Aabb)* m_aabb.size(), CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY, 0);
-			cl->writeBuffer(m_colliderCL, m_colliders.data(), sizeof(Collider)* m_colliders.size(), true);
+		if (!m_colliderCL()) {
+			m_colliderCL =
+				cl->createBuffer(sizeof(Collider) * m_colliders.size(), CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 0);
+			m_aabbCL = cl->createBuffer(sizeof(Aabb) * m_aabb.size(), CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY, 0);
+			cl->writeBuffer(m_colliderCL, m_colliders.data(), sizeof(Collider) * m_colliders.size(), true);
 		}
 
 		m_kernel.lock();
@@ -147,22 +147,19 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		m_kernel.setArg(2, m_aabbCL);
 		m_kernel.setArg(3, m_shapeProp.penetration);
 		m_kernel.setArg(4, m_shapeProp.margin);
-		auto e0 = m_kernel.runE({ m_colliders.size() });
+		auto e0 = m_kernel.runE({m_colliders.size()});
 		m_kernel.unlock();
-		m_eDoneCL = cl->readBufferE(m_aabb.data(), m_aabbCL, m_aabb.size() * sizeof(Aabb), { e0 });
+		m_eDoneCL = cl->readBufferE(m_aabb.data(), m_aabbCL, m_aabb.size() * sizeof(Aabb), {e0});
 	}
 
 #endif
 
-	PerVertexShape::PerVertexShape(SkinnedMeshBody* body)
-		: SkinnedMeshShape(body)
+	PerVertexShape::PerVertexShape(SkinnedMeshBody* body) : SkinnedMeshShape(body)
 	{
 #ifdef ENABLE_CL
 		auto cl = hdtCL::instance();
-		if (cl)
-		{
-			if (!m_kernel())
-			{
+		if (cl) {
+			if (!m_kernel()) {
 				m_kernel.lock();
 				if (!m_kernel())
 					m_kernel = hdtCLKernel(cl->compile(sourceVtxUpdate), "updateCollider");
@@ -172,30 +169,33 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 #endif
 	}
 
-	PerVertexShape::~PerVertexShape()
-	{
-	}
+	PerVertexShape::~PerVertexShape() {}
 
 	void PerVertexShape::finishBuild()
 	{
-		bool hasDynamic = false;
-
 		m_tree.optimize();
-		m_tree.updateKinematic([this](const Collider* n)
-		{
-			return m_owner->flexible(m_owner->m_vertices[n->vertex]);
-		});
+		m_tree.updateKinematic([this](const Collider* n) { return m_owner->flexible(m_owner->m_vertices[n->vertex]); });
 
 		m_owner->setCollisionFlags(m_tree.isKinematic ? btCollisionObject::CF_KINEMATIC_OBJECT : 0);
 
+		// exportColliders stores offsets in tree nodes (no pointers!)
 		m_tree.exportColliders(m_colliders);
 #ifdef CUDA
 		m_aabb.reset(new Aabb[m_colliders.size()]);
-		m_tree.remapColliders(m_colliders.data(), m_aabb.get());
 #else
 		m_aabb.resize(m_colliders.size());
-		m_tree.remapColliders(m_colliders.data(), m_aabb.data());
 #endif
+		// Clear local colliders from tree nodes (they're now in m_colliders)
+		m_tree.finalizeOffsets();
+
+		_VMESSAGE("PerVertexShape::finishBuild: shape=%p owner=%s colliders=%zu", this,
+				  (m_owner && m_owner->m_name()) ? m_owner->m_name()->cstr() : "null", m_colliders.size());
+
+		// Validate offsets are within bounds
+		if (!validateColliderOffsets()) {
+			_ERROR("PerVertexShape::finishBuild: VALIDATION FAILED! shape=%p owner=%s", this,
+				   (m_owner && m_owner->m_name()) ? m_owner->m_name()->cstr() : "null");
+		}
 	}
 
 	void PerVertexShape::internalUpdate()
@@ -216,10 +216,8 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 #ifdef __AVX512F__
 			// AVX-512 path: process 4 vertices at a time
-			for (; i + 3 < size; i += 4)
-			{
-				if (i + 12 < size)
-				{
+			for (; i + 3 < size; i += 4) {
+				if (i + 12 < size) {
 					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 12].vertex]), _MM_HINT_T0);
 					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 13].vertex]), _MM_HINT_T0);
 					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 14].vertex]), _MM_HINT_T0);
@@ -232,16 +230,12 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 				auto p3 = vertices[m_colliders[i + 3].vertex].m_data;
 
 				__m512 pos = _mm512_insertf32x4(
-					_mm512_insertf32x4(
-						_mm512_insertf32x4(_mm512_castps128_ps512(p0), p1, 1),
-						p2, 2),
-					p3, 3);
+					_mm512_insertf32x4(_mm512_insertf32x4(_mm512_castps128_ps512(p0), p1, 1), p2, 2), p3, 3);
 
 				__m512 margins = _mm512_insertf32x4(
 					_mm512_insertf32x4(
-						_mm512_insertf32x4(
-							_mm512_castps128_ps512(_mm_set_ps1(p0.m128_f32[3] * shapePropMargin)),
-							_mm_set_ps1(p1.m128_f32[3] * shapePropMargin), 1),
+						_mm512_insertf32x4(_mm512_castps128_ps512(_mm_set_ps1(p0.m128_f32[3] * shapePropMargin)),
+										   _mm_set_ps1(p1.m128_f32[3] * shapePropMargin), 1),
 						_mm_set_ps1(p2.m128_f32[3] * shapePropMargin), 2),
 					_mm_set_ps1(p3.m128_f32[3] * shapePropMargin), 3);
 
@@ -259,10 +253,8 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 			}
 #endif
 			// AVX2 path: process 2 vertices at a time
-			for (; i + 1 < size; i += 2)
-			{
-				if (i + 8 < size)
-				{
+			for (; i + 1 < size; i += 2) {
+				if (i + 8 < size) {
 					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 8].vertex]), _MM_HINT_T0);
 					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 9].vertex]), _MM_HINT_T0);
 				}
@@ -271,9 +263,8 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 				auto p1 = vertices[m_colliders[i + 1].vertex].m_data;
 
 				__m256 pos = _mm256_set_m128(p1, p0);
-				__m256 margins = _mm256_set_m128(
-					_mm_set_ps1(p1.m128_f32[3] * shapePropMargin),
-					_mm_set_ps1(p0.m128_f32[3] * shapePropMargin));
+				__m256 margins = _mm256_set_m128(_mm_set_ps1(p1.m128_f32[3] * shapePropMargin),
+												 _mm_set_ps1(p0.m128_f32[3] * shapePropMargin));
 
 				__m256 aabbMin = _mm256_sub_ps(pos, margins);
 				__m256 aabbMax = _mm256_add_ps(pos, margins);
@@ -285,8 +276,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 			}
 
 			// Scalar remainder
-			for (; i < size; ++i)
-			{
+			for (; i < size; ++i) {
 				auto p0 = vertices[m_colliders[i].vertex].m_data;
 				auto margin = _mm_set_ps1(p0.m128_f32[3] * shapePropMargin);
 				m_aabb[i].m_min = p0 - margin;
@@ -295,7 +285,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		}
 		{
 			HDT_ZONE_SCOPED_N("TreeUpdateAabb");
-			m_tree.updateAabb();
+			m_tree.updateAabb(getAabbBase());
 		}
 	}
 
@@ -303,11 +293,9 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 	{
 		m_tree.children.clear();
 		std::vector<U32> keys;
-		for (U32 i = 0; i < m_owner->m_vertices.size(); ++i)
-		{
+		for (U32 i = 0; i < m_owner->m_vertices.size(); ++i) {
 			keys.clear();
-			for (int j = 0; j < 4; ++j)
-			{
+			for (int j = 0; j < 4; ++j) {
 				if (m_owner->m_vertices[i].m_weight[j] > FLT_EPSILON)
 					keys.push_back(m_owner->m_vertices[i].getBoneIdx(j));
 			}
@@ -327,15 +315,12 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 			i.vertex = map[i.vertex];
 	}
 
-	PerTriangleShape::PerTriangleShape(SkinnedMeshBody* body)
-		: SkinnedMeshShape(body)
+	PerTriangleShape::PerTriangleShape(SkinnedMeshBody* body) : SkinnedMeshShape(body)
 	{
 #ifdef ENABLE_CL
 		auto cl = hdtCL::instance();
-		if (cl)
-		{
-			if (!m_kernel())
-			{
+		if (cl) {
+			if (!m_kernel()) {
 				m_kernel.lock();
 				if (!m_kernel())
 					m_kernel = hdtCLKernel(cl->compile(sourceTriUpdate), "updateCollider");
@@ -345,9 +330,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 #endif
 	}
 
-	PerTriangleShape::~PerTriangleShape()
-	{
-	}
+	PerTriangleShape::~PerTriangleShape() {}
 
 	void PerTriangleShape::internalUpdate()
 	{
@@ -365,11 +348,9 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 			const float shapePropMargin = m_shapeProp.margin / 3.0f;
 			const __m128 absPenetration = _mm_andnot_ps(_mm_set_ss(-0.0f), _mm_set_ss(m_shapeProp.penetration));
 
-			for (size_t i = 0; i < size; ++i)
-			{
+			for (size_t i = 0; i < size; ++i) {
 				// Prefetch ahead to hide memory latency for triangle vertices
-				if (i + 4 < size)
-				{
+				if (i + 4 < size) {
 					const auto* prefetchC = &m_colliders[i + 4];
 					_mm_prefetch(reinterpret_cast<const char*>(&vertices[prefetchC->vertices[0]]), _MM_HINT_T0);
 					_mm_prefetch(reinterpret_cast<const char*>(&vertices[prefetchC->vertices[1]]), _MM_HINT_T0);
@@ -396,15 +377,14 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		}
 		{
 			HDT_ZONE_SCOPED_N("TreeUpdateAabb");
-			m_tree.updateAabb();
+			m_tree.updateAabb(getAabbBase());
 		}
 	}
 
 	void PerTriangleShape::finishBuild()
 	{
 		m_tree.optimize();
-		m_tree.updateKinematic([=](const Collider* c)
-		{
+		m_tree.updateKinematic([=](const Collider* c) {
 			float k = m_owner->flexible(m_owner->m_vertices[c->vertices[0]]);
 			k += m_owner->flexible(m_owner->m_vertices[c->vertices[1]]);
 			k += m_owner->flexible(m_owner->m_vertices[c->vertices[2]]);
@@ -413,15 +393,24 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 		m_owner->setCollisionFlags(m_tree.isKinematic ? btCollisionObject::CF_KINEMATIC_OBJECT : 0);
 
+		// exportColliders stores offsets in tree nodes (no pointers!)
 		m_tree.exportColliders(m_colliders);
 #ifdef CUDA
 		m_aabb.reset(new Aabb[m_colliders.size()]);
-		m_tree.remapColliders(m_colliders.data(), m_aabb.get());
 #else
 		m_aabb.resize(m_colliders.size());
-		m_tree.remapColliders(m_colliders.data(), m_aabb.data());
-#endif // CUDA
+#endif
+		// Clear local colliders from tree nodes (they're now in m_colliders)
+		m_tree.finalizeOffsets();
 
+		_VMESSAGE("PerTriangleShape::finishBuild: shape=%p owner=%s colliders=%zu", this,
+				  (m_owner && m_owner->m_name()) ? m_owner->m_name()->cstr() : "null", m_colliders.size());
+
+		// Validate offsets are within bounds
+		if (!validateColliderOffsets()) {
+			_ERROR("PerTriangleShape::finishBuild: VALIDATION FAILED! shape=%p owner=%s", this,
+				   (m_owner && m_owner->m_name()) ? m_owner->m_name()->cstr() : "null");
+		}
 
 		Ref<PerTriangleShape> holder = this;
 		m_verticesCollision = new PerVertexShape(m_owner);
@@ -435,8 +424,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 	void PerTriangleShape::markUsedVertices(bool* flags)
 	{
-		for (auto& i : m_colliders)
-		{
+		for (auto& i : m_colliders) {
 			flags[i.vertices[0]] = true;
 			flags[i.vertices[1]] = true;
 			flags[i.vertices[2]] = true;
@@ -447,8 +435,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 	void PerTriangleShape::remapVertices(UINT* map)
 	{
-		for (auto& i : m_colliders)
-		{
+		for (auto& i : m_colliders) {
 			i.vertices[0] = map[i.vertices[0]];
 			i.vertices[1] = map[i.vertices[1]];
 			i.vertices[2] = map[i.vertices[2]];
@@ -465,26 +452,23 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		Collider collider(a, b, c);
 		std::vector<U32> keys;
 		std::vector<float> w;
-		for (int i = 0; i < 12; ++i)
-		{
+		for (int i = 0; i < 12; ++i) {
 			auto weight = getColliderBoneWeight(&collider, i);
-			if (weight < FLT_EPSILON) continue;
+			if (weight < FLT_EPSILON)
+				continue;
 			auto bone = getColliderBoneIndex(&collider, i);
 			auto iter = std::find(keys.begin(), keys.end(), bone);
 			if (iter != keys.end())
 				w[iter - keys.begin()] += weight;
-			else
-			{
+			else {
 				keys.push_back(bone);
 				w.push_back(weight);
 			}
 		}
 
 		for (int i = 0; i < keys.size(); ++i)
-			for (int j = 1; j < keys.size(); ++j)
-			{
-				if (w[j - 1] < w[j] || (w[j - 1] == w[j] && keys[j] < keys[j - 1]))
-				{
+			for (int j = 1; j < keys.size(); ++j) {
+				if (w[j - 1] < w[j] || (w[j - 1] == w[j] && keys[j] < keys[j - 1])) {
 					std::swap(keys[j], keys[j - 1]);
 					std::swap(w[j], w[j - 1]);
 				}
@@ -492,4 +476,4 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 		m_tree.insertCollider(keys, collider);
 	}
-}
+} // namespace hdt

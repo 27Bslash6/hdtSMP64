@@ -1,10 +1,9 @@
 #pragma once
 
-#include "skse64/NiObjects.h"
-#include "skse64/GameReferences.h"
-
 #include "EventDispatcherImpl.h"
+#include "skse64/GameReferences.h"
 #include "skse64/NiNodes.h"
+#include "skse64/NiObjects.h"
 
 namespace hdt
 {
@@ -42,12 +41,10 @@ namespace hdt
 	};
 
 	struct FrameSyncEvent
-	{
-	};
+	{};
 
 	struct ShutdownEvent
-	{
-	};
+	{};
 
 	extern EventDispatcherImpl<FrameEvent> g_frameEventDispatcher;
 	extern EventDispatcherImpl<FrameSyncEvent> g_frameSyncEventDispatcher;
@@ -56,4 +53,4 @@ namespace hdt
 	extern EventDispatcherImpl<ArmorDetachEvent> g_armorDetachEventDispatcher;
 	extern EventDispatcherImpl<SkinAllHeadGeometryEvent> g_skinAllHeadGeometryEventDispatcher;
 	extern EventDispatcherImpl<SkinSingleHeadGeometryEvent> g_skinSingleHeadGeometryEventDispatcher;
-}
+} // namespace hdt

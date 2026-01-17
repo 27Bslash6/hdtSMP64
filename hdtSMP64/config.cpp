@@ -1,42 +1,59 @@
 #include "config.h"
-#include "XmlReader.h"
 
+#include "hdtPrefix.h"					   // For hdt::logging::configuredLogLevel
+#include "hdtSkinnedMesh/hdtHighwayAABB.h" // For highway::getSimdTargetName
 #include "hdtSkyrimPhysicsWorld.h"
+
+#include "XmlReader.h"
 #ifdef CUDA
 #include "hdtSkinnedMesh/hdtCudaInterface.h"
 #endif
 
+#include <algorithm>
+#include <cctype>
 #include <clocale>
+#include <cstring>
 
 namespace hdt
 {
+	// Global Highway configuration instance
+	HighwayConfig g_highwayConfig;
+
+	// Case-insensitive tag comparison for XML config parsing
+	static bool tagEquals(const std::string& tag, const char* expected)
+	{
+		if (tag.length() != strlen(expected))
+			return false;
+		return std::equal(tag.begin(), tag.end(), expected, [](char a, char b) {
+			return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+		});
+	}
 	static void solver(XMLReader& reader)
 	{
-		while (reader.Inspect())
-		{
-			switch (reader.GetInspected())
-			{
-			case XMLReader::Inspected::StartTag:
-				if (reader.GetLocalName() == "numIterations")
+		while (reader.Inspect()) {
+			switch (reader.GetInspected()) {
+			case XMLReader::Inspected::StartTag: {
+				auto tag = reader.GetLocalName();
+				if (tagEquals(tag, "numIterations"))
 					SkyrimPhysicsWorld::get()->getSolverInfo().m_numIterations = btClamped(reader.readInt(), 4, 128);
-				else if (reader.GetLocalName() == "groupIterations")
+				else if (tagEquals(tag, "groupIterations"))
 					ConstraintGroup::MaxIterations = btClamped(reader.readInt(), 0, 4096);
-				else if (reader.GetLocalName() == "groupEnableMLCP")
+				else if (tagEquals(tag, "groupEnableMLCP"))
 					ConstraintGroup::EnableMLCP = reader.readBool();
-				else if (reader.GetLocalName() == "erp")
+				else if (tagEquals(tag, "erp"))
 					SkyrimPhysicsWorld::get()->getSolverInfo().m_erp = btClamped(reader.readFloat(), 0.01f, 1.0f);
-				else if (reader.GetLocalName() == "min-fps") {
+				else if (tagEquals(tag, "min-fps")) {
 					SkyrimPhysicsWorld::get()->min_fps = (btClamped(reader.readInt(), 1, 300));
 					SkyrimPhysicsWorld::get()->m_timeTick = 1.0f / SkyrimPhysicsWorld::get()->min_fps;
 				}
-				else if (reader.GetLocalName() == "maxSubSteps")
+				else if (tagEquals(tag, "maxSubSteps"))
 					SkyrimPhysicsWorld::get()->m_maxSubSteps = btClamped(reader.readInt(), 1, 60);
-				else
-				{
-					_WARNING("Unknown config : %s", reader.GetLocalName());
+				else {
+					_WARNING("Unknown config : %s", tag.c_str());
 					reader.skipCurrentElement();
 				}
 				break;
+			}
 			case XMLReader::Inspected::EndTag:
 				return;
 			}
@@ -45,25 +62,24 @@ namespace hdt
 
 	static void wind(XMLReader& reader)
 	{
-		while (reader.Inspect())
-		{
-			switch (reader.GetInspected())
-			{
-			case XMLReader::Inspected::StartTag:
-				if (reader.GetLocalName() == "windStrength")
+		while (reader.Inspect()) {
+			switch (reader.GetInspected()) {
+			case XMLReader::Inspected::StartTag: {
+				auto tag = reader.GetLocalName();
+				if (tagEquals(tag, "windStrength"))
 					SkyrimPhysicsWorld::get()->m_windStrength = btClamped(reader.readFloat(), 0.f, 1000.f);
-				else if (reader.GetLocalName() == "enabled")
+				else if (tagEquals(tag, "enabled"))
 					SkyrimPhysicsWorld::get()->m_enableWind = reader.readBool();
-				else if (reader.GetLocalName() == "distanceForNoWind")
+				else if (tagEquals(tag, "distanceForNoWind"))
 					SkyrimPhysicsWorld::get()->m_distanceForNoWind = btClamped(reader.readFloat(), 0.f, 10000.f);
-				else if (reader.GetLocalName() == "distanceForMaxWind")
+				else if (tagEquals(tag, "distanceForMaxWind"))
 					SkyrimPhysicsWorld::get()->m_distanceForMaxWind = btClamped(reader.readFloat(), 0.f, 10000.f);
-				else
-				{
-					_WARNING("Unknown config : %s", reader.GetLocalName());
+				else {
+					_WARNING("Unknown config : %s", tag.c_str());
 					reader.skipCurrentElement();
 				}
 				break;
+			}
 			case XMLReader::Inspected::EndTag:
 				return;
 			}
@@ -72,91 +88,117 @@ namespace hdt
 
 	static void smp(XMLReader& reader)
 	{
-		while (reader.Inspect())
-		{
-			switch (reader.GetInspected())
-			{
-			case XMLReader::Inspected::StartTag:
-				if (reader.GetLocalName() == "logLevel")
-					gLog.SetLogLevel(static_cast<IDebugLog::LogLevel>(reader.readInt()));
-				else if (reader.GetLocalName() == "enableNPCFaceParts")
+		while (reader.Inspect()) {
+			switch (reader.GetInspected()) {
+			case XMLReader::Inspected::StartTag: {
+				auto tag = reader.GetLocalName();
+				if (tagEquals(tag, "logLevel")) {
+					int rawLevel = reader.readInt();
+					// Clamp to valid enum range [kLevel_FatalError(0)..kLevel_DebugMessage(5)]
+					if (rawLevel < IDebugLog::kLevel_FatalError)
+						rawLevel = IDebugLog::kLevel_FatalError;
+					if (rawLevel > IDebugLog::kLevel_DebugMessage)
+						rawLevel = IDebugLog::kLevel_DebugMessage;
+					auto level = static_cast<IDebugLog::LogLevel>(rawLevel);
+					gLog.SetLogLevel(level);
+					hdt::logging::configuredLogLevel.store(level, std::memory_order_relaxed);
+				}
+				else if (tagEquals(tag, "enableNPCFaceParts"))
 					ActorManager::instance()->m_skinNPCFaceParts = reader.readBool();
-				else if (reader.GetLocalName() == "disableSMPHairWhenWigEquipped")
+				else if (tagEquals(tag, "disableSMPHairWhenWigEquipped"))
 					ActorManager::instance()->m_disableSMPHairWhenWigEquipped = reader.readBool();
-				else if (reader.GetLocalName() == "clampRotations")
+				else if (tagEquals(tag, "clampRotations"))
 					SkyrimPhysicsWorld::get()->m_clampRotations = reader.readBool();
-				else if (reader.GetLocalName() == "rotationSpeedLimit")
+				else if (tagEquals(tag, "rotationSpeedLimit"))
 					SkyrimPhysicsWorld::get()->m_rotationSpeedLimit = reader.readFloat();
-				else if (reader.GetLocalName() == "unclampedResets")
+				else if (tagEquals(tag, "unclampedResets"))
 					SkyrimPhysicsWorld::get()->m_unclampedResets = reader.readBool();
-				else if (reader.GetLocalName() == "unclampedResetAngle")
+				else if (tagEquals(tag, "unclampedResetAngle"))
 					SkyrimPhysicsWorld::get()->m_unclampedResetAngle = reader.readFloat();
-				else if (reader.GetLocalName() == "percentageOfFrameTime")
+				else if (tagEquals(tag, "percentageOfFrameTime"))
 					SkyrimPhysicsWorld::get()->m_percentageOfFrameTime = std::clamp(reader.readInt() * 10, 1, 1000);
-				else if (reader.GetLocalName() == "useRealTime")
+				else if (tagEquals(tag, "useRealTime"))
 					SkyrimPhysicsWorld::get()->m_useRealTime = reader.readBool();
 #ifdef CUDA
-				else if (reader.GetLocalName() == "enableCuda")
+				else if (tagEquals(tag, "enableCuda"))
 					CudaInterface::enableCuda = reader.readBool();
-				else if (reader.GetLocalName() == "cudaDevice")
-				{
+				else if (tagEquals(tag, "cudaDevice")) {
 					int device = reader.readInt();
 					if (device >= 0 && device < CudaInterface::instance()->deviceCount())
 						CudaInterface::currentDevice = device;
 				}
 #else
-				else if (reader.GetLocalName() == "enableCuda")
-				{
+				else if (tagEquals(tag, "enableCuda")) {
 					if (reader.readBool())
 						_MESSAGE("CUDA isn't built into this version.");
 				}
-				else if (reader.GetLocalName() == "cudaDevice") {}
+				else if (tagEquals(tag, "cudaDevice")) {
+					reader.readInt();
+				}
 #endif
-				else if (reader.GetLocalName() == "minCullingDistance")
+				else if (tagEquals(tag, "minCullingDistance"))
 					ActorManager::instance()->m_minCullingDistance = reader.readFloat();
-				else if (reader.GetLocalName() == "maximumActiveSkeletons")
-				{
+				else if (tagEquals(tag, "maximumActiveSkeletons"))
 					ActorManager::instance()->m_maxActiveSkeletons = reader.readInt();
-				}
-				else if (reader.GetLocalName() == "autoAdjustMaxSkeletons")
-				{
+				else if (tagEquals(tag, "autoAdjustMaxSkeletons"))
 					ActorManager::instance()->m_autoAdjustMaxSkeletons = reader.readBool();
-				}
-				else if (reader.GetLocalName() == "sampleSize")
+				else if (tagEquals(tag, "sampleSize"))
 					SkyrimPhysicsWorld::get()->m_sampleSize = std::max(reader.readInt(), 1);
-				else if (reader.GetLocalName() == "disable1stPersonViewPhysics")
+				else if (tagEquals(tag, "disable1stPersonViewPhysics"))
 					ActorManager::instance()->m_disable1stPersonViewPhysics = reader.readBool();
-				else
-				{
-					_WARNING("Unknown config : %s", reader.GetLocalName());
+				else {
+					_WARNING("Unknown config : %s", tag.c_str());
 					reader.skipCurrentElement();
 				}
 				break;
+			}
 			case XMLReader::Inspected::EndTag:
 				return;
 			}
 		}
 	}
 
+	static void parseHighwayConfig(XMLReader& reader)
+	{
+		// Parse highway element attributes: <highway enabled="true" batch-threshold="64" />
+		if (reader.hasAttribute("enabled"))
+			g_highwayConfig.enabled = reader.getAttributeAsBool("enabled");
+
+		if (reader.hasAttribute("batch-threshold"))
+			g_highwayConfig.batchThreshold = reader.getAttributeAsInt("batch-threshold");
+
+		// Clamp threshold to valid range
+		g_highwayConfig.clampThreshold();
+
+		// Log non-default values at startup
+		if (!g_highwayConfig.enabled)
+			_MESSAGE("[CONFIG] Highway SIMD disabled");
+		else if (g_highwayConfig.batchThreshold != 64)
+			_MESSAGE("[CONFIG] Highway batch-threshold=%d", g_highwayConfig.batchThreshold);
+
+		reader.skipCurrentElement();
+	}
+
 	static void config(XMLReader& reader)
 	{
-		while (reader.Inspect())
-		{
-			switch (reader.GetInspected())
-			{
-			case XMLReader::Inspected::StartTag:
-				if (reader.GetLocalName() == "solver")
+		while (reader.Inspect()) {
+			switch (reader.GetInspected()) {
+			case XMLReader::Inspected::StartTag: {
+				auto tag = reader.GetLocalName();
+				if (tagEquals(tag, "solver"))
 					solver(reader);
-				else if (reader.GetLocalName() == "wind")
+				else if (tagEquals(tag, "wind"))
 					wind(reader);
-				else if (reader.GetLocalName() == "smp")
+				else if (tagEquals(tag, "smp"))
 					smp(reader);
-				else
-				{
-					_WARNING("Unknown config : %s", reader.GetLocalName());
+				else if (tagEquals(tag, "highway"))
+					parseHighwayConfig(reader);
+				else {
+					_WARNING("Unknown config : %s", tag.c_str());
 					reader.skipCurrentElement();
 				}
 				break;
+			}
 			case XMLReader::Inspected::EndTag:
 				return;
 			}
@@ -166,7 +208,10 @@ namespace hdt
 	void loadConfig()
 	{
 		auto bytes = readAllFile2("data/skse/plugins/hdtSkinnedMeshConfigs/configs.xml");
-		if (bytes.empty()) return;
+		if (bytes.empty()) {
+			_WARNING("Config file not found: data/skse/plugins/hdtSkinnedMeshConfigs/configs.xml");
+			return;
+		}
 
 		// Store original locale
 		char saved_locale[32];
@@ -177,15 +222,13 @@ namespace hdt
 
 		XMLReader reader((uint8_t*)bytes.data(), bytes.size());
 
-		while (reader.Inspect())
-		{
-			if (reader.GetInspected() == XMLReader::Inspected::StartTag)
-			{
-				if (reader.GetLocalName() == "configs")
+		while (reader.Inspect()) {
+			if (reader.GetInspected() == XMLReader::Inspected::StartTag) {
+				auto tag = reader.GetLocalName();
+				if (tagEquals(tag, "configs"))
 					config(reader);
-				else
-				{
-					_WARNING("Unknown config : %s", reader.GetLocalName());
+				else {
+					_WARNING("Unknown config : %s", tag.c_str());
 					reader.skipCurrentElement();
 				}
 			}
@@ -193,5 +236,19 @@ namespace hdt
 
 		// Restore original locale
 		std::setlocale(LC_NUMERIC, saved_locale);
+
+		// Report configured log level - ALWAYS show this regardless of level setting
+		auto level = hdt::logging::configuredLogLevel.load(std::memory_order_relaxed);
+		char buf[256];
+		snprintf(buf, sizeof(buf), "[CONFIG] logLevel=%d (%s) - messages above level %d filtered",
+				 static_cast<int>(level), hdt::logging::GetLevelName(level), static_cast<int>(level));
+		gLog.Message(buf);
+
+		// Report Highway SIMD capabilities
+		if (g_highwayConfig.enabled) {
+			snprintf(buf, sizeof(buf), "[HIGHWAY] SIMD target: %s (batch-threshold=%d)", highway::getSimdTargetName(),
+					 g_highwayConfig.batchThreshold);
+			gLog.Message(buf);
+		}
 	}
-}
+} // namespace hdt

@@ -1,13 +1,15 @@
 #pragma once
 
+#include "hdtAABB.h"
 #include "hdtBulletHelper.h"
 #include "hdtSkinnedMeshBone.h"
+#include "hdtSoABuffer.h"
 #include "hdtVertex.h"
-#include "hdtAABB.h"
 
 #include <BulletCollision/Gimpact/btBoxCollision.h>
 
 #include <amp.h>
+#include <memory>
 
 namespace hdt
 {
@@ -16,12 +18,9 @@ namespace hdt
 	class CudaBody;
 #endif
 
-	class SkinnedMeshBody
-		: public btCollisionObject
-		  , public RefObject
+	class SkinnedMeshBody : public btCollisionObject, public RefObject
 	{
 	public:
-
 		SkinnedMeshBody();
 		virtual ~SkinnedMeshBody();
 
@@ -37,9 +36,7 @@ namespace hdt
 				aabbMax = m_aabb.m_max;
 			}
 
-			void setLocalScaling(const btVector3& scaling) override
-			{
-			}
+			void setLocalScaling(const btVector3& scaling) override {}
 
 			const btVector3& getLocalScaling() const override
 			{
@@ -47,16 +44,12 @@ namespace hdt
 				return ret;
 			}
 
-			void calculateLocalInertia(btScalar mass, btVector3& inertia) const override
-			{
-			}
+			void calculateLocalInertia(btScalar mass, btVector3& inertia) const override {}
 
 			const char* getName() const override { return "btSkinnedMeshBody"; }
 			btScalar getMargin() const override { return 0; }
 
-			void setMargin(btScalar m) override
-			{
-			}
+			void setMargin(btScalar m) override {}
 		} m_bulletShape;
 
 		struct SkinnedBone
@@ -109,15 +102,32 @@ namespace hdt
 		std::shared_ptr<CudaBody> m_cudaObject;
 #endif
 
+		// Highway SoA buffer (optional, allocated if highway enabled and mesh fits)
+		std::unique_ptr<SoAVertexBuffer> m_soaBuffer;
+
+		// Initialize SoA buffer from vertices - called from finishBuild()
+		void initializeSoABuffer();
+
+		// Mark SoA buffer dirty when bone transforms change
+		void markSoADirty()
+		{
+			if (m_soaBuffer)
+				m_soaBuffer->markDirty();
+		}
+
+		// Check if Highway skinning is available for this body
+		bool hasHighwaySkinning() const { return m_soaBuffer != nullptr; }
+
 		float flexible(const Vertex& v);
 
 		bool canCollideWith(const SkinnedMeshBone* bone) const
 		{
-			if (m_canCollideWithBones.size())
-			{
-				return std::find(m_canCollideWithBones.begin(), m_canCollideWithBones.end(), bone) != m_canCollideWithBones.end();
+			if (m_canCollideWithBones.size()) {
+				return std::find(m_canCollideWithBones.begin(), m_canCollideWithBones.end(), bone) !=
+					   m_canCollideWithBones.end();
 			}
-			return std::find(m_noCollideWithBones.begin(), m_noCollideWithBones.end(), bone) == m_noCollideWithBones.end();
+			return std::find(m_noCollideWithBones.begin(), m_noCollideWithBones.end(), bone) ==
+				   m_noCollideWithBones.end();
 		}
 
 		virtual bool canCollideWith(const SkinnedMeshBody* body) const;
@@ -125,4 +135,4 @@ namespace hdt
 		void updateBoundingSphereAabb();
 		bool isBoundingSphereCollided(SkinnedMeshBody* rhs);
 	};
-}
+} // namespace hdt

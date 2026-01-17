@@ -10,9 +10,7 @@ namespace hdt
 		m_constraint = constraint;
 	}
 
-	BoneScaleConstraint::~BoneScaleConstraint()
-	{
-	}
+	BoneScaleConstraint::~BoneScaleConstraint() {}
 
 	/*
 	void BoneScaleConstraint::scaleConstraint()
@@ -73,8 +71,8 @@ namespace hdt
 			auto ptr = (btSliderConstraint*)m_constraint;
 			ptr->getFrameOffsetA().setOrigin(ptr->getFrameOffsetA().getOrigin() * factorA);
 			ptr->getFrameOffsetB().setOrigin(ptr->getFrameOffsetB().getOrigin() * factorB);
-			ptr->setTargetLinMotorVelocity(ptr->getTargetLinMotorVelocity() * (ptr->getUseLinearReferenceFrameA() ? factorA.x() : factorB.x()));
-			break;
+			ptr->setTargetLinMotorVelocity(ptr->getTargetLinMotorVelocity() * (ptr->getUseLinearReferenceFrameA() ?
+	factorA.x() : factorB.x())); break;
 		}
 		case CONTACT_CONSTRAINT_TYPE:
 			break;
@@ -126,4 +124,4 @@ namespace hdt
 		m_scaleA = newScaleA;
 		m_scaleB = newScaleB;
 	}*/
-}
+} // namespace hdt

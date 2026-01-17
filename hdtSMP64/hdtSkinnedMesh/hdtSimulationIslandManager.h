@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hdtDispatcher.h"
+
 #include <BulletCollision/CollisionDispatch/btSimulationIslandManager.h>
 
 namespace hdt
@@ -11,6 +12,7 @@ namespace hdt
 		void updateActivationState(btCollisionWorld* colWorld, btDispatcher* dispatcher) override;
 
 		void findUnions(btDispatcher* dispatcher, btCollisionWorld* colWorld);
-		//void buildAndProcessIslands(btDispatcher* dispatcher, btCollisionWorld* collisionWorld, IslandCallback* callback);
+		// void buildAndProcessIslands(btDispatcher* dispatcher, btCollisionWorld* collisionWorld, IslandCallback*
+		// callback);
 	};
-}
+} // namespace hdt

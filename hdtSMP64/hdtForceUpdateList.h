@@ -1,17 +1,19 @@
 #pragma once
 
+#include "..\hdtSSEUtils\FrameworkUtils.h"
+
 #include <string>
 #include <unordered_set>
 
-#include "..\hdtSSEUtils\FrameworkUtils.h"
-
-namespace hdt {
-	class ForceUpdateList {
-
-		typedef struct {
+namespace hdt
+{
+	class ForceUpdateList
+	{
+		typedef struct
+		{
 			std::unordered_set<std::string> nodes;
 			std::unordered_set<std::string> nodes_mov;
-		}nodeList_t;
+		} nodeList_t;
 
 	public:
 		static ForceUpdateList* GetSingleton();
@@ -23,4 +25,4 @@ namespace hdt {
 
 		nodeList_t m_list;
 	};
-}
+} // namespace hdt

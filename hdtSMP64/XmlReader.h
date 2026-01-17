@@ -1,9 +1,9 @@
 #pragma once
 
-#include "XmlInspector/XmlInspector.hpp"
-#include "XmlInspector/CharactersReader.hpp"
-
 #include "hdtSkinnedMesh/hdtBulletHelper.h"
+
+#include "XmlInspector/CharactersReader.hpp"
+#include "XmlInspector/XmlInspector.hpp"
 
 namespace hdt
 {
@@ -13,9 +13,7 @@ namespace hdt
 		bool isEmptyStart;
 
 	public:
-		XMLReader(BYTE* data, size_t count) : Base(data, data + count)
-		{
-		}
+		XMLReader(BYTE* data, size_t count) : Base(data, data + count) {}
 
 		typedef Xml::Inspected Inspected;
 
@@ -43,4 +41,4 @@ namespace hdt
 		btQuaternion readAxisAngle();
 		btTransform readTransform();
 	};
-}
+} // namespace hdt

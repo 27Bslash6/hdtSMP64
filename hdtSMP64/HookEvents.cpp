@@ -1,4 +1,5 @@
 #include "HookEvents.h"
+
 #include "EventDispatcherImpl.h"
 
 namespace hdt
@@ -10,4 +11,4 @@ namespace hdt
 	EventDispatcherImpl<ArmorDetachEvent> g_armorDetachEventDispatcher;
 	EventDispatcherImpl<SkinAllHeadGeometryEvent> g_skinAllHeadGeometryEventDispatcher;
 	EventDispatcherImpl<SkinSingleHeadGeometryEvent> g_skinSingleHeadGeometryEventDispatcher;
-}
+} // namespace hdt

@@ -166,6 +166,9 @@ btITaskScheduler* btGetTBBTaskScheduler();
 // get PPL task scheduler (if available, otherwise returns null)
 btITaskScheduler* btGetPPLTaskScheduler();
 
+// get enkiTS task scheduler (always available in threadsafe builds)
+btITaskScheduler* btGetEnkiTSTaskScheduler();
+
 // btParallelFor -- call this to dispatch work like a for-loop
 //                 (iterations may be done out of order, so no dependencies are allowed)
 void btParallelFor(int iBegin, int iEnd, int grainSize, const btIParallelForBody& body);
