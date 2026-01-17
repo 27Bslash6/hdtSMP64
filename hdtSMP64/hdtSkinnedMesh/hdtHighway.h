@@ -43,6 +43,13 @@
 #pragma warning(disable : 4505) // unreferenced local function removed
 #endif
 
+// Highway disables AVX-512 on MSVC by default due to old compiler bugs.
+// VS2022 17.10+ (MSVC 19.40+) has fixed these issues, so we re-enable.
+// See: https://github.com/Mysticial/Flops/issues/16
+#if defined(_MSC_VER) && (_MSC_VER >= 1940)
+#define HWY_BROKEN_MSVC 0
+#endif
+
 // Target configuration - enable all x86 SIMD we care about
 // Highway will auto-detect and dispatch at runtime
 #ifndef HWY_DISABLED_TARGETS

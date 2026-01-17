@@ -6,6 +6,9 @@
 #include "hdtCudaInterface.h"
 #endif
 
+#include "hdtHighwaySkinning.h"
+
+#include "../config.h"
 #include "../hdtTracy.h"
 
 namespace hdt
@@ -165,15 +168,22 @@ __kernel void updateVertices(
 
 		updateBones();
 
-		int size = m_vertices.size();
+		const int size = static_cast<int>(m_vertices.size());
 		HDT_ZONE_VALUE(size);
 
+		// Highway batch path - use if enabled, above threshold, and buffer valid
+		if (g_highwayConfig.enabled && size >= g_highwayConfig.batchThreshold && m_soaBuffer &&
+			m_soaBuffer->count() == static_cast<size_t>(size))
+		{
+			HDT_ZONE_SCOPED_N("Highway::batchSkinVertices");
+			highway::batchSkinVertices(m_soaBuffer.get(), m_bones.get(), m_vpos.get(), size);
+			return;
+		}
+
+		// Legacy SSE path (fallback)
+		HDT_ZONE_SCOPED_N("Legacy::SSE_Skinning");
 		const __m128 epsilon = _mm_set_ps1(FLT_EPSILON);
-#ifdef CUDA
 		const Bone* bones = m_bones.get();
-#else
-		const Bone* bones = m_bones.data();
-#endif
 
 		for (int idx = 0; idx < size; ++idx) {
 			// Prefetch ahead to hide memory latency
@@ -213,9 +223,24 @@ __kernel void updateVertices(
 			m_bones[i].m_vertexToWorld = btMatrix4x3T(boneT) * v.vertexToBone;
 			m_bones[i].m_maginMultipler = v.ptr->m_marginMultipler * boneT.getScale();
 		}
-		int size = m_vpos.size();
+
+		const int size = static_cast<int>(m_vpos.size());
 		HDT_ZONE_VALUE(size);
 
+		// Highway batch path - use if enabled, above threshold, and buffer valid
+		if (g_highwayConfig.enabled && size >= g_highwayConfig.batchThreshold && m_soaBuffer &&
+			m_soaBuffer->count() == static_cast<size_t>(size))
+		{
+			// highway::batchSkinVertices has internal Tracy zone
+			highway::batchSkinVertices(m_soaBuffer.get(), m_bones.data(), m_vpos.data(), size);
+
+			// Still need to update shape
+			m_shape->internalUpdate();
+			m_bulletShape.m_aabb = m_shape->m_tree.aabbAll;
+			return;
+		}
+
+		// Legacy SSE path (fallback)
 		const __m128 epsilon = _mm_set_ps1(FLT_EPSILON);
 		const Bone* bones = m_bones.data();
 
@@ -273,6 +298,31 @@ __kernel void updateVertices(
 		return static_cast<int>(m_skinnedBones.size() - 1);
 	}
 
+	void SkinnedMeshBody::initializeSoABuffer()
+	{
+		// Only initialize if Highway is enabled
+		if (!g_highwayConfig.enabled)
+			return;
+
+		// Skip if vertex count is below threshold
+		if (static_cast<int>(m_vertices.size()) < g_highwayConfig.batchThreshold)
+			return;
+
+		// Allocate SoA buffer
+		m_soaBuffer = std::make_unique<SoAVertexBuffer>();
+		if (!m_soaBuffer->allocate(m_vertices.size())) {
+			// Allocation failed (exceeds 64MB cap)
+			_WARNING("SkinnedMeshBody - SoA buffer allocation failed for %zu vertices (exceeds 64MB), using legacy "
+					 "path",
+					 m_vertices.size());
+			m_soaBuffer.reset();
+			return;
+		}
+
+		// Transpose vertex data to SoA layout (one-time at mesh load)
+		m_soaBuffer->transposeFrom(m_vertices);
+	}
+
 	void SkinnedMeshBody::finishBuild()
 	{
 #ifdef CUDA
@@ -319,6 +369,9 @@ __kernel void updateVertices(
 #endif
 
 		m_useBoundingSphere = m_shape->m_colliders.size() > 10;
+
+		// Initialize Highway SoA buffer after vertices are finalized
+		initializeSoABuffer();
 	}
 
 	bool SkinnedMeshBody::canCollideWith(const SkinnedMeshBody* body) const

@@ -83,6 +83,15 @@
     <ClInclude Include="hdtSkinnedMesh\hdtVertex.h">
       <Filter>hdtSkinnedMesh</Filter>
     </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtHighwaySkinning.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtHighway.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
+    <ClInclude Include="hdtSkinnedMesh\hdtHighwayAABB.h">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClInclude>
     <ClInclude Include="hdtConvertNi.h">
       <Filter>hdtSkyrimProxy</Filter>
     </ClInclude>
@@ -919,6 +928,12 @@
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtSkinnedMeshWorld.cpp">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="hdtSkinnedMesh\hdtHighwaySkinning.cpp">
+      <Filter>hdtSkinnedMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="hdtSkinnedMesh\hdtHighwayAABB.cpp">
       <Filter>hdtSkinnedMesh</Filter>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtStiffSpringConstraint.cpp">

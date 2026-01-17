@@ -1,6 +1,9 @@
 #pragma once
 
 #include "hdtBulletHelper.h"
+#include "hdtHighwayAABB.h"
+
+#include "../config.h"
 
 #include <amp.h>
 #include <amp_graphics.h>
@@ -127,10 +130,42 @@ namespace hdt
 #endif
 
 		// Batch collision check against array of AABBs
-		// Uses AVX-512 (4 at a time) or AVX2 (2 at a time) depending on build
+		// Uses Highway runtime dispatch when enabled, falls back to AVX-512/AVX2/scalar
 		template<typename OutputIt>
 		static int collideWithMany(const Aabb& ref, const Aabb* aabbs, int count, OutputIt out)
 		{
+			if (count <= 0)
+				return 0;
+
+			// Highway path - runtime SIMD dispatch, portable across all targets
+			if (g_highwayConfig.enabled && count >= g_highwayConfig.batchThreshold) {
+				// Support up to 128 candidates per batch (2 uint64_t = 128 bits)
+				constexpr size_t MAX_HIGHWAY_BATCH = 128;
+				uint64_t resultBits[2] = {0, 0};
+				size_t batchCount = (count > static_cast<int>(MAX_HIGHWAY_BATCH)) ? MAX_HIGHWAY_BATCH : count;
+
+				size_t hits = highway::batchCollideWith(ref, aabbs, batchCount, resultBits);
+
+				// Convert bitmask to output iterator
+				for (size_t i = 0; i < batchCount; ++i) {
+					size_t wordIdx = i / 64;
+					size_t bitIdx = i % 64;
+					if (resultBits[wordIdx] & (1ULL << bitIdx))
+						*out++ = const_cast<Aabb*>(&aabbs[i]);
+				}
+
+				// Handle overflow beyond MAX_HIGHWAY_BATCH with scalar fallback
+				for (int i = static_cast<int>(batchCount); i < count; ++i) {
+					if (ref.collideWith(aabbs[i])) {
+						*out++ = const_cast<Aabb*>(&aabbs[i]);
+						++hits;
+					}
+				}
+
+				return static_cast<int>(hits);
+			}
+
+			// Legacy SIMD path - compile-time dispatch via #ifdef
 			int collisions = 0;
 			int i = 0;
 

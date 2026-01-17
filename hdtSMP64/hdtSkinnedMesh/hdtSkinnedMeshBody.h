@@ -3,11 +3,13 @@
 #include "hdtAABB.h"
 #include "hdtBulletHelper.h"
 #include "hdtSkinnedMeshBone.h"
+#include "hdtSoABuffer.h"
 #include "hdtVertex.h"
 
 #include <BulletCollision/Gimpact/btBoxCollision.h>
 
 #include <amp.h>
+#include <memory>
 
 namespace hdt
 {
@@ -99,6 +101,22 @@ namespace hdt
 #ifdef CUDA
 		std::shared_ptr<CudaBody> m_cudaObject;
 #endif
+
+		// Highway SoA buffer (optional, allocated if highway enabled and mesh fits)
+		std::unique_ptr<SoAVertexBuffer> m_soaBuffer;
+
+		// Initialize SoA buffer from vertices - called from finishBuild()
+		void initializeSoABuffer();
+
+		// Mark SoA buffer dirty when bone transforms change
+		void markSoADirty()
+		{
+			if (m_soaBuffer)
+				m_soaBuffer->markDirty();
+		}
+
+		// Check if Highway skinning is available for this body
+		bool hasHighwaySkinning() const { return m_soaBuffer != nullptr; }
 
 		float flexible(const Vertex& v);
 

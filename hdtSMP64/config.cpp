@@ -1,6 +1,7 @@
 #include "config.h"
 
-#include "hdtPrefix.h" // For hdt::logging::configuredLogLevel
+#include "hdtPrefix.h"					   // For hdt::logging::configuredLogLevel
+#include "hdtSkinnedMesh/hdtHighwayAABB.h" // For highway::getSimdTargetName
 #include "hdtSkyrimPhysicsWorld.h"
 
 #include "XmlReader.h"
@@ -13,6 +14,9 @@
 
 namespace hdt
 {
+	// Global Highway configuration instance
+	HighwayConfig g_highwayConfig;
+
 	// Case-insensitive tag comparison for XML config parsing
 	static bool tagEquals(const std::string& tag, const char* expected)
 	{
@@ -152,6 +156,27 @@ namespace hdt
 		}
 	}
 
+	static void parseHighwayConfig(XMLReader& reader)
+	{
+		// Parse highway element attributes: <highway enabled="true" batch-threshold="64" />
+		if (reader.hasAttribute("enabled"))
+			g_highwayConfig.enabled = reader.getAttributeAsBool("enabled");
+
+		if (reader.hasAttribute("batch-threshold"))
+			g_highwayConfig.batchThreshold = reader.getAttributeAsInt("batch-threshold");
+
+		// Clamp threshold to valid range
+		g_highwayConfig.clampThreshold();
+
+		// Log non-default values at startup
+		if (!g_highwayConfig.enabled)
+			_MESSAGE("[CONFIG] Highway SIMD disabled");
+		else if (g_highwayConfig.batchThreshold != 64)
+			_MESSAGE("[CONFIG] Highway batch-threshold=%d", g_highwayConfig.batchThreshold);
+
+		reader.skipCurrentElement();
+	}
+
 	static void config(XMLReader& reader)
 	{
 		while (reader.Inspect()) {
@@ -164,6 +189,8 @@ namespace hdt
 					wind(reader);
 				else if (tagEquals(tag, "smp"))
 					smp(reader);
+				else if (tagEquals(tag, "highway"))
+					parseHighwayConfig(reader);
 				else {
 					_WARNING("Unknown config : %s", tag.c_str());
 					reader.skipCurrentElement();
@@ -214,5 +241,12 @@ namespace hdt
 		snprintf(buf, sizeof(buf), "[CONFIG] logLevel=%d (%s) - messages above level %d filtered",
 				 static_cast<int>(level), hdt::logging::GetLevelName(level), static_cast<int>(level));
 		gLog.Message(buf);
+
+		// Report Highway SIMD capabilities
+		if (g_highwayConfig.enabled) {
+			snprintf(buf, sizeof(buf), "[HIGHWAY] SIMD target: %s (batch-threshold=%d)", highway::getSimdTargetName(),
+					 g_highwayConfig.batchThreshold);
+			gLog.Message(buf);
+		}
 	}
 } // namespace hdt

@@ -295,3 +295,125 @@ TEST_CASE("Wind factor calculation", "[physics][wind][BUG-NEW-007]")
 		REQUIRE(calculateWindFactor(100.f, 100.f, 100.01f) == Approx(0.f));	 // At epsilon boundary
 	}
 }
+
+// =============================================================================
+// Highway SIMD Config Tests
+// =============================================================================
+// Tests for HighwayConfig struct defined in config.h
+
+namespace
+{
+	// Mirror of HighwayConfig from config.h for standalone testing
+	struct TestHighwayConfig
+	{
+		bool enabled = true;
+		int batchThreshold = 64;
+
+		static constexpr int MIN_THRESHOLD = 0;
+		static constexpr int MAX_THRESHOLD = 65536;
+
+		void clampThreshold() { batchThreshold = btClamped(batchThreshold, MIN_THRESHOLD, MAX_THRESHOLD); }
+	};
+} // namespace
+
+TEST_CASE("HighwayConfig default values", "[config][highway]")
+{
+	TestHighwayConfig cfg;
+
+	SECTION("Default enabled is true")
+	{
+		REQUIRE(cfg.enabled == true);
+	}
+
+	SECTION("Default batchThreshold is 64")
+	{
+		REQUIRE(cfg.batchThreshold == 64);
+	}
+}
+
+TEST_CASE("HighwayConfig threshold clamping", "[config][highway]")
+{
+	SECTION("Values within bounds are unchanged")
+	{
+		TestHighwayConfig cfg;
+		cfg.batchThreshold = 128;
+		cfg.clampThreshold();
+		REQUIRE(cfg.batchThreshold == 128);
+
+		cfg.batchThreshold = 0;
+		cfg.clampThreshold();
+		REQUIRE(cfg.batchThreshold == 0);
+
+		cfg.batchThreshold = 65536;
+		cfg.clampThreshold();
+		REQUIRE(cfg.batchThreshold == 65536);
+	}
+
+	SECTION("Negative values clamped to MIN_THRESHOLD")
+	{
+		TestHighwayConfig cfg;
+		cfg.batchThreshold = -1;
+		cfg.clampThreshold();
+		REQUIRE(cfg.batchThreshold == TestHighwayConfig::MIN_THRESHOLD);
+
+		cfg.batchThreshold = -1000;
+		cfg.clampThreshold();
+		REQUIRE(cfg.batchThreshold == TestHighwayConfig::MIN_THRESHOLD);
+	}
+
+	SECTION("Excessive values clamped to MAX_THRESHOLD")
+	{
+		TestHighwayConfig cfg;
+		cfg.batchThreshold = 65537;
+		cfg.clampThreshold();
+		REQUIRE(cfg.batchThreshold == TestHighwayConfig::MAX_THRESHOLD);
+
+		cfg.batchThreshold = 1000000;
+		cfg.clampThreshold();
+		REQUIRE(cfg.batchThreshold == TestHighwayConfig::MAX_THRESHOLD);
+	}
+}
+
+TEST_CASE("HighwayConfig batch threshold decision logic", "[config][highway]")
+{
+	// Test the logic that determines whether to use Highway path
+
+	auto shouldUseHighway = [](bool enabled, int count, int threshold) -> bool {
+		return enabled && count >= threshold;
+	};
+
+	SECTION("Highway disabled always returns false")
+	{
+		REQUIRE(shouldUseHighway(false, 1000, 64) == false);
+		REQUIRE(shouldUseHighway(false, 64, 64) == false);
+		REQUIRE(shouldUseHighway(false, 0, 0) == false);
+	}
+
+	SECTION("Below threshold returns false")
+	{
+		REQUIRE(shouldUseHighway(true, 63, 64) == false);
+		REQUIRE(shouldUseHighway(true, 0, 64) == false);
+		REQUIRE(shouldUseHighway(true, 1, 64) == false);
+	}
+
+	SECTION("At or above threshold returns true")
+	{
+		REQUIRE(shouldUseHighway(true, 64, 64) == true);
+		REQUIRE(shouldUseHighway(true, 65, 64) == true);
+		REQUIRE(shouldUseHighway(true, 1000, 64) == true);
+	}
+
+	SECTION("Zero threshold always uses Highway when enabled")
+	{
+		REQUIRE(shouldUseHighway(true, 0, 0) == true);
+		REQUIRE(shouldUseHighway(true, 1, 0) == true);
+		REQUIRE(shouldUseHighway(true, 1000, 0) == true);
+	}
+
+	SECTION("High threshold restricts Highway usage")
+	{
+		REQUIRE(shouldUseHighway(true, 100, 1000) == false);
+		REQUIRE(shouldUseHighway(true, 999, 1000) == false);
+		REQUIRE(shouldUseHighway(true, 1000, 1000) == true);
+	}
+}
