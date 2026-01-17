@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef> // for size_t
+
 // Highway SIMD Batch Skinning for hdtSMP64
 //
 // Provides batch vertex skinning using Google Highway for automatic

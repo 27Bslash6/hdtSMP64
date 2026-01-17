@@ -10,7 +10,9 @@
 #endif
 
 #include <algorithm>
+#include <cctype>
 #include <clocale>
+#include <cstring>
 
 namespace hdt
 {
