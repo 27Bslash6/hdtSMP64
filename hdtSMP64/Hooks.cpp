@@ -99,7 +99,9 @@ namespace hdt
 			_DMESSAGE("SkinSingleGeometry %s %d - %s, %s, (formid %08x base form %08x head template form %08x)",
 					  a_skeleton->m_name, a_skeleton->m_children.m_size, a_geometry->m_name, name,
 					  a_skeleton->m_owner ? a_skeleton->m_owner->formID : 0x0,
-					  a_skeleton->m_owner ? a_skeleton->m_owner->baseForm->formID : 0x0, formId);
+					  (a_skeleton->m_owner && a_skeleton->m_owner->baseForm) ? a_skeleton->m_owner->baseForm->formID
+																			 : 0x0,
+					  formId);
 
 			SkinSingleHeadGeometryEvent e;
 			e.skeleton = a_skeleton;
@@ -120,10 +122,11 @@ namespace hdt
 				if (bnpc && bnpc->nextTemplate)
 					formId = bnpc->nextTemplate->formID;
 			}
-			_DMESSAGE("SkinAllGeometry %s %d, %s, (formid %08x base form %08x head template form %08x)",
-					  a_skeleton->m_name, a_skeleton->m_children.m_size, name,
-					  a_skeleton->m_owner ? a_skeleton->m_owner->formID : 0x0,
-					  a_skeleton->m_owner ? a_skeleton->m_owner->baseForm->formID : 0x0, formId);
+			_DMESSAGE(
+				"SkinAllGeometry %s %d, %s, (formid %08x base form %08x head template form %08x)", a_skeleton->m_name,
+				a_skeleton->m_children.m_size, name, a_skeleton->m_owner ? a_skeleton->m_owner->formID : 0x0,
+				(a_skeleton->m_owner && a_skeleton->m_owner->baseForm) ? a_skeleton->m_owner->baseForm->formID : 0x0,
+				formId);
 
 			SkinAllHeadGeometryEvent e;
 			e.skeleton = a_skeleton;

@@ -151,8 +151,13 @@ namespace hdt
 		// Swap flag for VT pairs where triangle is on body0
 		bool swapped = false;
 
-		// Check if bodies are still valid
-		bool bodiesValid() const { return cudaBody0.lock() && cudaBody1.lock(); }
+		// Check if bodies are still valid (both alive and not invalidated)
+		bool bodiesValid() const
+		{
+			auto b0 = cudaBody0.lock();
+			auto b1 = cudaBody1.lock();
+			return b0 && b1 && b0->isValid() && b1->isValid();
+		}
 	};
 
 	// CPU-side batch pair metadata (no CUDA types exposed in header)
@@ -185,7 +190,13 @@ namespace hdt
 		std::weak_ptr<CudaBody> cudaBody0;
 		std::weak_ptr<CudaBody> cudaBody1;
 
-		bool bodiesValid() const { return cudaBody0.lock() && cudaBody1.lock(); }
+		// Check if bodies are still valid (both alive and not invalidated)
+		bool bodiesValid() const
+		{
+			auto b0 = cudaBody0.lock();
+			auto b1 = cudaBody1.lock();
+			return b0 && b1 && b0->isValid() && b1->isValid();
+		}
 	};
 
 	// Manages batched collision detection with 1-frame latency pipeline

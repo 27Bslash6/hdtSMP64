@@ -121,11 +121,10 @@ namespace hdt
 			if (numCollider > 1)
 				aabbMe.mergeMany(myAabb + 1, numCollider - 1);
 		}
-#ifdef CUDA
 		else {
+			// Empty tree node - invalidate to prevent stale bounds inflating broadphase
 			aabbMe.invalidate();
 		}
-#endif
 
 		aabbAll = aabbMe;
 		for (auto& i : children) {

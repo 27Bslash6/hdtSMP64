@@ -32,7 +32,7 @@ namespace hdt
 		}
 		else
 		{
-			assert(false);
+			// Body not yet converted - perform first-time conversion
 			btRigidBody* rb = btRigidBody::upcast(&body);
 			//convert both active and kinematic objects (for their velocity)
 			if (rb && (rb->getInvMass() || rb->isKinematicObject()))

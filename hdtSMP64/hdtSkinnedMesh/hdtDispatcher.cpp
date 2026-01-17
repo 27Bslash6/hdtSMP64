@@ -80,8 +80,10 @@ namespace hdt
 		auto size = pairCache->getNumOverlappingPairs();
 		HDT_ZONE_VALUE(static_cast<int64_t>(size));
 		_DMESSAGE("dispatchAllCollisionPairs: entering with %d pairs", size);
-		if (!size)
+		if (!size) {
+			m_pairs.clear(); // Ensure no stale pairs from previous frames
 			return;
+		}
 
 		m_pairs.reserve(size);
 		auto pairs = pairCache->getOverlappingPairArrayPtr();
@@ -364,6 +366,10 @@ namespace hdt
 
 	void CollisionDispatcher::syncPreviousCollisionResults()
 	{
+		// Runtime guard: Skip if CUDA not available or disabled
+		if (!CudaInterface::instance()->hasCuda())
+			return;
+
 		HDT_ZONE_SCOPED_N("SyncPreviousCollisionResults");
 
 		// SYNC AT FRAME START: Ensures previous frame's GPU work is complete.

@@ -61,7 +61,7 @@ BSFixedString hdt::papyrus::QueryCurrentPhysicsFile(StaticFunctionTag* base, Act
 		if (verbose_log)
 			Console_Print("[DynamicHDT] -- Couldn't parse parameters: on_actor(ptr: %016X), on_item(ptr: %016X).",
 						  reinterpret_cast<UInt64>(on_actor), reinterpret_cast<UInt64>(on_item));
-		return false;
+		return BSFixedString();
 	}
 
 	return impl::QueryCurrentPhysicsFileImpl(on_actor->formID, on_item->formID, verbose_log).c_str();

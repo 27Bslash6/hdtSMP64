@@ -87,7 +87,13 @@ namespace hdt
 			case XMLReader::Inspected::StartTag: {
 				auto tag = reader.GetLocalName();
 				if (tagEquals(tag, "logLevel")) {
-					auto level = static_cast<IDebugLog::LogLevel>(reader.readInt());
+					int rawLevel = reader.readInt();
+					// Clamp to valid enum range [kLevel_FatalError(0)..kLevel_DebugMessage(5)]
+					if (rawLevel < IDebugLog::kLevel_FatalError)
+						rawLevel = IDebugLog::kLevel_FatalError;
+					if (rawLevel > IDebugLog::kLevel_DebugMessage)
+						rawLevel = IDebugLog::kLevel_DebugMessage;
+					auto level = static_cast<IDebugLog::LogLevel>(rawLevel);
 					gLog.SetLogLevel(level);
 					hdt::logging::configuredLogLevel.store(level, std::memory_order_relaxed);
 				}

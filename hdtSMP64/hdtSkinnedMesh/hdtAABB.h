@@ -58,6 +58,7 @@ namespace hdt
 
 		// AVX2 batch collision check: test 2 AABBs against this AABB simultaneously
 		// Returns bitmask: bit 0 = aabb0 collides, bit 1 = aabb1 collides
+#ifdef __AVX2__
 		__forceinline int collideWith2(const Aabb& aabb0, const Aabb& aabb1) const
 		{
 			// Broadcast this AABB's min/max to both lanes of 256-bit registers
@@ -86,6 +87,18 @@ namespace hdt
 				result |= 2; // aabb1 collides
 			return result;
 		}
+#else
+		// Scalar fallback for non-AVX2 builds
+		__forceinline int collideWith2(const Aabb& aabb0, const Aabb& aabb1) const
+		{
+			int result = 0;
+			if (collideWith(aabb0))
+				result |= 1;
+			if (collideWith(aabb1))
+				result |= 2;
+			return result;
+		}
+#endif
 
 		// AVX-512 batch collision check: test 4 AABBs against this AABB simultaneously
 		// Returns bitmask: bit N = aabbN collides (bits 0-3)
@@ -164,6 +177,7 @@ namespace hdt
 		}
 
 		// AVX2 batch merge: merge multiple AABBs into this one efficiently
+#ifdef __AVX2__
 		void mergeMany(const Aabb* aabbs, int count)
 		{
 			if (count <= 0)
@@ -195,6 +209,14 @@ namespace hdt
 			if (i < count)
 				merge(aabbs[i]);
 		}
+#else
+		// Scalar fallback for non-AVX2 builds
+		void mergeMany(const Aabb* aabbs, int count)
+		{
+			for (int i = 0; i < count; ++i)
+				merge(aabbs[i]);
+		}
+#endif
 
 		void mergeAdd(const btVector3& p)
 		{

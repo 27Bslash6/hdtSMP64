@@ -172,9 +172,15 @@ namespace hdt::logging
 		std::atomic<bool> m_running;
 	};
 
+	// Fast inline check - avoids function call overhead when logging is disabled
+	[[nodiscard]] inline bool shouldLog(IDebugLog::LogLevel level) noexcept
+	{
+		return level <= configuredLogLevel.load(std::memory_order_relaxed);
+	}
+
 	inline void LogWithTimestamp(IDebugLog::LogLevel level, const char* fmt, ...)
 	{
-		// Check log level BEFORE doing any work
+		// Check log level BEFORE doing any work (redundant if called via macro, but safe for direct calls)
 		if (level > configuredLogLevel.load(std::memory_order_relaxed))
 			return;
 
@@ -224,9 +230,21 @@ namespace hdt::logging
 #undef _VMESSAGE
 #undef _DMESSAGE
 
+// Critical messages always log - no check needed
 #define _FATALERROR(...) hdt::logging::LogWithTimestamp(IDebugLog::kLevel_FatalError, __VA_ARGS__)
 #define _ERROR(...) hdt::logging::LogWithTimestamp(IDebugLog::kLevel_Error, __VA_ARGS__)
 #define _WARNING(...) hdt::logging::LogWithTimestamp(IDebugLog::kLevel_Warning, __VA_ARGS__)
 #define _MESSAGE(...) hdt::logging::LogWithTimestamp(IDebugLog::kLevel_Message, __VA_ARGS__)
-#define _VMESSAGE(...) hdt::logging::LogWithTimestamp(IDebugLog::kLevel_VerboseMessage, __VA_ARGS__)
-#define _DMESSAGE(...) hdt::logging::LogWithTimestamp(IDebugLog::kLevel_DebugMessage, __VA_ARGS__)
+
+// Verbose/Debug messages check BEFORE evaluating arguments - avoids overhead in hot paths
+#define _VMESSAGE(...)                                                                     \
+	do {                                                                                   \
+		if (hdt::logging::shouldLog(IDebugLog::kLevel_VerboseMessage))                     \
+			hdt::logging::LogWithTimestamp(IDebugLog::kLevel_VerboseMessage, __VA_ARGS__); \
+	} while (0)
+
+#define _DMESSAGE(...)                                                                   \
+	do {                                                                                 \
+		if (hdt::logging::shouldLog(IDebugLog::kLevel_DebugMessage))                     \
+			hdt::logging::LogWithTimestamp(IDebugLog::kLevel_DebugMessage, __VA_ARGS__); \
+	} while (0)
