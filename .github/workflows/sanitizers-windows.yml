@@ -107,6 +107,11 @@ jobs:
             -p:Platform=x64 `
             -v:m
 
+      - name: Check build output
+        run: |
+          Write-Host "Contents of x64 directory:"
+          Get-ChildItem -Recurse x64 -ErrorAction SilentlyContinue | Select-Object FullName
+
       - name: Run tests with ASan
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:print_stats=1
