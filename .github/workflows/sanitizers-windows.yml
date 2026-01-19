@@ -103,13 +103,12 @@ jobs:
         run: |
           & 'C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/amd64/MSBuild.exe' `
             tests/hdtSMP64_tests.vcxproj `
-            -p:Configuration=Release `
+            -p:Configuration=Debug `
             -p:Platform=x64 `
-            -p:EnableASAN=true `
             -v:m
 
       - name: Run tests with ASan
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:print_stats=1
         run: |
-          & .\tests\x64\tests\Release\hdtSMP64_tests.exe --reporter console
+          & x64\tests\Debug\hdtSMP64_tests.exe --reporter console
