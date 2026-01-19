@@ -111,4 +111,4 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:print_stats=1
         run: |
-          & x64\tests\Debug\hdtSMP64_tests.exe --reporter console
+          & .\x64\tests\Debug\hdtSMP64_tests.exe --reporter console
