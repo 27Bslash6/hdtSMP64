@@ -77,7 +77,12 @@ jobs:
         shell: cmd
         run: |
           git clone --depth 1 --branch v4.0.1 https://github.com/microsoft/Detours.git external\detours-src
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set VS_PATH=%%i
+          if not defined VS_PATH (
+            echo ERROR: Visual Studio installation not found
+            exit /b 1
+          )
+          call "%VS_PATH%\VC\Auxiliary\Build\vcvars64.bat"
           cd external\detours-src
           nmake
           mkdir ..\detours\include
@@ -104,10 +109,11 @@ jobs:
           msbuild tests/hdtSMP64_tests.vcxproj `
             -p:Configuration=Debug `
             -p:Platform=x64 `
+            -p:SolutionDir=${{ github.workspace }}\ `
             -v:m
 
       - name: Run tests with ASan
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:print_stats=1
         run: |
-          & .\tests\x64\tests\Debug\hdtSMP64_tests.exe --reporter console
+          & .\x64\tests\Debug\hdtSMP64_tests.exe --reporter console
