@@ -43,10 +43,7 @@ jobs:
           sudo apt-get install -y cmake ninja-build clang
 
       - name: Configure (ASan)
-        run: |
-          cmake --preset=ci-asan \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+        run: cmake --preset=ci-asan
 
       - name: Build
         run: cmake --build build/ci-asan
@@ -75,19 +72,16 @@ jobs:
           sudo apt-get install -y cmake ninja-build clang
 
       - name: Configure (UBSan)
-        run: |
-          cmake --preset=ubsan \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+        run: cmake --preset=ci-ubsan
 
       - name: Build
-        run: cmake --build build/ubsan
+        run: cmake --build build/ci-ubsan
 
       - name: Run tests with UBSan
         env:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
-          cd build/ubsan
+          cd build/ci-ubsan
           ./hdtSMP64_tests
 
   # ThreadSanitizer - detects data races
@@ -107,10 +101,7 @@ jobs:
           sudo apt-get install -y cmake ninja-build clang
 
       - name: Configure (TSan)
-        run: |
-          cmake --preset=ci-tsan \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+        run: cmake --preset=ci-tsan
 
       - name: Build
         run: cmake --build build/ci-tsan
@@ -139,20 +130,17 @@ jobs:
           sudo apt-get install -y cmake ninja-build clang
 
       - name: Configure (ASan + UBSan)
-        run: |
-          cmake --preset=asan-ubsan \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+        run: cmake --preset=ci-asan-ubsan
 
       - name: Build
-        run: cmake --build build/asan-ubsan
+        run: cmake --build build/ci-asan-ubsan
 
       - name: Run tests with ASan + UBSan
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:print_stats=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
-          cd build/asan-ubsan
+          cd build/ci-asan-ubsan
           ./hdtSMP64_tests
 
   # Extended stress tests - runs only on push to main (not PRs)
@@ -174,19 +162,15 @@ jobs:
           sudo apt-get install -y cmake ninja-build clang
 
       - name: Configure (TSan for race detection)
-        run: |
-          cmake --preset=ci-tsan \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+        run: cmake --preset=ci-tsan
 
       - name: Build
         run: cmake --build build/ci-tsan
 
-      - name: Run extended stress tests (5 minutes)
+      - name: Run extended stress tests
         env:
           TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:suppressions=${{ github.workspace }}/tsan.supp
-          HDT_STRESS_DURATION_SEC: "300"
         run: |
           cd build/ci-tsan
-          # Run only the extended stress tests
-          ./hdtSMP64_tests "[.stress-extended]" --reporter console
+          # Run stress tests (threading, regression, and stress tags)
+          ./hdtSMP64_tests "[stress]" --reporter console
