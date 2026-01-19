@@ -233,20 +233,29 @@
     <!-- ################### PHYSICS SLOWDOWNS  ########################### -->
 
     <!--
-      maxSubSteps: (int, 1-60) this setting allows you to choose between fps and
-      physics simulation quality, at low fps.
-      maxSubSteps is the maximum number of physics calculus steps, each frame.
-      Slowdowns are experienced when fps are below min-fps/maxSubSteps.
-      With the default value, slowdowns are experienced below 60/4 = 15 fps.
-      The higher it is, the more costly your physics simulation will be at low
-      fps. 2 substeps cost twice as 1 substep.
-      When fps are above min-fps, one substep is enough; when fps are between
-      min-fps/n and min-fps/(n+1), n+1 substeps are necessary.
-      The max value is 60, which allows for slowdowns below 5 fps when min-fps
-      is at 300 (max value).
-      If no value is set, default is 4.
+      maxSubSteps: (int, 1-60) Controls physics simulation behavior during frame drops.
+
+      HOW IT WORKS:
+      - At 60+ FPS: 1 substep (ideal)
+      - Below min-fps: Multiple substeps try to maintain physics accuracy
+      - Problem: More substeps = higher frame time = death spiral
+
+      DEATH SPIRAL with maxSubSteps=4:
+      - Frame drops to 30 FPS → 2 substeps needed → frame time increases
+      - Frame time increases → more substeps → worse FPS → more substeps
+      - Eventually hits 4 substep cap, stuck in spiral
+
+      RECOMMENDATION:
+      - maxSubSteps=1: Physics slows down with low FPS (no death spiral)
+      - maxSubSteps=2: Allows 1 catch-up step, limits spiral to 2x cost
+      - maxSubSteps=4: Original default, allows death spiral
+
+      Lower values sacrifice physics accuracy for stable framerate.
+      Enable autoAdjustMaxSkeletons to reduce actor count before spiral starts.
+
+      If no value is set, default is 2.
     -->
-    <maxSubSteps>4</maxSubSteps>
+    <maxSubSteps>2</maxSubSteps>
 
   </solver>
   <!-- ################### WIND EFFECTS  ########################### -->
