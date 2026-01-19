@@ -1,0 +1,14 @@
+# ThreadSanitizer suppressions for hdtSMP64
+
+# Third-party: Bullet Physics
+race:btDbvt*
+race:btBroadphase*
+
+# Third-party: enkiTS scheduler (lock-free internals)
+race:enki::TaskScheduler*
+race:enki::TaskSet*
+race:enki::LockLessMultiReadPipe*
+race:enki::SubTaskSet*
+
+# Test framework: Catch2
+race:Catch::*

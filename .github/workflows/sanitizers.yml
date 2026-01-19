@@ -1,0 +1,54 @@
+# Sanitizer CI - ThreadSanitizer (Linux)
+# Minimal build testing pure C++ std::atomic correctness
+# For full testing with all dependencies: See sanitizers-windows.yml
+
+name: Sanitizers (Linux TSan)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.cpp'
+      - '**.h'
+      - '**.hpp'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tests/**'
+  pull_request:
+    branches: [master]
+    paths:
+      - '**.cpp'
+      - '**.h'
+      - '**.hpp'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tests/**'
+  workflow_dispatch:
+
+jobs:
+  # ThreadSanitizer - detects data races in pure C++ std::atomic tests
+  tsan:
+    name: ThreadSanitizer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang
+
+      - name: Configure (TSan)
+        run: cmake --preset=ci-tsan
+
+      - name: Build
+        run: cmake --build build/ci-tsan
+
+      - name: Run tests with TSan
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:suppressions=${{ github.workspace }}/tsan.supp
+        run: |
+          cd build/ci-tsan
+          ./hdtSMP64_tests --reporter console
