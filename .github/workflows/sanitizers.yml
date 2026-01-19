@@ -1,7 +1,8 @@
-# Sanitizer CI - Run tests with AddressSanitizer, UBSan, and ThreadSanitizer
-# Runs on Linux for full sanitizer support
+# Sanitizer CI - ThreadSanitizer (Linux)
+# Minimal build testing pure C++ std::atomic correctness
+# For full testing with all dependencies: See sanitizers-windows.yml
 
-name: Sanitizers
+name: Sanitizers (Linux TSan)
 
 on:
   push:
@@ -22,78 +23,17 @@ on:
       - 'CMakeLists.txt'
       - 'CMakePresets.json'
       - 'tests/**'
-  # Allow manual trigger
   workflow_dispatch:
 
 jobs:
-  # AddressSanitizer - detects memory errors
-  asan:
-    name: AddressSanitizer
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang
-
-      - name: Configure (ASan)
-        run: cmake --preset=ci-asan
-
-      - name: Build
-        run: cmake --build build/ci-asan
-
-      - name: Run tests with ASan
-        env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:print_stats=1:check_initialization_order=1
-        run: |
-          cd build/ci-asan
-          ./hdtSMP64_tests
-
-  # UndefinedBehaviorSanitizer - detects UB
-  ubsan:
-    name: UndefinedBehaviorSanitizer
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang
-
-      - name: Configure (UBSan)
-        run: cmake --preset=ci-ubsan
-
-      - name: Build
-        run: cmake --build build/ci-ubsan
-
-      - name: Run tests with UBSan
-        env:
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: |
-          cd build/ci-ubsan
-          ./hdtSMP64_tests
-
-  # ThreadSanitizer - detects data races
+  # ThreadSanitizer - detects data races in pure C++ std::atomic tests
   tsan:
     name: ThreadSanitizer
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install dependencies
         run: |
@@ -111,66 +51,4 @@ jobs:
           TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:suppressions=${{ github.workspace }}/tsan.supp
         run: |
           cd build/ci-tsan
-          ./hdtSMP64_tests
-
-  # Combined ASan + UBSan (catches more issues together)
-  asan-ubsan:
-    name: ASan + UBSan Combined
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang
-
-      - name: Configure (ASan + UBSan)
-        run: cmake --preset=ci-asan-ubsan
-
-      - name: Build
-        run: cmake --build build/ci-asan-ubsan
-
-      - name: Run tests with ASan + UBSan
-        env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:print_stats=1
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: |
-          cd build/ci-asan-ubsan
-          ./hdtSMP64_tests
-
-  # Extended stress tests - runs only on push to main (not PRs)
-  # These take 5+ minutes and are designed to expose rare race conditions
-  stress-extended:
-    name: Extended Stress Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang
-
-      - name: Configure (TSan for race detection)
-        run: cmake --preset=ci-tsan
-
-      - name: Build
-        run: cmake --build build/ci-tsan
-
-      - name: Run extended stress tests
-        env:
-          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1:suppressions=${{ github.workspace }}/tsan.supp
-        run: |
-          cd build/ci-tsan
-          # Run stress tests (threading, regression, and stress tags)
-          ./hdtSMP64_tests "[stress]" --reporter console
+          ./hdtSMP64_tests --reporter console
