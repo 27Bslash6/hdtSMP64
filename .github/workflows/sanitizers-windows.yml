@@ -101,8 +101,7 @@ jobs:
 
       - name: Build tests with ASan
         run: |
-          & 'C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/amd64/MSBuild.exe' `
-            tests/hdtSMP64_tests.vcxproj `
+          msbuild tests/hdtSMP64_tests.vcxproj `
             -p:Configuration=Debug `
             -p:Platform=x64 `
             -v:m

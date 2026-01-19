@@ -29,6 +29,7 @@
 #include "../include/catch.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 #include <vector>
 
