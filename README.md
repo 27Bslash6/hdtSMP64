@@ -243,6 +243,7 @@ See [Nexus bug reports](https://nexusmods.com/skyrimspecialedition/mods/57339?ta
 | **aers** | Fixes and improvements |
 | **ousnius** | Fixes and consulting |
 | **Karonar1** | Bug fixes and maintenance |
+| **Daymar** | Latest codeowner and maintainer |
 
 ---
 
@@ -252,5 +253,6 @@ See [Nexus bug reports](https://nexusmods.com/skyrimspecialedition/mods/57339?ta
 hydrogensaysHDT/hdt-skyrimse-mods (original)
     └── aers/hdtSMP64
         └── Karonar1/hdtSMP64
-            └── This fork
+            └── DaymareOn/hdtSMP64
+                └── This fork
 ```
