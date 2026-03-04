@@ -7,13 +7,13 @@ namespace hdt
 		: p0(p0), p1(p1), p2(p2), margin(margin), prenetration(prenetration)
 	{
 		normal = (p1 - p0).cross(p2 - p0);
-		__m128 len2 = _mm_dp_ps(normal.get128(), normal.get128(), 0x71);
-		if (_mm_cvtss_f32(len2) < FLT_EPSILON * FLT_EPSILON) {
+		const btScalar len2 = normal.length2();
+		if (len2 < FLT_EPSILON * FLT_EPSILON) {
 			valid = false;
 		}
 		else {
 			valid = true;
-			normal.set128(_mm_div_ps(normal.get128(), setAll0(_mm_sqrt_ss(len2))));
+			normal /= btSqrt(len2);
 
 			if (prenetration > -FLT_EPSILON && prenetration < FLT_EPSILON)
 				prenetration = 0;

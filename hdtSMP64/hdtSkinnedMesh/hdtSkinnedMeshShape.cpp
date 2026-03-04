@@ -252,30 +252,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 				m_aabb[i + 3].m_max = _mm512_extractf32x4_ps(aabbMax, 3);
 			}
 #endif
-			// AVX2 path: process 2 vertices at a time
-			for (; i + 1 < size; i += 2) {
-				if (i + 8 < size) {
-					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 8].vertex]), _MM_HINT_T0);
-					_mm_prefetch(reinterpret_cast<const char*>(&vertices[m_colliders[i + 9].vertex]), _MM_HINT_T0);
-				}
-
-				auto p0 = vertices[m_colliders[i].vertex].m_data;
-				auto p1 = vertices[m_colliders[i + 1].vertex].m_data;
-
-				__m256 pos = _mm256_set_m128(p1, p0);
-				__m256 margins = _mm256_set_m128(_mm_set_ps1(p1.m128_f32[3] * shapePropMargin),
-												 _mm_set_ps1(p0.m128_f32[3] * shapePropMargin));
-
-				__m256 aabbMin = _mm256_sub_ps(pos, margins);
-				__m256 aabbMax = _mm256_add_ps(pos, margins);
-
-				m_aabb[i].m_min = _mm256_castps256_ps128(aabbMin);
-				m_aabb[i].m_max = _mm256_castps256_ps128(aabbMax);
-				m_aabb[i + 1].m_min = _mm256_extractf128_ps(aabbMin, 1);
-				m_aabb[i + 1].m_max = _mm256_extractf128_ps(aabbMax, 1);
-			}
-
-			// Scalar remainder
+			// Scalar path: process 1 vertex at a time
 			for (; i < size; ++i) {
 				auto p0 = vertices[m_colliders[i].vertex].m_data;
 				auto margin = _mm_set_ps1(p0.m128_f32[3] * shapePropMargin);
@@ -346,7 +323,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 		{
 			HDT_ZONE_SCOPED_N("TriangleAABBLoop");
 			const float shapePropMargin = m_shapeProp.margin / 3.0f;
-			const __m128 absPenetration = _mm_andnot_ps(_mm_set_ss(-0.0f), _mm_set_ss(m_shapeProp.penetration));
+			const float absPenetration = btFabs(m_shapeProp.penetration);
 
 			for (size_t i = 0; i < size; ++i) {
 				// Prefetch ahead to hide memory latency for triangle vertices
@@ -368,8 +345,7 @@ __kernel void updateCollider(__global float4* vertices, __global uint4* collider
 
 				// Margin from average of w components
 				float avgMargin = (p0.m128_f32[3] + p1.m128_f32[3] + p2.m128_f32[3]) * shapePropMargin;
-				auto margin4 = _mm_max_ss(_mm_set_ss(avgMargin), absPenetration);
-				margin4 = _mm_shuffle_ps(margin4, margin4, 0);
+				auto margin4 = _mm_set_ps1(btMax(avgMargin, absPenetration));
 
 				m_aabb[i].m_min = aabbMin - margin4;
 				m_aabb[i].m_max = aabbMax + margin4;
