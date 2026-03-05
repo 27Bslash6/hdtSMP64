@@ -241,9 +241,9 @@ jobs:
         with:
           path: |
             x64/${{ matrix.version }}_${{ matrix.cuda }}
-          key: build-${{ matrix.version }}-${{ matrix.cuda }}-AVX-${{ hashFiles('hdtSMP64/**/*.cpp', 'hdtSMP64/**/*.h') }}
+          key: build-${{ matrix.version }}-${{ matrix.cuda }}-${{ hashFiles('hdtSMP64/**/*.cpp', 'hdtSMP64/**/*.h') }}
           restore-keys: |
-            build-${{ matrix.version }}-${{ matrix.cuda }}-AVX-
+            build-${{ matrix.version }}-${{ matrix.cuda }}-
 
       - name: Build
         run: |
@@ -253,7 +253,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: hdtSMP64-${{ matrix.version }}-${{ matrix.cuda }}-AVX
+          name: hdtSMP64-${{ matrix.version }}-${{ matrix.cuda }}
           path: |
             x64/${{ matrix.version }}_${{ matrix.cuda }}/hdtSMP64.dll
             x64/${{ matrix.version }}_${{ matrix.cuda }}/hdtSMP64.pdb

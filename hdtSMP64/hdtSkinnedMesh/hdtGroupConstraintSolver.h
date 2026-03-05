@@ -20,7 +20,7 @@ namespace hdt
 	public:
 		GroupConstraintSolver();
 
-		static btSingleConstraintRowSolver getResolveSingleConstraintRowGenericAVX();
-		static btSingleConstraintRowSolver getResolveSingleConstraintRowLowerLimitAVX();
+		static btSingleConstraintRowSolver getResolveSingleConstraintRowGeneric();
+		static btSingleConstraintRowSolver getResolveSingleConstraintRowLowerLimit();
 	};
 } // namespace hdt

@@ -60,12 +60,12 @@ namespace hdt
 		return (btFabs(jacInv) > SIMD_EPSILON) ? (deltaImpulse / jacInv) : btScalar(0);
 	}
 
-	btSingleConstraintRowSolver GroupConstraintSolver::getResolveSingleConstraintRowGenericAVX()
+	btSingleConstraintRowSolver GroupConstraintSolver::getResolveSingleConstraintRowGeneric()
 	{
 		return gResolveSingleConstraintRowGeneric;
 	}
 
-	btSingleConstraintRowSolver GroupConstraintSolver::getResolveSingleConstraintRowLowerLimitAVX()
+	btSingleConstraintRowSolver GroupConstraintSolver::getResolveSingleConstraintRowLowerLimit()
 	{
 		return gResolveSingleConstraintRowLowerLimit;
 	}

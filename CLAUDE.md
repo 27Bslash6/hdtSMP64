@@ -17,7 +17,7 @@ This is a Visual Studio 2019+ solution (`hdtSMP64.sln`). The project requires:
 
 ### Build Configurations
 
-Configuration names follow the pattern: `{VERSION}_{CUDA}_{AVX}[_DEBUG]`
+Configuration names follow the pattern: `{VERSION}_{CUDA}`
 
 **Game Versions:**
 - `SE` - Skyrim SE (v1.5.97)
@@ -34,8 +34,8 @@ Configuration names follow the pattern: `{VERSION}_{CUDA}_{AVX}[_DEBUG]`
 **SIMD:** Highway SIMD provides automatic runtime dispatch (SSE4 → AVX2 → AVX512).
 No separate build variants needed — one binary supports all CPUs.
 
-Example: `V1_6_659_CUDA` builds for AE 1.6.659 with CUDA. The `` suffix
-is the unified base; Highway handles per-CPU dispatch at runtime.
+Example: `V1_6_659_CUDA` builds for AE 1.6.659 with CUDA.
+Highway SIMD handles per-CPU dispatch at runtime — no SIMD suffix needed.
 
 ### Building
 
