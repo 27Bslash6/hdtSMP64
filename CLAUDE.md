@@ -31,13 +31,11 @@ Configuration names follow the pattern: `{VERSION}_{CUDA}_{AVX}[_DEBUG]`
 - `CUDA` - GPU collision detection enabled (requires NVIDIA GPU with compute capability 5.0+)
 - `NOCUDA` - CPU-only collision
 
-**AVX Options:**
-- `NoAVX` - Maximum compatibility
-- `AVX` - Requires AVX support
-- `AVX2` - Requires AVX2 support
-- `AVX512` - Requires AVX512 support
+**SIMD:** Highway SIMD provides automatic runtime dispatch (SSE4 → AVX2 → AVX512).
+No separate build variants needed — one binary supports all CPUs.
 
-Example: `V1_6_659_CUDA_AVX2` builds for AE 1.6.659 with CUDA and AVX2 optimizations.
+Example: `V1_6_659_CUDA_AVX` builds for AE 1.6.659 with CUDA. The `_AVX` suffix
+is the unified base; Highway handles per-CPU dispatch at runtime.
 
 ### Building
 
@@ -51,15 +49,15 @@ Output is a `.dll` file that goes in Skyrim's `Data/SKSE/Plugins/` directory.
 ### Command Line Build (PowerShell)
 
 ```powershell
-# Build specific configuration (e.g., V1_6_1170_NOCUDA_AVX2)
-& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA_AVX2' '-p:Platform=x64' '-v:m'
+# Build specific configuration (e.g., V1_6_1170_NOCUDA_AVX)
+& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA_AVX' '-p:Platform=x64' '-v:m'
 ```
 
 ### Command Line Build (Git Bash)
 
 ```bash
 # Build specific configuration
-powershell.exe -NoProfile -Command "& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA_AVX2' '-p:Platform=x64' '-v:m'"
+powershell.exe -NoProfile -Command "& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA_AVX' '-p:Platform=x64' '-v:m'"
 ```
 
 ## Architecture
