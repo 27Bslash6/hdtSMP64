@@ -5,7 +5,7 @@
 set shell := ["powershell.exe", "-NoLogo", "-Command"]
 
 # Default configuration
-default_config := "V1_6_1170_NOCUDA_AVX"
+default_config := "V1_6_1170_NOCUDA"
 msbuild := "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe"
 cuda_path := "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/"
 
@@ -91,19 +91,19 @@ bench-clean:
     @echo "Cleaning benchmark results..."
     @if (Test-Path results) { Remove-Item -Recurse -Force results/* -ErrorAction SilentlyContinue; echo "Benchmark results cleaned" } else { echo "No results directory found" }
 
-# Build all common CPU configurations (unified _AVX base, Highway handles runtime dispatch)
+# Build all common CPU configurations (unified  base, Highway handles runtime dispatch)
 build-all:
     @echo "Building all CPU configurations..."
-    just build V1_6_1170_NOCUDA_AVX
-    just build SE_NOCUDA_AVX
-    just build VR_NOCUDA_AVX
+    just build V1_6_1170_NOCUDA
+    just build SE_NOCUDA
+    just build VR_NOCUDA
 
 # Build all CUDA configurations (requires CUDA Toolkit)
 build-all-cuda:
     @echo "Building all CUDA configurations..."
-    just build V1_6_1170_CUDA_AVX
-    just build SE_CUDA_AVX
-    just build VR_CUDA_AVX
+    just build V1_6_1170_CUDA
+    just build SE_CUDA
+    just build VR_CUDA
 
 # Quick build (skip cppcheck)
 quick config=default_config:
@@ -119,14 +119,14 @@ configs:
     @echo "Available configurations:"
     @echo ""
     @echo "  CPU-only (no CUDA required):"
-    @echo "    V1_6_1170_NOCUDA_AVX  (default — AE 1.6.1170)"
-    @echo "    SE_NOCUDA_AVX         (Skyrim SE 1.5.97)"
-    @echo "    VR_NOCUDA_AVX         (Skyrim VR)"
+    @echo "    V1_6_1170_NOCUDA  (default — AE 1.6.1170)"
+    @echo "    SE_NOCUDA         (Skyrim SE 1.5.97)"
+    @echo "    VR_NOCUDA         (Skyrim VR)"
     @echo ""
     @echo "  CUDA (requires CUDA Toolkit 12.x):"
-    @echo "    V1_6_1170_CUDA_AVX"
-    @echo "    SE_CUDA_AVX"
-    @echo "    VR_CUDA_AVX"
+    @echo "    V1_6_1170_CUDA"
+    @echo "    SE_CUDA"
+    @echo "    VR_CUDA"
     @echo ""
     @echo "  Highway SIMD provides automatic runtime dispatch (SSE4 → AVX2 → AVX512)."
     @echo "  One binary supports all x86-64 CPUs — no separate AVX2/AVX512 builds needed."

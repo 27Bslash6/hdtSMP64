@@ -1,68 +1,68 @@
 <?xml version='1.0' encoding='utf-8'?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build" ToolsVersion="15.0">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="V1_6_1130_CUDA_AVX|x64">
-      <Configuration>V1_6_1130_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_1130_CUDA|x64">
+      <Configuration>V1_6_1130_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_1130_NOCUDA_AVX|x64">
-      <Configuration>V1_6_1130_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_1130_NOCUDA|x64">
+      <Configuration>V1_6_1130_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_1170_CUDA_AVX|x64">
-      <Configuration>V1_6_1170_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_1170_CUDA|x64">
+      <Configuration>V1_6_1170_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_1170_NOCUDA_AVX|x64">
-      <Configuration>V1_6_1170_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_1170_NOCUDA|x64">
+      <Configuration>V1_6_1170_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_1179_CUDA_AVX|x64">
-      <Configuration>V1_6_1179_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_1179_CUDA|x64">
+      <Configuration>V1_6_1179_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_1179_NOCUDA_AVX|x64">
-      <Configuration>V1_6_1179_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_1179_NOCUDA|x64">
+      <Configuration>V1_6_1179_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_353_CUDA_AVX|x64">
-      <Configuration>V1_6_353_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_353_CUDA|x64">
+      <Configuration>V1_6_353_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_353_NOCUDA_AVX|x64">
-      <Configuration>V1_6_353_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_353_NOCUDA|x64">
+      <Configuration>V1_6_353_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_640_CUDA_AVX|x64">
-      <Configuration>V1_6_640_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_640_CUDA|x64">
+      <Configuration>V1_6_640_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_640_NOCUDA_AVX|x64">
-      <Configuration>V1_6_640_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_640_NOCUDA|x64">
+      <Configuration>V1_6_640_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="SE_CUDA_AVX|x64">
-      <Configuration>SE_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="SE_CUDA|x64">
+      <Configuration>SE_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="SE_NOCUDA_AVX|x64">
-      <Configuration>SE_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="SE_NOCUDA|x64">
+      <Configuration>SE_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_659_NOCUDA_AVX|x64">
-      <Configuration>V1_6_659_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_659_NOCUDA|x64">
+      <Configuration>V1_6_659_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="V1_6_659_CUDA_AVX|x64">
-      <Configuration>V1_6_659_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="V1_6_659_CUDA|x64">
+      <Configuration>V1_6_659_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="VR_CUDA_AVX|x64">
-      <Configuration>VR_CUDA_AVX</Configuration>
+    <ProjectConfiguration Include="VR_CUDA|x64">
+      <Configuration>VR_CUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="VR_NOCUDA_AVX|x64">
-      <Configuration>VR_NOCUDA_AVX</Configuration>
+    <ProjectConfiguration Include="VR_NOCUDA|x64">
+      <Configuration>VR_NOCUDA</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     </ItemGroup>
@@ -76,14 +76,14 @@
     <CudaToolkitCustomDir>$(CUDA_PATH)</CudaToolkitCustomDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -104,14 +104,14 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -132,42 +132,42 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -496,42 +496,42 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA_AVX|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -867,10 +867,10 @@
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX_DEBUG|x64'" Label="PropertySheets">
@@ -879,10 +879,10 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX_DEBUG|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA_AVX_DEBUG|x64'" Label="PropertySheets">
@@ -891,22 +891,22 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA_AVX_DEBUG|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA_AVX_DEBUG|x64'" Label="PropertySheets">
@@ -1047,22 +1047,22 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA_AVX2_DEBUG|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA_AVX|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX_DEBUG|x64'" Label="PropertySheets">
@@ -1204,14 +1204,14 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
@@ -1232,14 +1232,14 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
@@ -1260,42 +1260,42 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
@@ -1624,42 +1624,42 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA_AVX|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\..\..\detours\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\..\detours\lib.X64;$(LibraryPath)</LibraryPath>
@@ -1988,7 +1988,7 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2049,7 +2049,7 @@
       <Command>copy "$(ProjectDir)exportSE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2244,7 +2244,7 @@
       <Command>copy "$(ProjectDir)exportSE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SE_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2307,7 +2307,7 @@
       <Command>copy "$(ProjectDir)exportSE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='VR_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2510,7 +2510,7 @@
       <Command>copy "$(ProjectDir)exportSE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2573,7 +2573,7 @@
       <Command>copy "$(ProjectDir)exportAE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2636,7 +2636,7 @@
       <Command>copy "$(ProjectDir)exportAE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2699,7 +2699,7 @@
       <Command>copy "$(ProjectDir)exportAE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2762,7 +2762,7 @@
       <Command>copy "$(ProjectDir)exportAE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -2825,7 +2825,7 @@
       <Command>copy "$(ProjectDir)exportAE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_CUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -5958,7 +5958,7 @@
       <Command>copy "$(ProjectDir)exportAE.def" "$(ProjectDir)export.def" /Y</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -6016,7 +6016,7 @@
       <GPUDebugInfo>true</GPUDebugInfo>
     </CudaLink>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -6074,7 +6074,7 @@
       <GPUDebugInfo>true</GPUDebugInfo>
     </CudaLink>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -6133,7 +6133,7 @@
       <GPUDebugInfo>true</GPUDebugInfo>
     </CudaLink>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -6192,7 +6192,7 @@
       <GPUDebugInfo>true</GPUDebugInfo>
     </CudaLink>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -6250,7 +6250,7 @@
       <GPUDebugInfo>true</GPUDebugInfo>
     </CudaLink>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA_AVX|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
@@ -9226,8 +9226,8 @@
     <ClInclude Include="hdtSkinnedMesh\hdtConeTwistConstraint.h" />
     <ClInclude Include="hdtSkinnedMesh\hdtConstraintGroup.h" />
     <ClInclude Include="hdtSkinnedMesh\hdtCudaCollision.cuh">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_NoAVX|x64'">true</ExcludedFromBuild>
@@ -9242,12 +9242,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX512|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX512_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX512_DEBUG|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
@@ -9580,8 +9580,8 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="hdtSkinnedMesh\hdtCudaCollision.cu">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_NoAVX|x64'">true</ExcludedFromBuild>
@@ -9596,12 +9596,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX512|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='SE_NOCUDA_AVX512_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='VR_NOCUDA_AVX512_DEBUG|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA_AVX|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1170_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1179_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_353_NOCUDA|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_640_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_1130_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='V1_6_659_NOCUDA_AVX_DEBUG|x64'">true</ExcludedFromBuild>
