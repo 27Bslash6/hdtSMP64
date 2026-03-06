@@ -9516,8 +9516,7 @@
     <ClCompile Include="hdtSkinnedMesh\hdtGeneric6DofConstraint.cpp" />
     <ClCompile Include="hdtSkinnedMesh\hdtGroupConstraintSolver.cpp" />
     <ClCompile Include="hdtSkinnedMesh\hdtHighwayAABB.cpp">
-
-      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtLCP.cpp" />
     <ClCompile Include="hdtSkinnedMesh\hdtSimulationIslandManager.cpp" />
@@ -9526,8 +9525,7 @@
     <ClCompile Include="hdtSkinnedMesh\hdtSkinnedMeshBone.cpp" />
     <ClCompile Include="hdtSkinnedMesh\hdtSoABuffer.cpp" />
     <ClCompile Include="hdtSkinnedMesh\hdtHighwaySkinning.cpp">
-
-      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
     </ClCompile>
     <ClCompile Include="hdtSkinnedMesh\hdtSkinnedMeshShape.cpp" />
     <ClCompile Include="hdtSkinnedMesh\hdtSkinnedMeshSystem.cpp" />

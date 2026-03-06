@@ -72,19 +72,26 @@ def strip_avx(vcxproj_path):
         except ValueError:
             pass  # already removed
 
-    # Pass 3: set EnableEnhancedInstructionSet to NotSet for all remaining non-Highway ClCompile
-    for eis in root.findall(f".//{tag('EnableEnhancedInstructionSet')}"):
-        # Highway files intentionally use AVX512 — don't touch those
-        # Safe approach: only reset if value is AVX/AVX2/AVX512 but not inside
-        # a per-file ClCompile (those have an Include attribute on the ClCompile parent).
-        # We'll reset all non-per-file ones.
-        current = eis.text or ""
-        if current in (
-            "AdvancedVectorExtensions",
-            "AdvancedVectorExtensions2",
-            "AdvancedVectorExtensions512",
-        ):
-            eis.text = "NotSet"
+    HIGHWAY_FILES = {"hdtHighwayAABB.cpp", "hdtHighwaySkinning.cpp"}
+
+    # Pass 3: set EnableEnhancedInstructionSet to NotSet for non-Highway files.
+    # Highway files must keep AdvancedVectorExtensions512 so the compiler accepts
+    # AVX512 intrinsics during foreach_target multi-target compilation.
+    for cl in root.findall(f".//{tag('ClCompile')}"):
+        include = cl.get("Include", "")
+        filename = include.replace("\\", "/").split("/")[-1]
+        is_highway = filename in HIGHWAY_FILES
+        for eis in cl.findall(f".//{tag('EnableEnhancedInstructionSet')}"):
+            current = eis.text or ""
+            if is_highway:
+                # Ensure Highway files always have AVX512
+                eis.text = "AdvancedVectorExtensions512"
+            elif current in (
+                "AdvancedVectorExtensions",
+                "AdvancedVectorExtensions2",
+                "AdvancedVectorExtensions512",
+            ):
+                eis.text = "NotSet"
 
     print(f"Removed {len(removed_configs)} configurations:")
     for c in sorted(removed_configs):
