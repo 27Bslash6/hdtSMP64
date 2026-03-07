@@ -284,4 +284,16 @@
     -->
     <distanceForMaxWind>3000.0</distanceForMaxWind>
   </wind>
+
+  <!--
+    benchmark: automated frame-timing benchmark mode.
+    enabled:        set to true to activate benchmark mode
+    save:           save file name to auto-load on startup (empty = manual load)
+    frames:         number of frames to measure (10–10000, default 2000)
+    exit-when-done: terminate the process when frame count is reached
+    suppress-ui:    (placeholder) hide HUD during benchmark
+    quiet-mode:     (placeholder) mute audio during benchmark
+  -->
+  <benchmark enabled="false" save="" frames="2000" exit-when-done="true" suppress-ui="true" quiet-mode="false" />
+
 </configs>
