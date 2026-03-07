@@ -64,6 +64,14 @@ tools/tracy/
 .env
 benchmark/.env
 
+# External build dependencies (local only, not part of repo)
+external/detours/
+external/detours-src/
+external/skse/
+external/skse-temp/
+external/skse64.7z
+external/build_detours.bat
+
 # Benchmark results and profiling data
 results/
 *.tracy
