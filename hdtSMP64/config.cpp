@@ -19,6 +19,9 @@ namespace hdt
 	// Global Highway configuration instance
 	HighwayConfig g_highwayConfig;
 
+	// Global benchmark configuration instance
+	BenchmarkConfig g_benchmarkConfig;
+
 	// Case-insensitive tag comparison for XML config parsing
 	static bool tagEquals(const std::string& tag, const char* expected)
 	{
@@ -179,6 +182,44 @@ namespace hdt
 		reader.skipCurrentElement();
 	}
 
+	static void parseBenchmarkConfig(XMLReader& reader)
+	{
+		// Parse benchmark element attributes
+		// <benchmark enabled="true" save="benchmark_12entities" frames="2000" exit-when-done="true" suppress-ui="true"
+		// quiet-mode="false" />
+		if (reader.hasAttribute("enabled"))
+			g_benchmarkConfig.enabled = reader.getAttributeAsBool("enabled");
+
+		if (reader.hasAttribute("save"))
+			g_benchmarkConfig.saveName = reader.getAttribute("save");
+
+		if (reader.hasAttribute("frames"))
+			g_benchmarkConfig.frames = reader.getAttributeAsInt("frames");
+
+		if (reader.hasAttribute("exit-when-done"))
+			g_benchmarkConfig.exitWhenDone = reader.getAttributeAsBool("exit-when-done");
+
+		if (reader.hasAttribute("suppress-ui"))
+			g_benchmarkConfig.suppressUI = reader.getAttributeAsBool("suppress-ui");
+
+		if (reader.hasAttribute("quiet-mode"))
+			g_benchmarkConfig.quietMode = reader.getAttributeAsBool("quiet-mode");
+
+		// Clamp frames to valid range
+		g_benchmarkConfig.clampFrames();
+
+		// Log benchmark configuration if enabled
+		if (g_benchmarkConfig.enabled) {
+			_MESSAGE("[BENCHMARK] Mode enabled:");
+			_MESSAGE("[BENCHMARK]   Save: %s",
+					 g_benchmarkConfig.saveName.empty() ? "(manual load)" : g_benchmarkConfig.saveName.c_str());
+			_MESSAGE("[BENCHMARK]   Frames: %d", g_benchmarkConfig.frames);
+			_MESSAGE("[BENCHMARK]   Exit when done: %s", g_benchmarkConfig.exitWhenDone ? "yes" : "no");
+		}
+
+		reader.skipCurrentElement();
+	}
+
 	static void config(XMLReader& reader)
 	{
 		while (reader.Inspect()) {
@@ -193,6 +234,8 @@ namespace hdt
 					smp(reader);
 				else if (tagEquals(tag, "highway"))
 					parseHighwayConfig(reader);
+				else if (tagEquals(tag, "benchmark"))
+					parseBenchmarkConfig(reader);
 				else {
 					_WARNING("Unknown config : %s", tag.c_str());
 					reader.skipCurrentElement();

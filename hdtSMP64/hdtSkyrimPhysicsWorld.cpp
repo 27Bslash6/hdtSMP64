@@ -3,15 +3,22 @@
 #include "hdtLog.h"
 #include "hdtSkinnedMesh/hdtConstraintGroup.h"
 #include "hdtSkinnedMesh/hdtDispatcher.h"
+#include "hdtSkinnedMesh/hdtFrameTimer.h"
 #include "hdtTracy.h"
+
+#include "config.h"
 #ifdef CUDA
 #include "hdtSkinnedMesh/hdtCudaInterface.h"
-#include "hdtSkinnedMesh/hdtFrameTimer.h"
 #endif
 
 #include "Offsets.h"
 #include "PluginInterfaceImpl.h"
 #include "skse64/GameMenus.h"
+
+#include <atomic>
+#include <cstdlib> // For std::exit
+#include <thread>
+#include <Windows.h>
 
 // Local wrapper for MenuManager::IsGamePaused()
 // Official SKSE 2.2.6 doesn't expose this - numPauseGame is private at offset 0x160
@@ -436,6 +443,48 @@ namespace hdt
 			int64_t endTime = ticks.QuadPart;
 			QueryPerformanceFrequency(&ticks);
 			m_SMPProcessingTimeInMainLoop = (endTime - startTime) / static_cast<float>(ticks.QuadPart) * 1e3;
+		}
+
+		// Benchmark mode: auto-exit when frame count reached
+		// This runs on main thread, so thread-safe checks are critical
+		if (g_benchmarkConfig.enabled && g_benchmarkConfig.exitWhenDone) {
+			auto ft = FrameTimer::instance();
+			static std::atomic<bool> benchmarkStarted{false};
+			static std::atomic<bool> wasRunning{false};
+			static std::atomic<bool> exitPosted{false};
+
+			// Start frame timer once when not suspended and not in menus
+			if (!benchmarkStarted.load(std::memory_order_acquire) && !m_suspended && !m_isStasis && !m_systems.empty())
+			{
+				ft->reset(g_benchmarkConfig.frames);
+				benchmarkStarted.store(true, std::memory_order_release);
+				wasRunning.store(true, std::memory_order_release);
+				_MESSAGE("[BENCHMARK] Frame counting started: %d frames", g_benchmarkConfig.frames);
+			}
+
+			// Detect completion: running() transitions from true → false
+			if (benchmarkStarted.load(std::memory_order_acquire)) {
+				bool currentlyRunning = ft->running();
+				bool expected = true;
+
+				// Atomic compare-exchange: only ONE thread will successfully swap wasRunning from true→false
+				if (!currentlyRunning && wasRunning.compare_exchange_strong(expected, false, std::memory_order_acq_rel))
+				{
+					// First thread to detect completion - exit ONCE
+					if (!exitPosted.exchange(true, std::memory_order_acq_rel)) {
+						_MESSAGE("[BENCHMARK] Complete: %d frames processed", g_benchmarkConfig.frames);
+						_MESSAGE("[BENCHMARK] Exiting application in 2 seconds...");
+
+						// Async exit after delay to flush logs
+						// Using std::exit() instead of PostQuitMessage() because we're in a worker thread
+						std::thread([]() {
+							std::this_thread::sleep_for(std::chrono::seconds(2));
+							_MESSAGE("[BENCHMARK] Terminating process now");
+							std::exit(0); // Clean process termination
+						}).detach();
+					}
+				}
+			}
 		}
 	}
 

@@ -7,6 +7,7 @@
 #include "Hooks.h"
 #include "Offsets.h"
 #include "PluginInterfaceImpl.h"
+#include "skse64/GameData.h"
 #include "skse64/GameMenus.h"
 #include "skse64/GameReferences.h"
 #include "skse64/ObScript.h"
@@ -14,12 +15,14 @@
 #include "skse64_common/SafeWrite.h"
 #include "skse64_common/skse_version.h"
 
+#include <chrono>
 #include <DbgHelp.h>
 #include <fstream>
 #include <numeric>
 #include <regex>
 #include <shlobj_core.h>
 #include <sstream>
+#include <thread>
 #pragma comment(lib, "DbgHelp.lib")
 #include "hdtSkinnedMesh/hdtFrameTimer.h"
 
@@ -888,6 +891,28 @@ namespace hdt
 					GetEventDispatcherList()->unk1B8.AddEventSink(&hdt::g_eventDebugLogger);
 					GetEventDispatcherList()->unk840.AddEventSink(&hdt::g_eventDebugLogger);
 #endif
+
+					// Benchmark mode: Auto-load save via BGSSaveLoadManager
+					if (hdt::g_benchmarkConfig.enabled && !hdt::g_benchmarkConfig.saveName.empty()) {
+						std::string saveName = hdt::g_benchmarkConfig.saveName;
+						_MESSAGE("[BENCHMARK] Auto-load enabled: scheduling load of '%s'", saveName.c_str());
+
+						// Delay execution to let main menu fully initialize (UI state stability)
+						// Use Load() directly - it's implemented in SKSE and available
+						std::thread([saveName]() {
+							std::this_thread::sleep_for(std::chrono::seconds(5));
+
+							auto saveLoadMgr = BGSSaveLoadManager::GetSingleton();
+							if (saveLoadMgr) {
+								_MESSAGE("[BENCHMARK] Loading save: %s", saveName.c_str());
+								saveLoadMgr->Load(saveName.c_str());
+								_MESSAGE("[BENCHMARK] Load initiated (will take several seconds to complete)");
+							}
+							else {
+								_ERROR("[BENCHMARK] Failed to get BGSSaveLoadManager singleton");
+							}
+						}).detach();
+					}
 				}
 
 				// If we receive a SaveGame message, we serialize our data and save it in our dedicated save files.

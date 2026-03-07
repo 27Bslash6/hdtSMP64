@@ -2,6 +2,8 @@
 
 #include "LinearMath/btMinMax.h"
 
+#include <string>
+
 namespace hdt
 {
 	// Highway SIMD batch configuration
@@ -18,6 +20,25 @@ namespace hdt
 
 	// Global Highway configuration - loaded once at startup
 	extern HighwayConfig g_highwayConfig;
+
+	// Benchmark mode configuration
+	struct BenchmarkConfig
+	{
+		bool enabled = false;
+		std::string saveName = ""; // Save file to auto-load (empty = manual load)
+		int frames = 2000;
+		bool exitWhenDone = true;
+		bool suppressUI = true; // TODO: Hide HUD during benchmark
+		bool quietMode = false; // TODO: Mute audio during benchmark
+
+		static constexpr int MIN_FRAMES = 10;
+		static constexpr int MAX_FRAMES = 10000;
+
+		void clampFrames() { frames = btClamped(frames, MIN_FRAMES, MAX_FRAMES); }
+	};
+
+	// Global benchmark configuration - loaded at startup and when config reloads
+	extern BenchmarkConfig g_benchmarkConfig;
 
 	void loadConfig();
 } // namespace hdt
