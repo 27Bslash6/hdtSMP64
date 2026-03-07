@@ -1,0 +1,136 @@
+# CodeQL Security Analysis for hdtSMP64
+# Scans for security vulnerabilities and code quality issues
+
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.cpp'
+      - '**.h'
+      - '**.cxx'
+      - '**.hpp'
+  pull_request:
+    branches: [master]
+    paths:
+      - '**.cpp'
+      - '**.h'
+      - '**.cxx'
+      - '**.hpp'
+  schedule:
+    # Weekly scan on Monday at 6:00 AM UTC
+    - cron: '0 6 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['cpp']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Initialize CodeQL
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Use security-and-quality for comprehensive analysis
+          queries: security-and-quality
+          # Focus on project code, exclude vendored dependencies
+          config: |
+            paths-ignore:
+              - 'hdtSMP64/BulletCollision/**'
+              - 'hdtSMP64/BulletDynamics/**'
+              - 'hdtSMP64/Bullet3Collision/**'
+              - 'hdtSMP64/Bullet3Dynamics/**'
+              - 'hdtSMP64/LinearMath/**'
+              - 'external/**'
+
+      # Setup build environment
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Cache SKSE
+        id: cache-skse
+        uses: actions/cache@v4
+        with:
+          path: external/skse
+          key: skse-2.2.6-1.6.1170-v7
+
+      - name: Setup SKSE (if not cached)
+        if: steps.cache-skse.outputs.cache-hit != 'true'
+        run: |
+          $skseUrl = "https://skse.silverlock.org/beta/skse64_2_02_06.7z"
+          Invoke-WebRequest -Uri $skseUrl -OutFile skse64.7z
+          7z x skse64.7z -oexternal/skse-temp
+          $extracted = Get-ChildItem -Path external/skse-temp -Directory | Select-Object -First 1
+          $srcDir = "$($extracted.FullName)/src"
+          New-Item -ItemType Directory -Path external/skse -Force | Out-Null
+          Copy-Item -Path "$srcDir\common\common" -Destination "external\skse\common" -Recurse
+          Copy-Item -Path "$srcDir\skse64\skse64" -Destination "external\skse\skse64" -Recurse
+          Copy-Item -Path "$srcDir\skse64\skse64_common" -Destination "external\skse\skse64_common" -Recurse
+          Copy-Item -Path "$srcDir\skse64\xbyak" -Destination "external\skse\xbyak" -Recurse
+          # Patch GameData.h
+          $gameData = "external\skse\skse64\GameData.h"
+          (Get-Content $gameData) -replace 'STATIC_ASSERT\(offsetof\(ModInfo, numRefMods\)', '// STATIC_ASSERT(offsetof(ModInfo, numRefMods)' -replace 'STATIC_ASSERT\(offsetof\(ModInfo, author\)', '// STATIC_ASSERT(offsetof(ModInfo, author)' -replace 'STATIC_ASSERT\(sizeof\(ModInfo\)', '// STATIC_ASSERT(sizeof(ModInfo)' | Set-Content $gameData
+          Remove-Item -Path external/skse-temp -Recurse -Force
+          Remove-Item -Path skse64.7z
+
+      - name: Cache Detours
+        id: cache-detours
+        uses: actions/cache@v4
+        with:
+          path: external/detours
+          key: detours-4.0.1
+
+      - name: Build Detours (if not cached)
+        if: steps.cache-detours.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          git clone --depth 1 --branch v4.0.1 https://github.com/microsoft/Detours.git external\detours-src
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd external\detours-src
+          nmake
+          mkdir ..\detours\include
+          mkdir ..\detours\lib.X64
+          copy include\*.h ..\detours\include\
+          copy lib.X64\*.lib ..\detours\lib.X64\
+
+      - name: Setup Build Props
+        run: |
+          $workspace = "${{ github.workspace }}".Replace('/', '\')
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+            <PropertyGroup Label="hdtSMP64Paths">
+              <SKSE_ROOT>$workspace\external\skse</SKSE_ROOT>
+              <SKSE_DIR>$workspace\external\skse</SKSE_DIR>
+              <DETOURS_DIR>$workspace\external\detours</DETOURS_DIR>
+            </PropertyGroup>
+          </Project>
+          "@ | Out-File -FilePath hdtSMP64.paths.props -Encoding utf8
+
+      # Autobuild attempts to build any compiled languages
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      # Perform CodeQL analysis
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
