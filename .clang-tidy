@@ -1,0 +1,60 @@
+# hdtSMP64 clang-tidy configuration
+# High-value checks with low false-positive rates
+# Phase 1: bugprone, clang-analyzer, performance
+# Phase 2 (future): modernize checks
+
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  readability-braces-around-statements,
+  readability-misleading-indentation,
+  readability-redundant-smartptr-get,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-exception-escape,
+  -clang-analyzer-cplusplus.NewDeleteLeaks,
+  -clang-analyzer-optin.cplusplus.VirtualCall,
+
+# Treat warnings as errors for enabled checks
+WarningsAsErrors: >
+  bugprone-use-after-move,
+  bugprone-dangling-handle,
+  bugprone-infinite-loop,
+  bugprone-move-forwarding-reference,
+  bugprone-string-constructor,
+  bugprone-undefined-memory-manipulation,
+  clang-analyzer-core.*,
+  clang-analyzer-deadcode.*,
+  performance-unnecessary-copy-initialization,
+
+# Header filter - only check project headers, not external
+HeaderFilterRegex: '(hdtSMP64|hdtSSEUtils)/.*\.h$'
+
+# Format style for suggested fixes
+FormatStyle: file
+
+CheckOptions:
+  # Performance tuning
+  - key: performance-for-range-copy.WarnOnAllAutoCopies
+    value: true
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: false
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: 'Ref;std::shared_ptr;std::unique_ptr'
+
+  # Bugprone tuning
+  - key: bugprone-argument-comment.StrictMode
+    value: false
+  - key: bugprone-assert-side-effect.AssertMacros
+    value: 'assert,_ASSERT,_ASSERTE,SKSE_ASSERT'
+  - key: bugprone-sizeof-expression.WarnOnSizeOfIntegerExpression
+    value: true
+
+  # Readability
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: 1
+
+# Ignore certain paths entirely
+ExcludeHeaderFilterRegex: '(Bullet|LinearMath|external|skse64)'
