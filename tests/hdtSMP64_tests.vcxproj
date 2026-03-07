@@ -86,6 +86,7 @@
     <ClCompile Include="unit\test_dispatcher.cpp" />
     <ClCompile Include="unit\test_serialization.cpp" />
     <ClCompile Include="unit\test_highway_skinning.cpp" />
+    <ClCompile Include="unit\test_parallel_frame_start.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\catch.hpp" />
