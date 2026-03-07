@@ -1,0 +1,63 @@
+<!--
+  Benchmark Mode Configuration Example
+
+  Add this <benchmark> element inside your <configs> root element in configs.xml
+
+  Usage:
+    1. Enable benchmark mode and set frame count
+    2. Build and launch Skyrim
+    3. Manually load your benchmark save file
+    4. Physics will run for N frames, then auto-exit
+    5. Check hdtSMP64.log for timing statistics
+
+  Attributes:
+    - enabled: Enable/disable benchmark mode
+    - save: Save file name (currently unused - load manually)
+    - frames: Number of frames to capture (10-10000)
+    - exit-when-done: Auto-exit after completion
+    - suppress-ui: Hide HUD during benchmark (not yet implemented)
+    - quiet-mode: Disable audio (not yet implemented)
+-->
+
+<benchmark
+  enabled="false"
+  save=""
+  frames="2000"
+  exit-when-done="true"
+  suppress-ui="true"
+  quiet-mode="false"
+/>
+
+<!--
+  Example workflow:
+
+  1. Create benchmark save:
+     - Load Skyrim normally
+     - Position yourself with desired NPCs/entities
+     - Save as "benchmark_12entities.ess"
+
+  2. Enable benchmark in configs.xml:
+     <benchmark enabled="true" frames="2000" />
+
+  3. Run via Python script:
+     python scripts/benchmark_pipeline.py run -name test1 -frames 2000
+
+  4. OR run manually:
+     - Launch Skyrim
+     - Load your benchmark save
+     - Stand still
+     - After 2000 frames, game auto-exits
+
+  5. Results in hdtSMP64.log:
+     [BENCHMARK] Complete: 2000 frames processed
+     Timings over 1000 frames:
+       CPU:
+         Internal update mean 527.930 us, std 139.971 us
+         Collision launch mean 835 us, std 335.604 us
+         ...
+
+  6. Tracy CSV automatically exported to results/<name>/trace.csv
+
+  7. Ingest to MCP for semantic queries:
+     The pipeline script automatically calls mcp__hdt-log__ingest_tracy
+-->

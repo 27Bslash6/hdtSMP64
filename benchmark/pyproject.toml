@@ -1,0 +1,18 @@
+[project]
+name = "hdtsmp64-benchmark"
+version = "0.1.0"
+description = "Automated benchmark pipeline for hdtSMP64 performance testing"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[tool.ruff]
+line-length = 129
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "TCH"]
+ignore = []
