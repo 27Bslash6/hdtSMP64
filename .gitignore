@@ -63,3 +63,40 @@ sksevr.sln
 tools/tracy/
 .env
 benchmark/.env
+
+# Benchmark results and profiling data
+results/
+*.tracy
+*.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.python-version
+
+# MCP tooling (local dev tool, not part of the project)
+mcp-log-inspector/
+
+# VS Code local settings
+.vscode/
+
+# Serena / spec-workflow local state
+.serena/
+.spec-workflow/
+
+# Claude local state
+.claude/
+
+# MCP config (personal)
+.mcp.json
+
+# Backup files from strip scripts
+*.vcxproj.bak
+*.vcxproj.bak2
+*.sln.bak
+*.sln.bak2
+
+# Temp files
+*.tmp
+tmpclaude*
