@@ -116,38 +116,36 @@ Not supported for GPU acceleration. CPU mode works with any graphics card.
 
 ### Build Configurations
 
-Format: `{VERSION}_{CUDA}_{AVX}`
+Format: `{VERSION}_{CUDA}`
 
 | Component | Options |
 |:----------|:--------|
 | Version | `SE`, `VR`, `V1_6_353`, `V1_6_640`, `V1_6_1170`, `V1_6_1179` |
 | CUDA | `CUDA` (GPU), `NOCUDA` (CPU-only) |
-| AVX | `NoAVX`, `AVX`, `AVX2`, `AVX512` |
+
+SIMD (SSE4/AVX2/AVX-512) is selected automatically at runtime by Google Highway. A single
+binary works on all x86-64 CPUs — no separate AVX2 or AVX512 build is needed.
 
 | Platform | Recommended Config |
 |:---------|:-------------------|
-| Steam AE | `V1_6_1170_NOCUDA_AVX2` |
-| GOG | `V1_6_1179_NOCUDA_AVX2` |
-| Steam SE | `SE_NOCUDA_AVX2` |
-| Steam VR | `VR_NOCUDA_AVX2` |
+| Steam AE | `V1_6_1170_NOCUDA` |
+| GOG | `V1_6_1179_NOCUDA` |
+| Steam SE | `SE_NOCUDA` |
+| Steam VR | `VR_NOCUDA` |
 
 ### Using Just (Recommended)
 
 ```bash
-just              # Build default config (V1_6_1170_NOCUDA_AVX2)
+just              # Build default config (V1_6_1170_NOCUDA)
 just build        # Build only
 just test         # Build + run tests
 just configs      # List all configurations
 just cuda-info    # Check CUDA installation
 
 # Specific configurations
-just build V1_6_1170_CUDA_AVX2    # Steam AE with CUDA
-just build V1_6_1179_NOCUDA_AVX2  # GOG
-just profile V1_6_1170_CUDA_AVX2  # With Tracy profiler
-
-# Build all GOG configurations
-just build-gog       # All GOG CPU configs
-just build-gog-cuda  # All GOG CUDA configs
+just build V1_6_1170_CUDA    # Steam AE with CUDA
+just build V1_6_1179_NOCUDA  # GOG
+just profile V1_6_1170_CUDA  # With Tracy profiler
 ```
 
 ### Manual Build

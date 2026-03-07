@@ -60,3 +60,6 @@ sksevr.sln
 *.vcxproj
 *.vcxproj
 *.filters
+tools/tracy/
+.env
+benchmark/.env
