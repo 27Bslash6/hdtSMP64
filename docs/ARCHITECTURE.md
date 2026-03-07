@@ -34,7 +34,7 @@ hdtSMP64 is a physics simulation plugin for Skyrim SE/AE/VR that provides cloth 
                     ▼                     ▼
         ┌───────────────────┐   ┌───────────────────┐
         │   CPU Backend     │   │   CUDA Backend    │
-        │  (SSE/AVX SIMD)   │   │  (GPU compute)    │
+        │  (Highway SIMD)   │   │  (GPU compute)    │
         └───────────────────┘   └───────────────────┘
 ```
 
@@ -267,13 +267,15 @@ Main Thread (Game)
 
 ## Build Variants
 
-Configuration naming: `{VERSION}_{CUDA}_{AVX}`
+Configuration naming: `{VERSION}_{CUDA}`
 
 | Component | Options | Notes |
 |-----------|---------|-------|
 | VERSION | SE, VR, V1_6_xxx | Game version |
 | CUDA | CUDA, NOCUDA | GPU acceleration |
-| AVX | NoAVX, AVX, AVX2, AVX512 | CPU SIMD level |
+
+SIMD is handled automatically at runtime by Google Highway (SSE4 → AVX2 → AVX-512). No
+per-ISA build variant is needed — one binary works on all x86-64 CPUs.
 
 ## Key Preprocessor Defines
 
@@ -306,4 +308,4 @@ Configuration naming: `{VERSION}_{CUDA}_{AVX}`
 - **Substep clamping**: Max 4 physics steps per frame
 - **CUDA threshold**: GPU only beneficial for high vertex counts
 - **Collision groups**: Reduce unnecessary collision checks
-- **SIMD**: AVX2/AVX512 for CPU-bound calculations
+- **SIMD**: Highway provides runtime dispatch (SSE4/AVX2/AVX-512) — no separate build needed

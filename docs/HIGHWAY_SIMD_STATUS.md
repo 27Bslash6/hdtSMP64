@@ -32,12 +32,19 @@ Google Highway SIMD abstraction has been integrated to replace fragmented SSE4/A
 
 ## Files With Raw Intrinsics (Potential Gaps)
 
+Three files were cleaned up as part of the AVX build-variant elimination refactor (2026-03):
+
+| File | Status | Notes |
+|------|--------|-------|
+| `hdtGroupConstraintSolver.cpp` | **Cleaned** | AVX2 (`_mm256_*`) replaced with plain scalar C++. Hot path handled by `hdtHighwaySolverBridge.h`. |
+| `hdtLCP.cpp` | **Cleaned** | SSE4.1 (`_mm_dp_ps`, `_mm_hadd_ps`) replaced with scalar. |
+| `hdtSkinnedMeshAlgorithm.cpp` | **Cleaned** | SSE4.1 geometry ops replaced with `btVector3` methods. |
+
+Remaining files with raw intrinsics:
+
 | File | Intrinsic Count | Hot Path? | Highway Candidate? |
 |------|-----------------|-----------|-------------------|
-| `hdtLCP.cpp` | 78 | Yes - MLCP solver | **Yes** - Linear algebra operations |
-| `hdtSkinnedMeshAlgorithm.cpp` | 38 | Yes - Collision detection | **Yes** - `checkCollide()` functions |
-| `hdtGroupConstraintSolver.cpp` | 35 | Yes - Constraint solver | **Maybe** - Complex dependencies |
-| `hdtSkinnedMeshShape.cpp` | 28 | Yes - AABB updates | **Partial** - AVX-512 path remains |
+| `hdtSkinnedMeshShape.cpp` | 28 | Yes - AABB updates | **Partial** - AVX-512 path is compile-time gated (`#ifdef __AVX512F__`) but the file has no per-file `/arch:AVX512` override, so that path is unreachable under the current build. Should migrate to Highway. |
 | `hdtCollisionAlgorithm.cpp` | 3 | Medium | No - Already minimal |
 | `hdtSkinnedMeshWorld.cpp` | 1 | No | No - Single use |
 
@@ -52,30 +59,17 @@ Google Highway SIMD abstraction has been integrated to replace fragmented SSE4/A
 ### High Priority
 
 1. **`PerVertexShape::internalUpdate()` in `hdtSkinnedMeshShape.cpp`**
-   - Still has `#ifdef __AVX512F__` compile-time dispatch
-   - Should use Highway for runtime dispatch
+   - Has `#ifdef __AVX512F__` compile-time dispatch, but the file has no per-file `/arch:AVX512`
+     compiler flag — that branch is **unreachable** under the current build system
+   - Should migrate to Highway `HWY_DYNAMIC_DISPATCH` so the AVX-512 path is actually usable
    - Computes per-vertex AABBs from collider data
 
-2. **`hdtLCP.cpp` - MLCP Solver**
-   - 78 intrinsics - most SIMD-heavy file
-   - Matrix operations, dot products, accumulations
-   - Would benefit from Highway's portable FMA
+### Completed (as of 2026-03 refactor)
 
-### Medium Priority
-
-3. **`hdtSkinnedMeshAlgorithm.cpp` - Collision Checking**
-   - `checkCollide()` functions for sphere/capsule/triangle
-   - Cross product, distance calculations
-   - Some operations are inherently scalar (early-out tests)
-
-4. **`hdtGroupConstraintSolver.cpp` - Constraint Solving**
-   - Complex iteration patterns
-   - May not vectorize well due to dependencies
-
-### Low Priority / Not Candidates
-
-5. **`hdtCollisionAlgorithm.cpp`** - Only 3 intrinsics, already minimal
-6. **`hdtSkinnedMeshWorld.cpp`** - Single intrinsic, not worth abstracting
+- **`hdtGroupConstraintSolver.cpp`** — AVX2 intrinsics removed; scalar fallback for low counts;
+  hot path handled by `hdtHighwaySolverBridge.h`
+- **`hdtLCP.cpp`** — SSE4.1 matrix factorization intrinsics replaced with scalar
+- **`hdtSkinnedMeshAlgorithm.cpp`** — SSE4.1 geometry ops replaced with `btVector3` methods
 
 ## Integration Patterns
 
@@ -127,6 +121,6 @@ On AVX-512 capable CPUs, you'll see `AVX3`. On AVX2 CPUs, you'll see `AVX2`.
 
 ## Future Work
 
-1. **Phase 2**: Migrate `PerVertexShape::internalUpdate()` to Highway
-2. **Phase 3**: Evaluate LCP solver for Highway migration
-3. **Phase 4**: Profile collision checking for vectorization opportunities
+1. **Phase 2**: Migrate `PerVertexShape::internalUpdate()` to Highway (fixes dead AVX-512 code path)
+2. ~~**Phase 3**: Evaluate LCP solver for Highway migration~~ — completed 2026-03 (converted to scalar)
+3. ~~**Phase 4**: Profile collision checking for vectorization opportunities~~ — `hdtSkinnedMeshAlgorithm.cpp` converted to scalar 2026-03
