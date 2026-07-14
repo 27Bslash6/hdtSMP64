@@ -33,25 +33,9 @@ namespace hdt
 
 	float LargeDot(float* a, float* b, int n)
 	{
-		__m128 xmm0 = _mm_setzero_ps();
-		int i;
-		for (i = 0; i < n - 7; i += 8, a += 8, b += 8) {
-			__m128 xmm1 = _mm_loadu_ps(a);
-			__m128 xmm2 = _mm_loadu_ps(b);
-			__m128 xmm3 = _mm_loadu_ps(a + 4);
-			__m128 xmm4 = _mm_loadu_ps(b + 4);
-			xmm1 *= xmm2;
-			xmm3 *= xmm4;
-			xmm1 += xmm3;
-			xmm0 += xmm1;
-		}
-
-		xmm0 = _mm_hadd_ps(xmm0, xmm0);
-		xmm0 = _mm_hadd_ps(xmm0, xmm0);
-
-		float sum = _mm_cvtss_f32(xmm0);
-		for (; i < n; ++i, ++a, ++b)
-			sum += *a * *b;
+		float sum = 0.0f;
+		for (int i = 0; i < n; ++i)
+			sum += a[i] * b[i];
 		return sum;
 	}
 
@@ -96,12 +80,9 @@ namespace hdt
 			ex = B;
 			/* the inner loop that computes outer products and adds them to Z */
 			for (j = i - 4; j >= 0; j -= 4, ell += 4, ex += 4) {
-				__m128 p1 = _mm_loadu_ps(ell);
-				__m128 q1 = _mm_loadu_ps(ex);
-				__m128 p2 = _mm_loadu_ps(ell + lskip1);
-
-				Z11 += _mm_cvtss_f32(_mm_dp_ps(p1, q1, 0xf1));
-				Z21 += _mm_cvtss_f32(_mm_dp_ps(p2, q1, 0xf1));
+				Z11 += ell[0] * ex[0] + ell[1] * ex[1] + ell[2] * ex[2] + ell[3] * ex[3];
+				Z21 += ell[lskip1 + 0] * ex[0] + ell[lskip1 + 1] * ex[1] + ell[lskip1 + 2] * ex[2] +
+					   ell[lskip1 + 3] * ex[3];
 			}
 			/* compute left-over iterations */
 			for (j += 4; j > 0; j--) {
@@ -156,15 +137,13 @@ namespace hdt
 			/* the inner loop that computes outer products and adds them to Z */
 			for (j = i - 4; j >= 0; j -= 4, ell += 4, ex += 4) {
 				/* compute outer product and add it to the Z matrix */
-				__m128 p1 = _mm_loadu_ps(ell);
-				__m128 q1 = _mm_loadu_ps(ex);
-				__m128 p2 = _mm_loadu_ps(ell + lskip1);
-				__m128 q2 = _mm_loadu_ps(ex + lskip1);
-
-				Z11 += _mm_cvtss_f32(_mm_dp_ps(p1, q1, 0xf1));
-				Z12 += _mm_cvtss_f32(_mm_dp_ps(p1, q2, 0xf1));
-				Z21 += _mm_cvtss_f32(_mm_dp_ps(p2, q1, 0xf1));
-				Z22 += _mm_cvtss_f32(_mm_dp_ps(p2, q2, 0xf1));
+				Z11 += ell[0] * ex[0] + ell[1] * ex[1] + ell[2] * ex[2] + ell[3] * ex[3];
+				Z12 += ell[0] * ex[lskip1 + 0] + ell[1] * ex[lskip1 + 1] + ell[2] * ex[lskip1 + 2] +
+					   ell[3] * ex[lskip1 + 3];
+				Z21 += ell[lskip1 + 0] * ex[0] + ell[lskip1 + 1] * ex[1] + ell[lskip1 + 2] * ex[2] +
+					   ell[lskip1 + 3] * ex[3];
+				Z22 += ell[lskip1 + 0] * ex[lskip1 + 0] + ell[lskip1 + 1] * ex[lskip1 + 1] +
+					   ell[lskip1 + 2] * ex[lskip1 + 2] + ell[lskip1 + 3] * ex[lskip1 + 3];
 				/* end of inner loop */
 			}
 			/* compute left-over iterations */
@@ -220,16 +199,17 @@ namespace hdt
 			ell = A + i * nskip1;
 			dee = d;
 			for (j = i - 4; j >= 0; j -= 4, ell += 4, dee += 4) {
-				__m128 p1 = _mm_loadu_ps(ell);
-				__m128 p2 = _mm_loadu_ps(ell + nskip1);
-				__m128 dd = _mm_loadu_ps(dee);
-				__m128 q1 = p1 * dd;
-				__m128 q2 = p2 * dd;
-				_mm_storeu_ps(ell, q1);
-				_mm_storeu_ps(ell + nskip1, q2);
-				Z11 += _mm_cvtss_f32(_mm_dp_ps(p1, q1, 0xf1));
-				Z21 += _mm_cvtss_f32(_mm_dp_ps(p2, q1, 0xf1));
-				Z22 += _mm_cvtss_f32(_mm_dp_ps(p2, q2, 0xf1));
+				for (int k = 0; k < 4; ++k) {
+					const btScalar p1k = ell[k];
+					const btScalar p2k = ell[nskip1 + k];
+					const btScalar q1k = p1k * dee[k];
+					const btScalar q2k = p2k * dee[k];
+					ell[k] = q1k;
+					ell[nskip1 + k] = q2k;
+					Z11 += p1k * q1k;
+					Z21 += p2k * q1k;
+					Z22 += p2k * q2k;
+				}
 			}
 			/* compute left-over iterations */
 			j += 4;
@@ -371,24 +351,19 @@ namespace hdt
 			ex = B;
 
 			/* set the Z matrix to 0 */
-			__m128 Z = _mm_setzero_ps();
+			Z11 = 0;
+			Z21 = 0;
+			Z31 = 0;
+			Z41 = 0;
 			/* the inner loop that computes outer products and adds them to Z */
 			for (j = i - 4; j >= 0; j -= 4, ell += 4, ex += 4) {
-				__m128 p1 = _mm_loadu_ps(ell);
-				__m128 p2 = _mm_loadu_ps(ell + lskip1);
-				__m128 p3 = _mm_loadu_ps(ell + lskip2);
-				__m128 p4 = _mm_loadu_ps(ell + lskip3);
-				__m128 q1 = _mm_loadu_ps(ex);
-
-				p1 = _mm_dp_ps(p1, q1, 0xf1);
-				p2 = _mm_dp_ps(p2, q1, 0xf2);
-				p3 = _mm_dp_ps(p3, q1, 0xf4);
-				p4 = _mm_dp_ps(p4, q1, 0xf8);
-
-				p1 = _mm_or_ps(p1, p3);
-				p2 = _mm_or_ps(p2, p4);
-				p1 = _mm_or_ps(p1, p2);
-				Z = _mm_add_ps(Z, p1);
+				Z11 += ell[0] * ex[0] + ell[1] * ex[1] + ell[2] * ex[2] + ell[3] * ex[3];
+				Z21 += ell[lskip1 + 0] * ex[0] + ell[lskip1 + 1] * ex[1] + ell[lskip1 + 2] * ex[2] +
+					   ell[lskip1 + 3] * ex[3];
+				Z31 += ell[lskip2 + 0] * ex[0] + ell[lskip2 + 1] * ex[1] + ell[lskip2 + 2] * ex[2] +
+					   ell[lskip2 + 3] * ex[3];
+				Z41 += ell[lskip3 + 0] * ex[0] + ell[lskip3 + 1] * ex[1] + ell[lskip3 + 2] * ex[2] +
+					   ell[lskip3 + 3] * ex[3];
 			}
 			for (j += 4; j > 0; j--) {
 				/* load p and q values */
@@ -399,16 +374,15 @@ namespace hdt
 				p4 = ell[lskip3];
 
 				/* compute outer product and add it to the Z matrix */
-				Z += _mm_set_ps(p4, p3, p2, p1) * setAll(q1);
+				Z11 += p1 * q1;
+				Z21 += p2 * q1;
+				Z31 += p3 * q1;
+				Z41 += p4 * q1;
 
 				/* advance pointers */
 				ell += 1;
 				ex += 1;
 			}
-			Z11 = _mm_cvtss_f32(Z);
-			Z21 = _mm_cvtss_f32(pshufd<1>(Z));
-			Z31 = _mm_cvtss_f32(pshufd<2>(Z));
-			Z41 = _mm_cvtss_f32(pshufd<3>(Z));
 
 			/* finish computing the X(i) block */
 			Z11 = ex[0] - Z11;
@@ -436,16 +410,9 @@ namespace hdt
 			ex = B;
 			/* the inner loop that computes outer products and adds them to Z */
 			for (j = i - 12; j >= 0; j -= 12) {
-				__m128 p1 = _mm_loadu_ps(ell);
-				__m128 q1 = _mm_loadu_ps(ex);
-				__m128 p2 = _mm_loadu_ps(ell + 4);
-				__m128 q2 = _mm_loadu_ps(ex + 4);
-				__m128 p3 = _mm_loadu_ps(ell + 8);
-				__m128 q3 = _mm_loadu_ps(ex + 8);
-
-				Z11 += _mm_cvtss_f32(_mm_dp_ps(p1, q1, 0xf1));
-				Z11 += _mm_cvtss_f32(_mm_dp_ps(p2, q2, 0xf1));
-				Z11 += _mm_cvtss_f32(_mm_dp_ps(p3, q3, 0xf1));
+				Z11 += ell[0] * ex[0] + ell[1] * ex[1] + ell[2] * ex[2] + ell[3] * ex[3] + ell[4] * ex[4] +
+					   ell[5] * ex[5] + ell[6] * ex[6] + ell[7] * ex[7] + ell[8] * ex[8] + ell[9] * ex[9] +
+					   ell[10] * ex[10] + ell[11] * ex[11];
 
 				ell += 12;
 				ex += 12;
@@ -493,53 +460,49 @@ namespace hdt
 		for (i = 0; i <= n - 4; i += 4) {
 			/* compute all 4 x 1 block of X, from rows i..i+4-1 */
 			/* set the Z matrix to 0 */
-			__m128 Z = _mm_setzero_ps();
+			Z11 = 0;
+			Z21 = 0;
+			Z31 = 0;
+			Z41 = 0;
 			ell = L - i;
 			ex = B;
 
 			ell -= 3;
 			/* the inner loop that computes outer products and adds them to Z */
 			for (j = i - 4; j >= 0; j -= 4, ex -= 4) {
-				__m128 q0 = _mm_loadu_ps(ex - 3);
-				__m128 p0 = _mm_loadu_ps(ell);
-				__m128 q = setAll3(q0);
-				p0 = _mm_mul_ps(p0, q);
-				Z = _mm_add_ps(Z, p0);
+				/* Each group of 4 ex values broadcast against 4 rows of L^T */
+				Z41 += ell[0] * ex[0];
+				Z31 += ell[1] * ex[0];
+				Z21 += ell[2] * ex[0];
+				Z11 += ell[3] * ex[0];
 				ell += lskip1;
-
-				p0 = _mm_loadu_ps(ell);
-				q = setAll2(q0);
-				p0 = _mm_mul_ps(p0, q);
-				Z = _mm_add_ps(Z, p0);
+				Z41 += ell[0] * ex[-1];
+				Z31 += ell[1] * ex[-1];
+				Z21 += ell[2] * ex[-1];
+				Z11 += ell[3] * ex[-1];
 				ell += lskip1;
-
-				p0 = _mm_loadu_ps(ell);
-				q = setAll1(q0);
-				p0 = _mm_mul_ps(p0, q);
-				Z = _mm_add_ps(Z, p0);
+				Z41 += ell[0] * ex[-2];
+				Z31 += ell[1] * ex[-2];
+				Z21 += ell[2] * ex[-2];
+				Z11 += ell[3] * ex[-2];
 				ell += lskip1;
-
-				p0 = _mm_loadu_ps(ell);
-				q = setAll0(q0);
-				p0 = _mm_mul_ps(p0, q);
-				Z = _mm_add_ps(Z, p0);
+				Z41 += ell[0] * ex[-3];
+				Z31 += ell[1] * ex[-3];
+				Z21 += ell[2] * ex[-3];
+				Z11 += ell[3] * ex[-3];
 				ell += lskip1;
 				/* end of inner loop */
 			}
 			/* compute left-over iterations */
 			j += 4;
 			for (; j > 0; j--, ell += lskip1, --ex) {
-				__m128 p = _mm_loadu_ps(ell);
-				__m128 q = setAll(*ex);
-				p = _mm_mul_ps(p, q);
-				Z = _mm_add_ps(Z, p);
+				Z41 += ell[0] * ex[0];
+				Z31 += ell[1] * ex[0];
+				Z21 += ell[2] * ex[0];
+				Z11 += ell[3] * ex[0];
 			}
 			/* finish computing the X(i) block */
 			ell += 3;
-			Z11 = _mm_cvtss_f32(pshufd<3>(Z));
-			Z21 = _mm_cvtss_f32(pshufd<2>(Z));
-			Z31 = _mm_cvtss_f32(pshufd<1>(Z));
-			Z41 = _mm_cvtss_f32(Z);
 
 			Z11 = ex[0] - Z11;
 			ex[0] = Z11;

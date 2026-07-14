@@ -17,7 +17,7 @@ This is a Visual Studio 2019+ solution (`hdtSMP64.sln`). The project requires:
 
 ### Build Configurations
 
-Configuration names follow the pattern: `{VERSION}_{CUDA}_{AVX}[_DEBUG]`
+Configuration names follow the pattern: `{VERSION}_{CUDA}`
 
 **Game Versions:**
 - `SE` - Skyrim SE (v1.5.97)
@@ -31,19 +31,17 @@ Configuration names follow the pattern: `{VERSION}_{CUDA}_{AVX}[_DEBUG]`
 - `CUDA` - GPU collision detection enabled (requires NVIDIA GPU with compute capability 5.0+)
 - `NOCUDA` - CPU-only collision
 
-**AVX Options:**
-- `NoAVX` - Maximum compatibility
-- `AVX` - Requires AVX support
-- `AVX2` - Requires AVX2 support
-- `AVX512` - Requires AVX512 support
+**SIMD:** Highway SIMD provides automatic runtime dispatch (SSE4 → AVX2 → AVX512).
+No separate build variants needed — one binary supports all CPUs.
 
-Example: `V1_6_659_CUDA_AVX2` builds for AE 1.6.659 with CUDA and AVX2 optimizations.
+Example: `V1_6_659_CUDA` builds for AE 1.6.659 with CUDA.
+Highway SIMD handles per-CPU dispatch at runtime — no SIMD suffix needed.
 
 ### Building
 
 1. Set up dependencies (Detours, Bullet, SKSE source) per README.md
 2. Open `hdtSMP64.sln` in Visual Studio
-3. Select appropriate configuration (e.g., `SE_NOCUDA_AVX|x64`)
+3. Select appropriate configuration (e.g., `SE_NOCUDA|x64`)
 4. Build Solution
 
 Output is a `.dll` file that goes in Skyrim's `Data/SKSE/Plugins/` directory.
@@ -51,15 +49,15 @@ Output is a `.dll` file that goes in Skyrim's `Data/SKSE/Plugins/` directory.
 ### Command Line Build (PowerShell)
 
 ```powershell
-# Build specific configuration (e.g., V1_6_1170_NOCUDA_AVX2)
-& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA_AVX2' '-p:Platform=x64' '-v:m'
+# Build specific configuration (e.g., V1_6_1170_NOCUDA)
+& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA' '-p:Platform=x64' '-v:m'
 ```
 
 ### Command Line Build (Git Bash)
 
 ```bash
 # Build specific configuration
-powershell.exe -NoProfile -Command "& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA_AVX2' '-p:Platform=x64' '-v:m'"
+powershell.exe -NoProfile -Command "& 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe' 'hdtSMP64.sln' '-p:Configuration=V1_6_1170_NOCUDA' '-p:Platform=x64' '-v:m'"
 ```
 
 ## Architecture

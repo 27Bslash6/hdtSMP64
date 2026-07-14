@@ -63,7 +63,7 @@ jobs:
 
   # Build matrix for different configurations
   build:
-    name: Build ${{ matrix.version }}_${{ matrix.cuda }}_${{ matrix.avx }}
+    name: Build ${{ matrix.version }}_${{ matrix.cuda }}
     runs-on: windows-latest
     needs: test  # Only build if tests pass
 
@@ -74,10 +74,6 @@ jobs:
           # Anniversary Edition 1.6.1170 (primary target)
           - version: V1_6_1170
             cuda: NOCUDA
-            avx: NoAVX
-          - version: V1_6_1170
-            cuda: NOCUDA
-            avx: AVX2
 
     steps:
       - uses: actions/checkout@v4
@@ -244,23 +240,23 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            x64/${{ matrix.version }}_${{ matrix.cuda }}_${{ matrix.avx }}
-          key: build-${{ matrix.version }}-${{ matrix.cuda }}-${{ matrix.avx }}-${{ hashFiles('hdtSMP64/**/*.cpp', 'hdtSMP64/**/*.h') }}
+            x64/${{ matrix.version }}_${{ matrix.cuda }}
+          key: build-${{ matrix.version }}-${{ matrix.cuda }}-${{ hashFiles('hdtSMP64/**/*.cpp', 'hdtSMP64/**/*.h') }}
           restore-keys: |
-            build-${{ matrix.version }}-${{ matrix.cuda }}-${{ matrix.avx }}-
+            build-${{ matrix.version }}-${{ matrix.cuda }}-
 
       - name: Build
         run: |
-          msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Configuration=${{ matrix.version }}_${{ matrix.cuda }}_${{ matrix.avx }} /p:Platform=x64 /m
+          msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Configuration=${{ matrix.version }}_${{ matrix.cuda }} /p:Platform=x64 /m
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: hdtSMP64-${{ matrix.version }}-${{ matrix.cuda }}-${{ matrix.avx }}
+          name: hdtSMP64-${{ matrix.version }}-${{ matrix.cuda }}
           path: |
-            x64/${{ matrix.version }}_${{ matrix.cuda }}_${{ matrix.avx }}/hdtSMP64.dll
-            x64/${{ matrix.version }}_${{ matrix.cuda }}_${{ matrix.avx }}/hdtSMP64.pdb
+            x64/${{ matrix.version }}_${{ matrix.cuda }}/hdtSMP64.dll
+            x64/${{ matrix.version }}_${{ matrix.cuda }}/hdtSMP64.pdb
 
   # Static analysis (runs on Ubuntu where cppcheck is properly packaged)
   analyze:

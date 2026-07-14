@@ -14,9 +14,9 @@ namespace hdt
 		if ((cpuFeatures & btCpuFeatureUtility::CPU_FEATURE_FMA3) && (cpuFeatures & btCpuFeatureUtility::
 			CPU_FEATURE_SSE4_1))
 		{
-			m_resolveSingleConstraintRowGeneric = GroupConstraintSolver::getResolveSingleConstraintRowGenericAVX();
+			m_resolveSingleConstraintRowGeneric = GroupConstraintSolver::getResolveSingleConstraintRowGeneric();
 			m_resolveSingleConstraintRowLowerLimit = GroupConstraintSolver::
-				getResolveSingleConstraintRowLowerLimitAVX();
+				getResolveSingleConstraintRowLowerLimit();
 		}
 	}
 

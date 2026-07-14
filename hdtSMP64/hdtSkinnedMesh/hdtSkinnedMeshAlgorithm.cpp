@@ -165,19 +165,6 @@ namespace hdt
 	};
 
 #if true
-	namespace
-	{
-		inline __m128 cross_product(__m128 const& vec0, __m128 const& vec1)
-		{
-			__m128 tmp0 = _mm_shuffle_ps(vec0, vec0, _MM_SHUFFLE(3, 0, 2, 1));
-			__m128 tmp1 = _mm_shuffle_ps(vec1, vec1, _MM_SHUFFLE(3, 1, 0, 2));
-			__m128 tmp2 = _mm_mul_ps(tmp0, vec1);
-			__m128 tmp3 = _mm_mul_ps(tmp0, tmp1);
-			__m128 tmp4 = _mm_shuffle_ps(tmp2, tmp2, _MM_SHUFFLE(3, 0, 2, 1));
-			return _mm_sub_ps(tmp3, tmp4);
-		}
-	} // namespace
-
 	template<bool SwapResults>
 	struct CollisionChecker<PerTriangleShape, SwapResults> : public CollisionCheckBase2<PerTriangleShape, SwapResults>
 	{
@@ -199,31 +186,25 @@ namespace hdt
 				penetration = 0;
 			}
 
-			// Compute unit normal. Keep the original normal because we'll need it later for the triangle
-			// check.
-			auto ab = (p1.pos() - p0.pos()).get128();
-			auto ac = (p2.pos() - p0.pos()).get128();
-			auto raw_normal = cross_product(ab, ac);
-			auto len = _mm_sqrt_ps(_mm_dp_ps(raw_normal, raw_normal, 0x77));
-			if (_mm_cvtss_f32(len) < FLT_EPSILON) {
+			// Compute unit normal. Keep raw_normal for the triangle-in-point test.
+			btVector3 ab_edge = p1.pos() - p0.pos();
+			btVector3 ac_edge = p2.pos() - p0.pos();
+			btVector3 raw_normal = ab_edge.cross(ac_edge);
+			btScalar len = raw_normal.length();
+			if (len < FLT_EPSILON) {
 				return false;
 			}
-			auto normal = _mm_div_ps(raw_normal, len);
+			btVector3 normal = raw_normal / len;
 			if (penetration < 0) {
-				normal = _mm_sub_ps(_mm_set1_ps(0.0), normal);
+				normal = -normal;
 				penetration = -penetration;
 			}
 
-			// Compute distance from point to plane // ifndef CUDA: and projection onto plane
-#ifdef CUDA
-			auto ap = _mm_sub_ps(s.pos().get128(), p0.pos().get128());
-			auto distance = _mm_dp_ps(ap, normal, 0x77);
-			float distanceFromPlane = _mm_cvtss_f32(distance);
-#else
-			auto ap = (s.pos() - p0.pos()).get128();
-			auto distance = _mm_dp_ps(ap, normal, 0x77);
-			float distanceFromPlane = _mm_cvtss_f32(distance);
-			auto projection = _mm_sub_ps(s.pos().get128(), _mm_mul_ps(normal, distance));
+			// Compute distance from sphere center to triangle plane, and (non-CUDA) projection onto plane
+			btVector3 ap = s.pos() - p0.pos();
+			btScalar distanceFromPlane = ap.dot(normal);
+#ifndef CUDA
+			btVector3 projection = s.pos() - normal * distanceFromPlane;
 #endif
 			// Decide whether point is close enough to plane
 			float radiusWithMargin = r + margin;
@@ -233,7 +214,7 @@ namespace hdt
 			else {
 				if (distanceFromPlane < 0) {
 					distanceFromPlane = -distanceFromPlane;
-					normal = _mm_sub_ps(_mm_set1_ps(0.0), normal);
+					normal = -normal;
 				}
 				isInsideContactPlane = distanceFromPlane < radiusWithMargin;
 			}
@@ -242,52 +223,34 @@ namespace hdt
 			}
 
 #ifdef CUDA
-			// Compute the triple product of the triangle normal with vectors from the sphere center to each
-			// pair of triangle vertices (note ordering of the vertices is important). The projection of the
-			// center onto the triangle plane lies within the triangle if and only if all three products are
-			// positive.
-			auto bp = _mm_sub_ps(s.pos().get128(), p1.pos().get128());
-			auto cp = _mm_sub_ps(s.pos().get128(), p2.pos().get128());
-			auto aa = cross_product(bp, cp);
-			ab = cross_product(cp, ap);
-			ac = cross_product(ap, bp);
-			aa = _mm_dp_ps(aa, raw_normal, 0x74);
-			ab = _mm_dp_ps(ab, raw_normal, 0x72);
-			ac = _mm_dp_ps(ac, raw_normal, 0x71);
-			aa = _mm_or_ps(aa, ab);
-			aa = _mm_or_ps(aa, ac);
-			aa = _mm_cmpgt_ps(_mm_set1_ps(0.0), aa);
+			// Triple-product test: projection lies inside triangle iff all three scalar triple products
+			// of (raw_normal, sphere-to-vertex pairs) are non-negative.
+			btVector3 bp = s.pos() - p1.pos();
+			btVector3 cp = s.pos() - p2.pos();
+			bool pointInTriangle = raw_normal.dot(bp.cross(cp)) >= 0 && raw_normal.dot(cp.cross(ap)) >= 0 &&
+								   raw_normal.dot(ap.cross(bp)) >= 0;
 #else
-			// Compute (twice) area of each triangle between projection and two triangle points
-			ap = _mm_sub_ps(projection, p0.pos().get128());
-			auto bp = _mm_sub_ps(projection, p1.pos().get128());
-			auto cp = _mm_sub_ps(projection, p2.pos().get128());
-			auto aa = cross_product(bp, cp);
-			ab = cross_product(cp, ap);
-			ac = cross_product(ap, bp);
-			aa = _mm_dp_ps(aa, aa, 0x74);
-			ab = _mm_dp_ps(ab, ab, 0x72);
-			ac = _mm_dp_ps(ac, ac, 0x71);
-			aa = _mm_or_ps(aa, ab);
-			aa = _mm_or_ps(aa, ac);
-			aa = _mm_sqrt_ps(aa);
-			// Now if every pair of elements in aa sums to no more than area, then the point is inside the triangle
-			aa = _mm_add_ps(aa, _mm_shuffle_ps(aa, aa, _MM_SHUFFLE(3, 0, 2, 1)));
-			aa = _mm_cmpgt_ps(aa, len);
+			// Area test: sub-triangle areas from projection to each edge pair.
+			// If projection is inside the triangle, no pair of sub-areas can exceed the total area.
+			btVector3 ap_proj = projection - p0.pos();
+			btVector3 bp_proj = projection - p1.pos();
+			btVector3 cp_proj = projection - p2.pos();
+			btScalar area_a = bp_proj.cross(cp_proj).length();
+			btScalar area_b = cp_proj.cross(ap_proj).length();
+			btScalar area_c = ap_proj.cross(bp_proj).length();
+			bool pointInTriangle = !((area_a + area_b > len) || (area_b + area_c > len) || (area_a + area_c > len));
 #endif
-			auto pointInTriangle = _mm_test_all_zeros(_mm_set_epi32(0, -1, -1, -1), _mm_castps_si128(aa));
-			// auto pointInTriangle = _mm_testz_ps(_mm_set_ps(0, -1, -1, -1), aa);
 
 			res.colliderIndexA = a - colliderBaseA;
 			res.colliderIndexB = b - colliderBaseB;
 
 			if (pointInTriangle) {
-				res.normOnB.set128(normal);
+				res.normOnB = normal;
 				res.posA = s.pos() - res.normOnB * r;
 #ifdef CUDA
 				res.posB = s.pos() - res.normOnB * (distanceFromPlane - margin);
 #else
-				res.posB.set128(projection);
+				res.posB = projection;
 #endif
 				res.depth = distanceFromPlane - radiusWithMargin;
 				return res.depth < -FLT_EPSILON;
